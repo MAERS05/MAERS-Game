@@ -1114,15 +1114,42 @@
 
     .equip-slot.filled { border-color: rgba(245, 158, 11, 0.8); border-style: solid; background: rgba(245, 158, 11, 0.15); }
     .equip-slot .slot-name { font-size: 0.72rem; color: #fbbf24; text-align: center; lineHeight: 1.2; padding: 0 4px; }
-    .equip-slot .slot-change {
+
+    /* 悬浮栏容器：更换 + 交换 */
+    .equip-slot .slot-actions {
       position: absolute; bottom: 0; left: 0; right: 0;
       height: 0; overflow: hidden;
-      background: rgba(245, 158, 11, 0.2);
-      font-size: 0.65rem; color: #fbbf24;
-      display: flex; align-items: center; justify-content: center;
+      display: flex;
       transition: height 0.2s;
     }
-    .equip-slot.filled:hover .slot-change { height: 22px; }
+    .equip-slot.filled:hover .slot-actions { height: 22px; }
+
+    .slot-btn {
+      flex: 1; border: none; cursor: pointer;
+      font-size: 0.62rem; font-family: inherit;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, color 0.15s;
+    }
+    .slot-change {
+      background: rgba(245, 158, 11, 0.2); color: #fbbf24;
+    }
+    .slot-change:hover { background: rgba(245, 158, 11, 0.45); }
+    .slot-swap {
+      background: rgba(56, 189, 248, 0.15); color: #7dd3fc;
+    }
+    .slot-swap:hover { background: rgba(56, 189, 248, 0.35); }
+
+    /* 待交换高亮 */
+    .equip-slot.swapping {
+      border-color: #38bdf8 !important;
+      background: rgba(56, 189, 248, 0.18) !important;
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.5);
+      animation: swapPulse 1s infinite;
+    }
+    @keyframes swapPulse {
+      0%, 100% { box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.5); }
+      50%       { box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.2); }
+    }
 
     /* ── 效果库弹窗 ──────────────────────────────────── */
     .effect-picker {

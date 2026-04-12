@@ -606,6 +606,7 @@ function initUI() {
 
 // 当前正在选择的槽位上下文
 let _pickCtx = null; // { action, slot }
+let _swapCtx = null; // { action, slot } — 等待与另一槽交换
 
 /** 刷新装备面板上所有槽位的显示，基于 engine 当前 equippedEffects */
 function refreshEquipSlots() {
@@ -629,18 +630,34 @@ function refreshEquipSlots() {
         nameEl.className = 'slot-name';
         nameEl.textContent = def.name;
 
-        const changeEl = document.createElement('div');
-        changeEl.className = 'slot-change';
+        const actionsEl = document.createElement('div');
+        actionsEl.className = 'slot-actions';
+
+        const changeEl = document.createElement('button');
+        changeEl.className = 'slot-change slot-btn';
         changeEl.textContent = '更换';
 
+        const swapEl = document.createElement('button');
+        swapEl.className = 'slot-swap slot-btn';
+        swapEl.textContent = '交换';
+        swapEl.dataset.action = action;
+        swapEl.dataset.slot   = idx;
+
+        actionsEl.appendChild(changeEl);
+        actionsEl.appendChild(swapEl);
         slotEl.appendChild(nameEl);
-        slotEl.appendChild(changeEl);
+        slotEl.appendChild(actionsEl);
       } else {
         const plus  = document.createElement('span');
         plus.className = 'slot-add';
         plus.textContent = '+';
         slotEl.appendChild(plus);
       }
+
+      // 标记待交换状态
+      slotEl.classList.toggle('swapping',
+        !!_swapCtx && _swapCtx.action === action && _swapCtx.slot === idx
+      );
     });
   });
 }
@@ -707,18 +724,77 @@ ui.effectPickerClose.addEventListener('click', () => {
   _pickCtx = null;
 });
 
+// 执行两个槽位的效果互换
+function swapEffects(action, slotA, slotB) {
+  const snap = engine.getSnapshot();
+  const p1   = snap.players[PlayerId.P1];
+  const slots = p1.equippedEffects?.[action] ?? [];
+  const idA = slots[slotA] ?? null;
+  const idB = slots[slotB] ?? null;
+  
+  // 先清空两边，防止引擎的唯一性同名检测导致分配失败
+  engine.assignEffect(PlayerId.P1, action, slotA, null);
+  engine.assignEffect(PlayerId.P1, action, slotB, null);
+  
+  // 再重新装配对应效果
+  engine.assignEffect(PlayerId.P1, action, slotA, idB);
+  engine.assignEffect(PlayerId.P1, action, slotB, idA);
+  
+  _swapCtx = null;
+  refreshEquipSlots();
+}
+
 // 委托所有装备槽的点击（在 equip-overlay 内）
 ui.equipOverlay.addEventListener('click', e => {
+  // ── 点击「交换」按鈕 ──
+  const swapBtn = e.target.closest('.slot-swap');
+  if (swapBtn) {
+    e.stopPropagation();
+    const action = swapBtn.dataset.action;
+    const slot   = parseInt(swapBtn.dataset.slot, 10);
+    if (_swapCtx) {
+      if (_swapCtx.action === action && _swapCtx.slot === slot) {
+        // 点同一个——取消交换模式
+        _swapCtx = null;
+        refreshEquipSlots();
+      } else if (_swapCtx.action === action) {
+        // 同行动下的另一个槽——执行交换
+        swapEffects(action, _swapCtx.slot, slot);
+      } else {
+        // 不同行动——重新选择
+        _swapCtx = { action, slot };
+        refreshEquipSlots();
+      }
+    } else {
+      _swapCtx = { action, slot };
+      refreshEquipSlots();
+    }
+    return;
+  }
+
   const slotEl = e.target.closest('.equip-slot');
   if (!slotEl) return;
-  // 如果弹窗已打开则关闭
+
+  const action = slotEl.dataset.action;
+  const slot   = parseInt(slotEl.dataset.slot, 10);
+
+  // 如果处于交换模式，点击某槽即完成交换
+  if (_swapCtx) {
+    if (_swapCtx.action === action && _swapCtx.slot !== slot) {
+      swapEffects(action, _swapCtx.slot, slot);
+    } else {
+      _swapCtx = null;
+      refreshEquipSlots();
+    }
+    return;
+  }
+
+  // 常规流程：打开效果库
   if (ui.effectPicker.classList.contains('show')) {
     ui.effectPicker.classList.remove('show');
     _pickCtx = null;
     return;
   }
-  const action = slotEl.dataset.action;
-  const slot   = parseInt(slotEl.dataset.slot, 10);
   openEffectPicker(action, slot);
 });
 
