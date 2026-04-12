@@ -1,0 +1,1684 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>博弈战斗系统 UI 演示</title>
+    <!-- 引入英文字体增强数字和标题表现力 -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            /* 现代暗黑风与毛玻璃 */
+            --bg-base: #0f1115;
+            --panel-bg: rgba(20, 24, 32, 0.75);
+            --border: rgba(255, 255, 255, 0.12);
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+
+            /* 机制颜色定义 */
+            --color-hp: #ef4444;
+            /* 红色: 生命/受击次数 */
+            --color-stamina: #0ea5e9;
+            /* 蓝青: 精力格 */
+
+            --color-atk: #fb7185;
+            /* 攻击 - 偏粉红 */
+            --color-def: #60a5fa;
+            /* 守备 - 偏蓝 */
+            --color-dod: #34d399;
+            /* 闪避 - 偏绿 */
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            /* 游戏界面防误触选择 */
+        }
+
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: var(--bg-base);
+            /* 动态渐变背景，模拟战场氛围 */
+            background-image:
+                radial-gradient(circle at 50% 30%, rgba(30, 41, 59, 0.8), var(--bg-base) 70%),
+                radial-gradient(circle at 0% 100%, rgba(239, 68, 68, 0.05), transparent 50%),
+                radial-gradient(circle at 100% 100%, rgba(14, 165, 233, 0.05), transparent 50%);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ----- 顶部 HUD：状态面板 ----- */
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            padding: 30px 50px;
+            z-index: 10;
+            position: relative;
+        }
+
+        .turn-group {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            z-index: 15;
+        }
+
+        .turn-indicator {
+            font-family: 'Cinzel', serif;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--text-muted);
+            letter-spacing: 2px;
+            pointer-events: none;
+        }
+
+        .log-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: var(--text-muted);
+            border-radius: 8px;
+            width: 34px;
+            height: 34px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 1.1rem;
+        }
+
+        .log-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: scale(1.1);
+        }
+
+        .status-card {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 16px 28px;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s;
+        }
+
+        .status-enemy {
+            flex-direction: row-reverse;
+            cursor: pointer;
+        }
+
+        /* 敌方头像悬浮特效，暗示可交互 */
+        .status-enemy:hover {
+            transform: scale(1.02);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+        }
+
+        .avatar {
+            width: 72px;
+            height: 72px;
+            background: #1e293b;
+            border-radius: 50%;
+            border: 2px solid var(--border);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.3rem; /* 缩小字号容纳3个中文字符 */
+            white-space: nowrap; /* 强制不换行 */
+            position: relative;
+        }
+
+        .status-enemy .avatar::after {
+            content: '👁️ 点击查看情报';
+            position: absolute;
+            bottom: -24px;
+            font-size: 12px;
+            white-space: nowrap;
+            color: var(--text-muted);
+            opacity: 0;
+            transition: 0.2s;
+        }
+
+        .status-enemy:hover .avatar::after {
+            opacity: 1;
+        }
+
+        .agile-buff {
+            position: absolute;
+            bottom: 4px;
+            left: 12px;
+            font-size: 1.2rem;
+            cursor: help;
+            filter: drop-shadow(0 0 5px rgba(20, 184, 166, 0.6));
+        }
+
+        .status-enemy .agile-buff {
+            left: auto;
+            right: 12px;
+        }
+
+        .insight-btn {
+            position: absolute;
+            top: 6px;
+            left: 8px;
+            padding: 2px 6px;
+            border-radius: 8px;
+            background: rgba(14, 165, 233, 0.2);
+            border: 1px solid rgba(14, 165, 233, 0.5);
+            color: var(--color-stamina);
+            font-size: 0.65rem;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            z-index: 5;
+            letter-spacing: 1px;
+        }
+
+        .insight-btn:hover:not(:disabled) {
+            background: rgba(14, 165, 233, 0.35);
+        }
+
+        .insight-btn:disabled {
+            filter: grayscale(1);
+            opacity: 0.3;
+            cursor: not-allowed;
+            transform: scale(1);
+        }
+
+        .insight-tooltip {
+            position: absolute;
+            top: -30px;
+            left: 8px;
+            background: rgba(0, 0, 0, 0.85);
+            border: 1px solid rgba(14, 165, 233, 0.5);
+            color: #fff;
+            font-size: 0.8rem;
+            padding: 4px 10px;
+            border-radius: 6px;
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 10;
+        }
+
+        .insight-active .insight-tooltip {
+            opacity: 1;
+        }
+
+        .stats-col {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .status-enemy .stats-col {
+            align-items: flex-end;
+        }
+
+        .stat-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            width: 70px;
+        }
+
+        /* 生命值(受击次数) 具象化: 红色菱形 */
+        .hp-pip {
+            width: 14px;
+            height: 14px;
+            background: var(--color-hp);
+            transform: rotate(45deg);
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+            transition: all 0.3s;
+        }
+
+        .hp-pip.lost {
+            background: #334155;
+            box-shadow: none;
+            opacity: 0.5;
+        }
+
+        /* 精力格 具象化: 蓝青色圆形 */
+        .stamina-pip {
+            width: 14px;
+            height: 14px;
+            background: var(--color-stamina);
+            border-radius: 50%;
+            box-shadow: 0 0 8px rgba(14, 165, 233, 0.6);
+            transition: all 0.3s;
+        }
+
+        .stamina-pip.spent {
+            background: #334155;
+            box-shadow: none;
+            opacity: 0.5;
+        }
+
+        /* 速度值 UI */
+        .speed-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .speed-val {
+            font-family: 'Cinzel', serif;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--color-dod);
+            min-width: 18px;
+            text-align: center;
+        }
+
+        .speed-down-btn,
+        .speed-up-btn {
+            background: rgba(52, 211, 153, 0.12);
+            border: 1px solid rgba(52, 211, 153, 0.35);
+            color: var(--color-dod);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 0.85rem;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            padding: 0;
+        }
+
+        .speed-down-btn:hover:not(:disabled),
+        .speed-up-btn:hover:not(:disabled) {
+            background: rgba(52, 211, 153, 0.28);
+            transform: scale(1.12);
+        }
+
+        .speed-down-btn:disabled,
+        .speed-up-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        /* ----- 中间：战场与提示 ----- */
+        .battle-area {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .vs-text {
+            font-family: 'Cinzel', serif;
+            font-size: 6rem;
+            color: rgba(255, 255, 255, 0.03);
+            pointer-events: none;
+            position: absolute;
+        }
+
+        /* 战斗结算日志板 */
+        .battle-log {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 20px 40px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            text-align: center;
+            backdrop-filter: blur(8px);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.5s;
+            max-width: 600px;
+            line-height: 1.6;
+        }
+
+        .battle-log.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .log-title {
+            font-size: 1.5rem;
+            color: var(--color-atk);
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        /* ----- 左侧：效果注入与精力强化 UI ----- */
+        .left-panel {
+            position: absolute;
+            left: -430px;
+            /* 默认隐藏在屏幕外 */
+            top: 50%;
+            transform: translateY(-50%);
+            width: 400px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-left: none;
+            border-radius: 0 24px 24px 0;
+            padding: 30px;
+            transition: left 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 10px 0 30px rgba(0, 0, 0, 0.3);
+            z-index: 20;
+        }
+
+        .left-panel.active {
+            left: 0;
+        }
+
+        .panel-title {
+            font-size: 1.1rem;
+            font-weight: 500;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-curr-act {
+            color: var(--text-main);
+            font-weight: bold;
+        }
+
+        /* 精力强化按钮容器 */
+        .enhance-wrapper {
+            width: 100%;
+            padding: 8px 14px;
+            background: rgba(14, 165, 233, 0.1);
+            border: 1px solid var(--color-stamina);
+            border-radius: 10px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+        }
+
+        .enhance-wrapper.active {
+            background: var(--color-stamina);
+            box-shadow: 0 0 15px rgba(14, 165, 233, 0.5);
+        }
+
+        .enhance-sub-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: none;
+            background: rgba(14, 165, 233, 0.2);
+            color: var(--color-stamina);
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.2s;
+        }
+
+        .enhance-wrapper.active .enhance-sub-btn {
+            background: rgba(0, 0, 0, 0.15);
+            color: #000;
+        }
+
+        .enhance-sub-btn:hover:not(:disabled) {
+            transform: scale(1.1);
+            background: rgba(14, 165, 233, 0.4);
+        }
+
+        .enhance-wrapper.active .enhance-sub-btn:hover:not(:disabled) {
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .enhance-sub-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            transform: scale(1);
+        }
+
+        .enhance-center {
+            font-size: 0.95rem;
+            font-weight: bold;
+            color: var(--color-stamina);
+        }
+
+        .enhance-wrapper.active .enhance-center {
+            color: #000;
+        }
+
+        .effect-section-title {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        /* 效果词条列表 */
+        .effect-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .effect-item {
+            padding: 14px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .effect-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .effect-item.selected {
+            border-color: var(--text-main);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .effect-name {
+            font-weight: bold;
+            font-size: 0.95rem;
+        }
+
+        .effect-desc {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* ----- 底部：行动指令选择区 ----- */
+        .bottom-actions {
+            padding: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            gap: 40px;
+            background: linear-gradient(0deg, #06080a 0%, transparent 100%);
+            z-index: 10;
+        }
+
+        .act-btn-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .act-btn {
+            position: relative;
+            width: 110px;
+            height: 110px;
+            border-radius: 50%;
+            background: var(--panel-bg);
+            border: 2px solid var(--border);
+            color: var(--text-main);
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            backdrop-filter: blur(10px);
+        }
+
+        .act-pt {
+            font-family: 'Cinzel', serif;
+            font-size: 2.2rem;
+            margin-top: 4px;
+            line-height: 1;
+        }
+
+        /* 悬停与选中状态的特化变色 */
+        .act-btn.attack:hover,
+        .act-btn.attack.selected {
+            border-color: var(--color-atk);
+        }
+
+        .act-btn.guard:hover,
+        .act-btn.guard.selected {
+            border-color: var(--color-def);
+        }
+
+        .act-btn.dodge:hover,
+        .act-btn.dodge.selected {
+            border-color: var(--color-dod);
+        }
+
+        .act-btn.selected {
+            transform: translateY(-20px) scale(1.15);
+            background: rgba(30, 41, 59, 0.9);
+        }
+
+        .act-btn.selected.attack {
+            box-shadow: 0 10px 30px rgba(251, 113, 133, 0.3);
+            color: var(--color-atk);
+        }
+
+        .act-btn.selected.guard {
+            box-shadow: 0 10px 30px rgba(96, 165, 250, 0.3);
+            color: var(--color-def);
+        }
+
+        .act-btn.selected.dodge {
+            box-shadow: 0 10px 30px rgba(52, 211, 153, 0.3);
+            color: var(--color-dod);
+        }
+
+        /* ----- 确认战斗按钮 ----- */
+        .commit-wrapper {
+            position: absolute;
+            bottom: 240px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 16px;
+            z-index: 15;
+        }
+
+        .commit-btn {
+            background: #fff;
+            color: #000;
+            border: none;
+            padding: 16px 48px;
+            border-radius: 40px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
+            transition: all 0.2s;
+        }
+
+        .commit-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.6);
+        }
+
+        /* ----- 敌方情报弹出框 ----- */
+        .enemy-modal {
+            position: absolute;
+            top: 130px;
+            right: 50px;
+            background: var(--panel-bg);
+            border: 1px solid var(--color-atk);
+            border-radius: 12px;
+            padding: 20px;
+            width: 280px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-10px);
+            transition: all 0.3s;
+            z-index: 50;
+        }
+
+        .enemy-modal.show {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0);
+        }
+
+        .enemy-modal-title {
+            font-size: 0.9rem;
+            color: var(--color-atk);
+            margin-bottom: 12px;
+            font-weight: bold;
+        }
+
+        /* 战事录（历史弹窗） */
+        .history-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -40%);
+            background: rgba(10, 15, 25, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            width: 500px;
+            max-width: 90vw;
+            max-height: 75vh;
+            border-radius: 12px;
+            padding: 24px;
+            z-index: 2000;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+            backdrop-filter: blur(10px);
+        }
+
+        .history-modal.show {
+            opacity: 1;
+            transform: translate(-50%, -50%);
+            pointer-events: auto;
+        }
+
+        .history-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: var(--text-main);
+        }
+
+        .history-list {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            text-align: left;
+        }
+
+        .history-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .history-list::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+
+        .history-turnItem {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+
+        .agile-buff {
+            display: inline-block;
+            margin-left: 8px;
+            font-size: 1rem;
+            cursor: help;
+        }
+
+        /* 战斗结算期间锁定除结算框外的所有操作 */
+        body.combat-resolving .hud-top,
+        body.combat-resolving .bottom-actions,
+        body.combat-resolving .commit-wrapper,
+        body.combat-resolving .enemy-modal {
+            pointer-events: none !important;
+            opacity: 0.7;
+            /* 轻微降低透明度暗示不可用 */
+        }
+
+        /* 战事录弹窗打开期间，锁定背景（但不锁底部按钮）*/
+        body.history-open .hud-top,
+        body.history-open .bottom-actions,
+        body.history-open .enemy-modal {
+            pointer-events: none !important;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 顶部状态栏 -->
+    <header class="hud-top">
+        <!-- 玩家状态 -->
+        <div class="status-card status-player">
+            <button class="insight-btn" id="insightBtn" title="消耗 1 精力洞察敌方意图">👁︎</button>
+            <div class="insight-tooltip" id="insightTooltip"></div>
+            <div class="avatar" style="border-color: var(--color-stamina);">少女</div>
+            <div class="agile-buff" id="player-agile-buff" title="轻灵：本次交锋速度+1" style="display:none;">🍃</div>
+            <div class="stats-col">
+                <div class="stat-row">
+                    <span class="stat-label">受击次数</span>
+                    <div class="hp-pip" id="player-hp-1"></div>
+                    <div class="hp-pip" id="player-hp-2"></div>
+                    <div class="hp-pip" id="player-hp-3"></div>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">精力格</span>
+                    <div class="stamina-pip" id="player-stam-1"></div>
+                    <div class="stamina-pip" id="player-stam-2"></div>
+                    <div class="stamina-pip" id="player-stam-3"></div>
+                </div>
+                <div class="stat-row speed-row">
+                    <span class="stat-label">速度</span>
+                    <button class="speed-down-btn" id="speedDownBtn" title="降低速度恢复 1 精力">－</button>
+                    <span class="speed-val" id="player-speed-val">1</span>
+                    <button class="speed-up-btn" id="speedUpBtn" title="消耗 1 精力提升速度">＋</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 回合指示器 & 历史记录 -->
+        <div class="turn-group">
+            <button class="log-btn" id="historyLogBtn" title="查看战事录">📝</button>
+            <div class="turn-indicator" id="turnIndicator">TURN 1</div>
+        </div>
+
+        <!-- 敌方状态 -->
+        <div class="status-card status-enemy" id="enemyAvatarBtn">
+            <div class="avatar" style="border-color: var(--color-hp);">马厄斯</div>
+            <div class="agile-buff" id="enemy-agile-buff" title="轻灵：本次交锋速度+1" style="display:none;">🍃</div>
+            <div class="stats-col">
+                <div class="stat-row">
+                    <div class="hp-pip" id="enemy-hp-1"></div>
+                    <div class="hp-pip" id="enemy-hp-2"></div>
+                    <div class="hp-pip" id="enemy-hp-3"></div>
+                    <span class="stat-label" style="text-align: right;">受击次数</span>
+                </div>
+                <div class="stat-row">
+                    <div class="stamina-pip" id="enemy-stam-1"></div>
+                    <div class="stamina-pip" id="enemy-stam-2"></div>
+                    <div class="stamina-pip" id="enemy-stam-3"></div>
+                    <span class="stat-label" style="text-align: right;">精力格</span>
+                </div>
+                <div class="stat-row speed-row" style="justify-content:flex-end">
+                    <span class="speed-val" id="enemy-speed-val">1</span>
+                    <span class="stat-label" style="text-align: right;">速度</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 敌方配装弹窗 -->
+    <div class="enemy-modal" id="enemyModal">
+        <div class="enemy-modal-title" id="enemyModalTitle">📋 敌方配装档案</div>
+        <div id="enemyModalContent">
+            <div style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px 0;">
+                尚未获取任何情报。<br />第一轮交锋后，将显示敌方已暴露的配装。
+            </div>
+        </div>
+    </div>
+
+    <!-- 战事录弹窗 -->
+    <div class="history-modal" id="historyModal">
+        <div class="history-modal-header">
+            <div>📜 本局战事录</div>
+            <div style="cursor:pointer;color:var(--text-muted);" id="historyCloseBtn">✕</div>
+        </div>
+        <div class="history-list" id="historyList">
+            <div style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px 0;">尚未发生任何交锋。</div>
+        </div>
+    </div>
+
+    <!-- 中间战场 -->
+    <main class="battle-area">
+        <div class="vs-text">CLASH</div>
+        <div class="battle-log" id="battleLog" style="cursor:pointer;">
+            <div class="log-title">战斗结算</div>
+            <div id="logContent"></div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:14px;">点击结算面板关闭</div>
+        </div>
+    </main>
+
+    <!-- 右下/中间的确认按钮 -->
+    <div class="commit-wrapper" id="commitWrapper">
+        <button class="commit-btn" id="standbyBtn">待命 (恢复1点精力)</button>
+        <button class="commit-btn" id="startCombatBtn"
+            style="display:none; border-color: var(--color-atk);">开始交锋</button>
+        <button class="commit-btn" id="restartBtn" style="display:none; border-color: var(--color-dod);">重新开始局点</button>
+    </div>
+
+    <!-- 左侧UI：效果注入与强化 -->
+    <aside class="left-panel" id="leftPanel">
+        <div class="panel-title">
+            <span>行动配置</span>
+            <span class="panel-curr-act" id="panelActName">攻击</span>
+        </div>
+
+        <div class="enhance-wrapper" id="enhanceBtn">
+            <button class="enhance-sub-btn" id="enhanceDownBtn" title="撤销强化恢复 1 精力" disabled>－</button>
+            <span class="enhance-center" id="enhanceBtnLabel">✦ 消耗 1 精力强化 (+1 点数)</span>
+            <button class="enhance-sub-btn" id="enhanceUpBtn" title="消耗 1 精力强化">＋</button>
+        </div>
+
+        <div class="effect-section-title">选择注入效果 (最多可选 <span id="maxEffectNum">1</span> 个)</div>
+
+        <div class="effect-list" id="effectList">
+            <!-- 动态渲染 -->
+        </div>
+    </aside>
+
+    <!-- 底部：基础操作选择 -->
+    <footer class="bottom-actions">
+        <div class="act-btn-container">
+            <div class="act-btn dodge" onclick="selectAction('dodge', this)">
+                闪避
+                <span class="act-pt" id="pt-dodge">1</span>
+            </div>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">代表速度</span>
+        </div>
+
+        <div class="act-btn-container">
+            <div class="act-btn guard" onclick="selectAction('guard', this)">
+                守备
+                <span class="act-pt" id="pt-guard">1</span>
+            </div>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">额外抗伤次数</span>
+        </div>
+
+        <div class="act-btn-container">
+            <div class="act-btn attack" onclick="selectAction('attack', this)">
+                攻击
+                <span class="act-pt" id="pt-attack">1</span>
+            </div>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">次数与威力</span>
+        </div>
+    </footer>
+
+    <script>
+        var PLAYER_MAX_STAMINA = 3;
+        var PLAYER_MAX_HP = 3;
+        var playerStamina = PLAYER_MAX_STAMINA;
+        var playerHp = PLAYER_MAX_HP;
+        var enemyHp = PLAYER_MAX_HP;
+        var playerSpeed = 1;    // 速度独立于工能，通过消耗精力持续提升
+        var currentTurn = 1;
+        var currentAction = null;
+        var enhanceCount = 0;
+        var selectedEffects = [];
+        var hasUsedInsight = false;
+        var matchHistory = [];
+        var isGameOver = false;
+
+        // 异常状态标记（跨回合持续）
+        var playerInjured = false; // 创伤：下回合精力消耗+1
+        var playerLocked = false; // 破绽：下回合无法闪避/守备
+        var playerDepressed = false; // 低落：下回合最终点数减1
+        var playerAgile = false; // 轻灵：下回合基础速度变为2
+        var enemyInjured = false;
+        var enemyLocked = false;
+        var enemyDepressed = false;
+        var enemyAgile = false;
+
+        const uiMap = {
+            attack: { name: '攻击', defaultPt: 1 },
+            guard: { name: '守备', defaultPt: 1 },
+            dodge: { name: '闪避', defaultPt: 1 }
+        };
+
+        const effectLibrary = {
+            attack: [
+                { id: 'a1', name: '创伤', desc: '若命中对方，为其挂上伤标（下回合行动精力+1消耗）' },
+                { id: 'a2', name: '破绽', desc: '若点数比对方高2及以上，使对方下回合只能发起攻击' },
+                { id: 'a3', name: '重整', desc: '若攻击被守备化解或被闪避，且自身未受伤，整理步伐恢复1点精力' }
+            ],
+            guard: [
+                { id: 'g1', name: '反震', desc: '若完美拦截对方攻击（点数不低于对方），反弹1次受击给对方' },
+                { id: 'g2', name: '回气', desc: '若完美拦截对方攻击（点数不低于对方），恢复1点精力' },
+                { id: 'g3', name: '休整', desc: '若本回合对方未发起攻击，返还该次守备消耗的所有精力' }
+            ],
+            dodge: [
+                { id: 'd1', name: '扰乱', desc: '若闪避成功（躲开对方攻击），给对方附加一层低落（下回合最终行动点数减1）' },
+                { id: 'd2', name: '轻灵', desc: '若闪避成功（躲开对方攻击），提升1点速度' },
+                { id: 'd3', name: '迷踪', desc: '若双方皆未发起攻击，恢复自身1次受击次数' }
+            ]
+        };
+
+        const leftPanel = document.getElementById('leftPanel');
+        const panelActName = document.getElementById('panelActName');
+        const effectListEl = document.getElementById('effectList');
+        const enhanceBtn = document.getElementById('enhanceBtn');
+        const commitWrapper = document.getElementById('commitWrapper');
+        const ptDisplayMap = {
+            attack: document.getElementById('pt-attack'),
+            guard: document.getElementById('pt-guard'),
+            dodge: document.getElementById('pt-dodge')
+        };
+
+        // ---- 行动选择 ----
+        window.selectAction = function (type, el) {
+            // 取消选择逻辑
+            if (currentAction === type) {
+                currentAction = null;
+                el.classList.remove('selected');
+                leftPanel.classList.remove('active');
+                document.getElementById('startCombatBtn').style.display = 'none';
+                document.getElementById('standbyBtn').style.display = 'block';
+                enhanceCount = 0;
+                selectedEffects = [];
+                updateStaminaUI();
+                updatePointsDisplay();
+                return;
+            }
+
+            var extraCost = playerInjured ? 1 : 0;
+            // 精力不足（连基础1点+创伤惩罚 都不够）则强制只能待命，无法选择其他动作
+            if (playerStamina < (1 + extraCost)) {
+                el.style.opacity = '0.4';
+                setTimeout(function () { el.style.opacity = ''; }, 500);
+                return;
+            }
+
+            document.querySelectorAll('.act-btn').forEach(b => b.classList.remove('selected'));
+            el.classList.add('selected');
+            currentAction = type;
+            enhanceCount = 0;
+            selectedEffects = [];
+            enhanceBtn.classList.remove('active');
+            enhanceBtn.style.display = ''; // 闪避也可以强化（用于增加效果槽）
+            updateStaminaUI();
+            updatePointsDisplay();
+            updateEnhanceBtnLabel();
+            panelActName.textContent = uiMap[type].name;
+            renderEffects(type);
+            leftPanel.classList.add('active');
+
+            document.getElementById('startCombatBtn').style.display = 'block';
+            document.getElementById('standbyBtn').style.display = 'none';
+        };
+
+        function getMaxEffects() {
+            return 1 + enhanceCount;
+        }
+
+        function renderEffects(type) {
+            document.getElementById('maxEffectNum').textContent = getMaxEffects();
+            effectListEl.innerHTML = '';
+            effectLibrary[type].forEach(function (eff) {
+                var item = document.createElement('div');
+                item.className = 'effect-item' + (selectedEffects.indexOf(eff.id) > -1 ? ' selected' : '');
+                item.innerHTML = '<div class="effect-name">' + eff.name + '</div>'
+                    + '<div class="effect-desc">' + eff.desc + '</div>';
+                item.onclick = function () { toggleEffect(eff.id, item); };
+                effectListEl.appendChild(item);
+            });
+        }
+
+        function toggleEffect(id, el) {
+            var max = getMaxEffects();
+            var index = selectedEffects.indexOf(id);
+            if (index > -1) {
+                selectedEffects.splice(index, 1);
+                el.classList.remove('selected');
+            } else if (selectedEffects.length < max) {
+                selectedEffects.push(id);
+                el.classList.add('selected');
+            }
+        }
+
+        // ---- 精力强化（可多次叠加）----
+        var enhanceDownBtn = document.getElementById('enhanceDownBtn');
+        var enhanceUpBtn = document.getElementById('enhanceUpBtn');
+
+        enhanceUpBtn.onclick = function () {
+            if (!currentAction) return;
+            var extraCost = playerInjured ? 1 : 0;
+            // 基础行动已消耗 1点 + 创伤消耗，强化再消耗 enhanceCount，总计不超过 playerStamina
+            if ((1 + enhanceCount + extraCost) >= playerStamina) return;
+            enhanceCount++;
+            enhanceBtn.classList.add('active');
+            updateStaminaUI();
+            updatePointsDisplay();
+            updateEnhanceBtnLabel();
+            renderEffects(currentAction);
+        };
+
+        enhanceDownBtn.onclick = function () {
+            if (!currentAction || enhanceCount <= 0) return;
+            enhanceCount--;
+            // 若已选效果超过新上限，截断末尾
+            var newMax = 1 + enhanceCount;
+            while (selectedEffects.length > newMax) selectedEffects.pop();
+            if (enhanceCount === 0) enhanceBtn.classList.remove('active');
+            updateStaminaUI();
+            updatePointsDisplay();
+            updateEnhanceBtnLabel();
+            renderEffects(currentAction);
+        };
+
+        function updateStaminaUI() {
+            // 从左往右连续变暗：历史消耗 + 本回合预览，不拆分两端
+            var historicalLoss = PLAYER_MAX_STAMINA - playerStamina;  // 历史已扣
+            var extraCost = playerInjured ? 1 : 0;
+            var previewSpend = currentAction ? (1 + enhanceCount + extraCost) : 0;
+            var totalDark = historicalLoss + previewSpend;
+            for (var i = 1; i <= PLAYER_MAX_STAMINA; i++) {
+                var pip = document.getElementById('player-stam-' + i);
+                if (pip) pip.classList.toggle('spent', i <= totalDark);
+            }
+        }
+
+        function updateEnemyStaminaUI() {
+            var historicalLoss = PLAYER_MAX_STAMINA - enemyAiState.stamina;
+            for (var i = 1; i <= PLAYER_MAX_STAMINA; i++) {
+                var pip = document.getElementById('enemy-stam-' + i);
+                if (pip) pip.classList.toggle('spent', i <= historicalLoss);
+            }
+        }
+
+        function updateEnhanceBtnLabel() {
+            var extraCost = playerInjured ? 1 : 0;
+            // 基础已占 1点 + 附加创伤扣减，剩余可用于强化的精力
+            var canEnhance = playerStamina - (1 + extraCost) - enhanceCount;
+            var label = document.getElementById('enhanceBtnLabel');
+            var suffix = (currentAction === 'dodge') ? '效果槽' : '点数';
+            if (enhanceCount === 0) {
+                label.textContent = '✦ 消耗 1 精力强化 (+1 ' + suffix + ')';
+            } else {
+                label.textContent = '✦ 已强化 ' + enhanceCount + ' 次 (+' + enhanceCount + ' ' + suffix + ')';
+            }
+
+            if (typeof enhanceDownBtn !== 'undefined' && typeof enhanceUpBtn !== 'undefined') {
+                enhanceDownBtn.disabled = (enhanceCount <= 0);
+                enhanceUpBtn.disabled = (canEnhance <= 0);
+            }
+
+            // 无额外精力可强化时 dimmed
+            enhanceBtn.style.opacity = canEnhance <= 0 ? '0.7' : '1';
+        }
+
+        function updatePointsDisplay() {
+            Object.keys(uiMap).forEach(function (key) {
+                var pt;
+                if (key === 'dodge') {
+                    pt = playerSpeed; // 闪避点数和全局速度值同步
+                } else {
+                    pt = uiMap[key].defaultPt + (key === currentAction ? enhanceCount : 0);
+                }
+                ptDisplayMap[key].textContent = pt;
+            });
+        }
+
+        // ---- 速度提升/降级按鈕 ----
+        var speedUpBtn = document.getElementById('speedUpBtn');
+        var speedDownBtn = document.getElementById('speedDownBtn');
+
+        speedUpBtn.onclick = function () {
+            if (isGameOver) return;
+            var extraCost = playerInjured ? 1 : 0;
+            // 提速时，必须确保如果待会儿想执行动作，能付得起 (基础1点+创伤)。如果精力连最低起步价都不够了，就不能用来提速
+            if (playerStamina <= extraCost || playerSpeed >= PLAYER_MAX_SPEED) return;
+            playerStamina--;
+            playerSpeed++;
+            updateStaminaUI();
+            updateSpeedUI();
+            updatePointsDisplay(); // 刷新途避按鈕上的点数显示
+        };
+
+        speedDownBtn.onclick = function () {
+            if (playerSpeed <= 1) return; // 基础速度为1
+            playerSpeed--;
+            playerStamina++;
+            updateStaminaUI();
+            updateSpeedUI();
+            updatePointsDisplay();
+        };
+
+        function updateSpeedUI() {
+            document.getElementById('player-speed-val').textContent = playerSpeed;
+            document.getElementById('enemy-speed-val').textContent = enemyAiState.speed;
+            var extraCost = playerInjured ? 1 : 0;
+            speedUpBtn.disabled = (playerStamina <= (1 + extraCost));
+            speedDownBtn.disabled = (playerSpeed <= 1);
+            
+            document.getElementById('player-agile-buff').style.display = playerAgile ? 'block' : 'none';
+            document.getElementById('enemy-agile-buff').style.display = enemyAgile ? 'block' : 'none';
+        }
+
+        function updateHpUI() {
+            for (var i = 1; i <= PLAYER_MAX_HP; i++) {
+                var pp = document.getElementById('player-hp-' + i);
+                var ep = document.getElementById('enemy-hp-' + i);
+                if (pp) pp.classList.toggle('lost', i > playerHp);
+                if (ep) ep.classList.toggle('lost', i > enemyHp);
+            }
+        }
+
+
+        var enemyAvatarBtn = document.getElementById('enemyAvatarBtn');
+        var enemyModal = document.getElementById('enemyModal');
+        enemyAvatarBtn.onclick = function () {
+            enemyModal.classList.toggle('show');
+        };
+        // ---- 敌方 AI ----
+        var enemyAiState = { stamina: PLAYER_MAX_STAMINA, speed: 1 };
+        var currentEnemyData = null;
+
+        function actionColor(a) { return a === 'attack' ? 'var(--color-atk)' : a === 'guard' ? 'var(--color-def)' : 'var(--color-dod)'; }
+        function actionBg(a) { return a === 'attack' ? 'rgba(239,68,68,0.1)' : a === 'guard' ? 'rgba(96,165,250,0.1)' : 'rgba(52,211,153,0.1)'; }
+        function actionBorder(a) { return a === 'attack' ? 'rgba(239,68,68,0.3)' : a === 'guard' ? 'rgba(96,165,250,0.3)' : 'rgba(52,211,153,0.3)'; }
+
+        // 开局生成持久化配装：每个动作固定携带 1-2 个注入效果（全局不变）
+        var enemyLoadout = (function () {
+            var loadout = {};
+            ['attack', 'guard', 'dodge'].forEach(function (act) {
+                var pool = effectLibrary[act].slice().sort(function () { return 0.5 - Math.random(); });
+                var count = Math.random() > 0.5 ? 2 : 1;
+                loadout[act] = pool.slice(0, count);
+            });
+            return loadout;
+        }());
+
+        // 每回合在后台决定行动意图（玩家无法事先得知）
+        function prepareEnemyAction() {
+            if (enemyAiState.stamina <= 0) {
+                currentEnemyData = { action: 'standby', enhance: false, effects: [], pts: 0 };
+                return;
+            }
+
+            var actions = ['attack', 'guard', 'dodge'];
+            // 正常解绑锁状态
+            if (enemyLocked) { actions = ['attack']; enemyLocked = false; }
+
+            var chosen = actions[Math.floor(Math.random() * actions.length)];
+            var forceExecution = false;
+
+            // AI 杀意嗅觉：若玩家精力见底，且自身有精力，必定转为攻击进行斩杀！
+            if (playerStamina <= 0) {
+                chosen = 'attack';
+                forceExecution = true;
+            }
+
+            var enhance, pts, activeEffects;
+            if (chosen === 'dodge') {
+                pts = enemyAiState.speed;
+                enhance = enemyAiState.stamina > 1 && Math.random() > 0.5;
+                activeEffects = enemyLoadout['dodge'].slice(0, 1 + (enhance ? 1 : 0));
+            } else {
+                // 如果是去斩杀的，能强化必强化（确保不受低落影响导致0点）
+                enhance = (forceExecution && enemyAiState.stamina > 1) ? true : (enemyAiState.stamina > 1 && Math.random() > 0.5);
+                pts = uiMap[chosen].defaultPt + (enhance ? 1 : 0);
+                activeEffects = enemyLoadout[chosen].slice(0, 1 + (enhance ? 1 : 0));
+            }
+
+            currentEnemyData = { action: chosen, enhance: enhance, effects: activeEffects, pts: pts };
+        }
+
+        // 已暴露的行动类型 & 使用过的效果（跨回合累积）
+        var revealedActions = {};
+        var revealedEffectsMap = {};
+
+        // 每回合结束后，累积暴露敌方实际使用的动作和效果
+        function revealEnemyLoadout(usedAction) {
+            if (usedAction === 'standby') return; // 待命不暴露配装
+            var names = { attack: '攻击', guard: '守备', dodge: '闪避' };
+            revealedActions[usedAction] = true;
+
+            // 将本轮实际使用的效果合并进已暴露 Map
+            if (!revealedEffectsMap[usedAction]) revealedEffectsMap[usedAction] = {};
+            currentEnemyData.effects.forEach(function (eff) {
+                revealedEffectsMap[usedAction][eff.id] = eff;
+            });
+
+            var html = '<div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:12px;">已累积暴露的敌方配装：</div>';
+
+            ['attack', 'guard', 'dodge'].forEach(function (act) {
+                if (!revealedActions[act]) return;
+                var effs = Object.values(revealedEffectsMap[act] || {});
+                if (effs.length === 0) return;
+                var color = actionColor(act);
+                var bg = actionBg(act);
+                var border = actionBorder(act);
+                html += '<div style="margin-bottom:12px;">';
+                html += '<div style="font-size:0.8rem;font-weight:bold;color:' + color + ';margin-bottom:6px;">' + names[act] + '</div>';
+                effs.forEach(function (eff) {
+                    html += '<div class="effect-item" style="background:' + bg + ';border-color:' + border + ';padding:8px 12px;margin-bottom:6px;">'
+                        + '<div class="effect-name" style="color:' + color + ';font-size:0.85rem;">' + eff.name + '</div>'
+                        + '<div class="effect-desc" style="font-size:0.7rem;">' + eff.desc + '</div>'
+                        + '</div>';
+                });
+                html += '</div>';
+            });
+
+            document.getElementById('enemyModalContent').innerHTML = html;
+            document.getElementById('enemyModalTitle').textContent = '📋 敌方配装档案（已更新）';
+        }
+
+        prepareEnemyAction();
+
+        // ---- 洞察系统 ----
+        document.getElementById('insightBtn').onclick = function (e) {
+            e.stopPropagation();
+            if (isGameOver) return;
+            if (hasUsedInsight || playerStamina <= 0) return;
+            // 待命不展示洞察结果（敌方尚未决定下一回合行动）
+            if (!currentEnemyData || currentEnemyData.action === 'standby') {
+                this.style.opacity = '0.4';
+                setTimeout(() => this.style.opacity = '', 300);
+                return;
+            }
+            playerStamina--;
+            hasUsedInsight = true;
+            updateStaminaUI();
+
+            var actionName = currentEnemyData.action === 'standby' ? '待命' : uiMap[currentEnemyData.action].name;
+            var actionColorText = currentEnemyData.action === 'attack' ? 'var(--color-atk)' :
+                currentEnemyData.action === 'guard' ? 'var(--color-def)' : 'var(--color-dod)';
+            document.getElementById('insightTooltip').innerHTML = '敌方意图：<span style="color:' + actionColorText + ';">' + actionName + '</span>';
+            this.parentNode.classList.add('insight-active');
+            this.disabled = true;
+        };
+
+        // ---- 战斗结算 ----
+        var startCombatBtn = document.getElementById('startCombatBtn');
+        var standbyBtn = document.getElementById('standbyBtn');
+        var battleLog = document.getElementById('battleLog');
+        var logContent = document.getElementById('logContent');
+
+        function executeCombat() {
+            if (isGameOver) return;
+            var pa = currentAction || 'standby';
+            var isPlayerExhausted = (playerStamina <= 0); // 记录结算前状态用于判败
+            var isEnemyExhausted = (enemyAiState.stamina <= 0);
+
+            // 进入独立结算状态，锁定背景 UI 交互
+            document.body.classList.add('combat-resolving');
+
+            leftPanel.classList.remove('active');
+            document.getElementById('startCombatBtn').style.display = 'none';
+            document.getElementById('standbyBtn').style.display = 'block';
+            enemyModal.classList.remove('show');
+
+            // ==== 1. 应用创伤debuff（本回合额外消耗） ====
+            var extraCost = playerInjured ? 1 : 0;
+            playerInjured = false;  // 清除，新的伤标只在本回合enemy a1触发后下回合才生效
+            playerLocked = false;
+
+            if (pa !== 'standby') {
+                playerStamina -= (1 + enhanceCount + extraCost);
+                if (playerStamina < 0) playerStamina = 0;
+            }
+
+            // Bug fix: 保存并清除敌方伤标
+            var enemyExtraCost = enemyInjured ? 1 : 0;
+            enemyInjured = false;
+            var isEnemyExhausted = (enemyAiState.stamina <= 0);
+
+            // 应用轻灵Buff（仅在交锋计算中生效，不修改UI显示的base速度）
+            var currentP_Speed = playerSpeed + (playerAgile ? 1 : 0);
+            var currentE_Speed = enemyAiState.speed + (enemyAgile ? 1 : 0);
+
+            // 闪避点数取带buff的全局速度值，攻击/守备取 1+强化
+            var pPts = (pa === 'standby') ? 0 : (pa === 'dodge' ? currentP_Speed : (uiMap[pa].defaultPt + enhanceCount));
+            var pName = (pa === 'standby') ? '待命' : uiMap[pa].name;
+
+            // 如果 AI 选择了闪避并且准备投资速度，就在战斗开始时才当场结算以防提前剧透
+            if (currentEnemyData.action === 'dodge' && enemyAiState.stamina >= 1 && Math.random() > 0.6) {
+                enemyAiState.stamina--;
+                enemyAiState.speed += 1;
+                currentE_Speed += 1; // 更新当前计算用速度
+                currentEnemyData.pts = currentE_Speed;
+                updateSpeedUI();
+            }
+
+            var ea = currentEnemyData.action;
+            var ePts = currentEnemyData.pts;
+            var eName = (ea === 'standby') ? '待命' : uiMap[ea].name;
+
+            var effLog = [];
+            // 应用低落debuff
+            if (playerDepressed) {
+                if (pa !== 'standby' && pPts > 0) {
+                    pPts = Math.max(0, pPts - 1);
+                    effLog.push('由于你的【低落】状态，最终行动点数-1！');
+                }
+                playerDepressed = false;
+            }
+            if (enemyDepressed) {
+                if (ea !== 'standby' && ePts > 0) {
+                    ePts = Math.max(0, ePts - 1);
+                    effLog.push('敌方受到【低落】影响，最终行动点数-1！');
+                }
+                enemyDepressed = false;
+            }
+
+            // ==== 2. 碰撞矩阵 ====
+            var playerDamage = 0;
+            var enemyDamage = 0;
+            var perfectGuardP = false;
+            var perfectGuardE = false;
+            var dodgeSuccessP = false;
+            var dodgeSuccessE = false;
+            var noAttack = (pa !== 'attack' && ea !== 'attack');
+
+            var clashLine = '';
+
+            // Handle standby matrix
+            if (pa === 'standby' && ea === 'standby') {
+                clashLine = '🍃 双方相顾无言，各自调息。';
+            } else if (pa === 'standby') {
+                if (ea === 'attack') {
+                    if (ePts > 0) {
+                        enemyDamage = ePts;
+                        clashLine = '⚠️ 毫无防备！你在待命时全盘吃下敌方 ' + ePts + ' 次攻击命中！';
+                    } else {
+                        clashLine = '🍃 毫无防备！但敌方的攻击软弱无力（0点），未能伤到你分毫。';
+                    }
+                } else {
+                    clashLine = '🍃 敌方虽未发起攻击，但你正处于破绽百出的待命状态。';
+                }
+            } else if (ea === 'standby') {
+                if (pa === 'attack') {
+                    if (pPts > 0) {
+                        playerDamage = pPts;
+                        clashLine = '⚠️ 破绽百出！敌方待命毫无防备，被你 ' + pPts + ' 击命中！';
+                    } else {
+                        clashLine = '🍃 敌方毫无防备！只可惜你的攻击软弱无力（0点），未能造成伤害。';
+                    }
+                } else {
+                    clashLine = '🍃 敌方正陷入待命状态。';
+                }
+            } else if (pa === 'attack' && ea === 'attack') {
+                // 威力对比，胜者全命中
+                if (pPts === 0 && ePts === 0) {
+                    clashLine = '⚔️ 拼刀僵持！双方的攻击皆软弱无力（0点），互不伤害。';
+                } else if (pPts > ePts) {
+                    playerDamage = pPts;
+                    clashLine = '⚔️ 威力碾压！你以 ' + pPts + ' 对 ' + ePts + ' 的威力压制，全部 ' + pPts + ' 击命中敌方！';
+                } else if (ePts > pPts) {
+                    enemyDamage = ePts;
+                    clashLine = '⚔️ 被压制！敌方以 ' + ePts + ' 对 ' + pPts + ' 的威力超越，全部 ' + ePts + ' 击命中你！';
+                } else {
+                    clashLine = '⚔️ 拼刀僵持！双方威力相当（' + pPts + ' vs ' + ePts + '），势均力敌，互不伤害。';
+                }
+            } else if (pa === 'attack' && ea === 'guard') {
+                // 格挡消耗，溢出穿透
+                playerDamage = Math.max(0, pPts - ePts);
+                perfectGuardE = (playerDamage === 0);
+                if (playerDamage > 0) {
+                    clashLine = '💥 击穿守备！' + pPts + ' 次攻击穿越 ' + ePts + ' 层格挡，造成 ' + playerDamage + ' 次受击！';
+                } else {
+                    clashLine = '🛡️ 固若金汤！守备（' + ePts + '）完全吸收了你的 ' + pPts + ' 次攻击！';
+                }
+            } else if (pa === 'attack' && ea === 'dodge') {
+                // 攻击 vs 闪避：比带buff的速度（你的 currentP_Speed vs 敌方 ePts）
+                if (currentP_Speed > ePts) {
+                    playerDamage = pPts; // 速度胜，威力全数命中
+                    clashLine = '🎯 速度压制！你的攻击速度（' + currentP_Speed + '）超过敌方闪避（' + ePts + '），全部 ' + pPts + ' 威力命中！';
+                } else {
+                    dodgeSuccessE = true;
+                    clashLine = '💨 身法如风！敌方闪避速度（' + ePts + '）不低于你的攻击速度（' + currentP_Speed + '），完全閃开！';
+                }
+            } else if (ea === 'attack' && pa === 'guard') {
+                // 敌攻击 vs 玩家守备，溢出穿透
+                enemyDamage = Math.max(0, ePts - pPts);
+                perfectGuardP = (enemyDamage === 0);
+                if (enemyDamage > 0) {
+                    clashLine = '🔴 防线崩溃！敌方 ' + ePts + ' 次攻击穿越 ' + pPts + ' 层守备，造成 ' + enemyDamage + ' 次受击！';
+                } else {
+                    clashLine = '🛡️ 完美格挡！守备（' + pPts + '）完全吸收了敌方 ' + ePts + ' 次攻击！';
+                }
+            } else if (ea === 'attack' && pa === 'dodge') {
+                // 敌攻击 vs 玩家闪避：比带buff的速度（敌方 currentE_Speed vs 你的 pPts）
+                if (currentE_Speed > pPts) {
+                    enemyDamage = ePts; // 敌方威力全数命中
+                    clashLine = '🔴 速度不及！敌方攻击速度（' + currentE_Speed + '）超过你的闪避（' + pPts + '），全部 ' + ePts + ' 威力命中！';
+                } else {
+                    dodgeSuccessP = true;
+                    clashLine = '✨ 千钧一发！你的闪避速度（' + pPts + '）不低于敌方攻击速度（' + currentE_Speed + '），完全闪开！';
+                }
+            } else {
+                clashLine = '🤝 双方都在蓄势，未发生攻击碰撞。';
+            }
+
+            // 布尔标记（用于效果系统）
+            var playerHit = playerDamage > 0;
+            var enemyHit = enemyDamage > 0;
+
+            // ==== 3. 应用伤害 ====
+            if (playerDamage > 0) enemyHp = Math.max(0, enemyHp - playerDamage);
+            if (enemyDamage > 0) playerHp = Math.max(0, playerHp - enemyDamage);
+
+            // ==== 4. 结算玩家注入效果 ====
+            selectedEffects.forEach(function (id) {
+                switch (id) {
+                    case 'a1': // 创伤：命中 → 敌下回合精力消耗+1
+                        if (playerHit) { enemyInjured = true; effLog.push('【创伤】触发：敌方下回合额外消耗1精力。'); }
+                        break;
+                    case 'a2': // 破绽：点数高出2+ → 敌下回合锁定
+                        if (pPts - ePts >= 2) { enemyLocked = true; effLog.push('【破绽】触发：敌方下回合无法使用闪避和守备！'); }
+                        break;
+                    case 'a3': // 重整：攻击被守备化解或被闪避，且自身未受伤 → 恢复1精力
+                        if ((perfectGuardE || dodgeSuccessE) && !enemyHit) { playerStamina = Math.min(playerStamina + 1, PLAYER_MAX_STAMINA); effLog.push('【重整】触发：攻击被化解且自身未受伤，整理步伐恢复1点精力。'); }
+                        break;
+                    case 'g1': // 反震：完美守备 → 反弹1受击
+                        if (perfectGuardP) { enemyHp = Math.max(0, enemyHp - 1); effLog.push('【反震】触发：完美守备，反弹1次受击给敌方！'); }
+                        break;
+                    case 'g2': // 回气：完美守备 → 恢复1精力
+                        if (perfectGuardP) { playerStamina = Math.min(playerStamina + 1, PLAYER_MAX_STAMINA); effLog.push('【回气】触发：成功守备，恢复1点精力。'); }
+                        break;
+                    case 'g3': // 休整：未受到攻击 → 返还守备消耗
+                        if (ea !== 'attack') { playerStamina = Math.min(playerStamina + 1 + enhanceCount, PLAYER_MAX_STAMINA); effLog.push('【休整】触发：未受到攻击，返还全部守备消耗的精力。'); }
+                        break;
+                    case 'd1': // 扰乱：闪避成功 → 附加低落
+                        if (dodgeSuccessP) { enemyDepressed = true; effLog.push('【扰乱】触发：闪避成功，给敌方附加一层低落（下回合最终点数减1）！'); }
+                        break;
+                    case 'd2': // 轻灵：闪避成功 → 下回合提升1点速度
+                        if (dodgeSuccessP) {
+                            playerAgile = true;
+                            effLog.push('【轻灵】触发：闪避成功，你下回合的基础速度将提升1点！');
+                        }
+                        break;
+                    case 'd3': // 迷踪：若双方均未攻击 → 恢复1次受击
+                        if (noAttack) { playerHp = Math.min(playerHp + 1, PLAYER_MAX_HP); effLog.push('【迷踪】触发：双方均未发起攻击，恢复1次受击次数。'); }
+                        break;
+                }
+            });
+
+            // ==== 5. 先扣除敌方基础精力（先付出，再结算回收效果） ====
+            // 使用回合初保存的 enemyExtraCost（避免本回合玩家a1设置后同回合就触发）
+            enemyAiState.stamina = Math.max(0, enemyAiState.stamina - enemyExtraCost);
+            // 敌方本回合基础行动消耗
+            enemyAiState.stamina -= (1 + (currentEnemyData.enhance ? 1 : 0));
+            if (enemyAiState.stamina < 0) enemyAiState.stamina = 0;
+
+            // ==== 6. 结算敌方注入效果（此时精力已扣，恢复是真正的净收益） ====
+            currentEnemyData.effects.forEach(function (eff) {
+                switch (eff.id) {
+                    case 'a1': if (enemyHit) { playerInjured = true; effLog.push('【敌·创伤】触发：你下回合额外消耗1精力！'); } break;
+                    case 'a2': if (ePts - pPts >= 2) { playerLocked = true; effLog.push('【敌·破绽】触发：你下回合无法使用闪避和守备！'); } break;
+                    case 'a3': if (perfectGuardP) { enemyAiState.stamina = Math.min(enemyAiState.stamina + 1, PLAYER_MAX_STAMINA); effLog.push('【敌·重整】触发：敌方攻击被你守备化解，返还1点精力。'); } break;
+                    case 'g1': if (perfectGuardE) { playerHp = Math.max(0, playerHp - 1); effLog.push('【敌·反震】触发：敌方完美守备，反弹1次受击给你！'); } break;
+                    case 'g2': if (perfectGuardE) { enemyAiState.stamina = Math.min(enemyAiState.stamina + 1, PLAYER_MAX_STAMINA); effLog.push('【敌·回气】触发：敌方守备成功，恢复1点精力。'); } break;
+                    case 'g3': if (pa !== 'attack') { enemyAiState.stamina = Math.min(enemyAiState.stamina + currentEnemyData.pts, PLAYER_MAX_STAMINA); effLog.push('【敌·休整】触发：敌方未受攻击，返还全部守备消耗的精力。'); } break;
+                    case 'd1': if (dodgeSuccessE) { playerDepressed = true; effLog.push('【敌·扰乱】触发：敌方闪避成功，为你附加一层低落（下回合最终点数减1）！'); } break;
+                    case 'd2': if (dodgeSuccessE) { enemyAgile = true; effLog.push('【敌·轻灵】触发：敌方闪避成功，敌方下回合的基础速度将提升1点！'); } break;
+                    case 'd3': if (noAttack) { enemyHp = Math.min(enemyHp + 1, PLAYER_MAX_HP); effLog.push('【敌·迷踪】触发：敌方恢复1次受击次数。'); } break;
+                }
+            });
+
+            // ==== 8. 拼装战报 ====
+            var eEffStr = currentEnemyData.effects.map(function (e) { return '【' + e.name + '】'; }).join('、');
+            var actionColor = function (act) {
+                if (act === 'attack') return 'var(--color-atk)';
+                if (act === 'guard') return 'var(--color-def)';
+                if (act === 'dodge') return 'var(--color-dod)';
+                return 'var(--color-stamina)';
+            };
+
+            var html = '你释放了<span style="color:' + actionColor(pa) + ';">【' + pName + (pa !== 'standby' ? ' ' + pPts + '点' : ' 0点') + '】</span>。<br/>'
+                + '敌方释放了<span style="color:' + actionColor(ea) + ';">【' + eName + (ea !== 'standby' ? ' ' + ePts + '点' : ' 0点') + '】</span>'
+                + (eEffStr ? '（注入了：' + eEffStr + '）' : '') + '。<br/><br/>'
+                + clashLine;
+
+            if (effLog.length > 0) {
+                html += '<br/><br/><div style="font-size:0.82rem;color:#a5f3fc;border-top:1px solid rgba(255,255,255,0.1);margin-top:8px;padding-top:8px;text-align:left;">'
+                    + '✨ 效果结算：<br/>'
+                    + effLog.map(function (s) { return '· ' + s; }).join('<br/>')
+                    + '</div>';
+            }
+            if (extraCost > 0) {
+                html += '<br/><span style="font-size:0.8rem;color:#fca5a5;">（创伤debuff：本回合额外消耗了1点精力）</span>';
+            }
+
+            // --- 记录到战事录 ---
+            var recordHtml = '<div class="history-turnTitle">TURN ' + currentTurn + '</div>'
+                + '双方行动：你 <span style="color:' + actionColor(pa) + ';">' + pName + ' ' + pPts + '</span> vs 敌 <span style="color:' + actionColor(ea) + ';">' + eName + ' ' + ePts + '</span><br/>'
+                + '<div style="color:var(--text-muted); margin-top:4px;">' + clashLine + '</div>';
+            if (effLog.length > 0) {
+                recordHtml += '<div style="color:#a5f3fc;margin-top:4px;font-size:0.8rem;">' + effLog.join(' ') + '</div>';
+            }
+            matchHistory.push(recordHtml);
+            updateHistoryUI();
+
+            logContent.innerHTML = html;
+            battleLog.classList.add('show');
+
+            // ==== 待命状态恢复精力（回合末结算） ====
+            if (pa === 'standby') {
+                playerStamina = Math.min(playerStamina + 1, PLAYER_MAX_STAMINA);
+            }
+            if (ea === 'standby') {
+                enemyAiState.stamina = Math.min(enemyAiState.stamina + 1, PLAYER_MAX_STAMINA);
+            }
+
+            // ==== 9. 先重置回合状态，再更新 UI（避免 previewSpend 重复叠加）====
+            enhanceCount = 0;
+            selectedEffects = [];
+            currentAction = null;
+            document.querySelectorAll('.act-btn').forEach(function (b) { b.classList.remove('selected'); });
+            updateEnhanceBtnLabel();
+            enhanceBtn.classList.remove('active');
+            enhanceBtn.style.display = ''; // 恢复强化按鈕显示（下回合可能选其他行动）
+
+            // 回合结束，双方基础速度完全归1（轻灵不再侵入基础速度变量）
+            playerSpeed = 1;
+            enemyAiState.speed = 1;
+            
+            // 清除加速buff（该buff在回合显示并在结算时消耗）
+            playerAgile = false;
+            enemyAgile = false;
+
+            // 回合数增加
+            currentTurn++;
+            document.getElementById('turnIndicator').innerText = 'TURN ' + currentTurn;
+
+            // 重置洞察状态
+            hasUsedInsight = false;
+            var insBtn = document.getElementById('insightBtn');
+            var insTooltip = document.getElementById('insightTooltip');
+            if (insBtn && insTooltip) {
+                insBtn.disabled = false;
+                insTooltip.innerHTML = '';
+                insBtn.parentNode.classList.remove('insight-active');
+            }
+
+            // ==== 10. 检查胜负条件（并硬性归零展示死亡状态） ====
+            var gameOverMsg = '';
+            if (playerHp <= 0 && enemyHp <= 0) gameOverMsg = "【平局】双方同时倒下！";
+            else if (playerHp <= 0) gameOverMsg = "【败北】你的受击次数已空，被击倒在地！";
+            else if (enemyHp <= 0) gameOverMsg = "【胜利】敌方受击次数清零，你赢得了胜利！";
+            else if (isPlayerExhausted && ea === 'attack' && ePts > 0) {
+                gameOverMsg = "【败北】力竭时遭遇致命攻击，被敌人彻底斩杀！";
+                playerHp = 0;
+                playerStamina = 0;
+            }
+            else if (isEnemyExhausted && pa === 'attack' && pPts > 0) {
+                gameOverMsg = "【胜利】敌方彻底力竭，被你一招致命斩杀！";
+                enemyHp = 0;
+                enemyAiState.stamina = 0;
+            }
+
+            updateHpUI();
+            updateStaminaUI();
+            updateEnemyStaminaUI();
+            updateSpeedUI();
+            updatePointsDisplay();
+            revealEnemyLoadout(ea);
+
+            if (gameOverMsg) {
+                html += '<div style="margin-top:20px;padding-top:15px;border-top:2px solid var(--color-atk);">';
+                html += '<div style="font-size:1.2rem;font-weight:bold;color:var(--color-atk);">' + gameOverMsg + '</div>';
+                html += '<div style="font-size:0.8rem;color:var(--text-muted);margin-top:8px;">点击结算面板重新开始</div>';
+                html += '</div>';
+                logContent.innerHTML = html;
+            }
+
+            if (!gameOverMsg) {
+                prepareEnemyAction();
+            }
+
+            // 仅对结算面板本身开放点击判定
+            setTimeout(function () {
+                battleLog.onclick = function () {
+                    battleLog.classList.remove('show');
+                    document.body.classList.remove('combat-resolving');
+                    battleLog.onclick = null;
+                    if (gameOverMsg) {
+                        // 游戏结束：不直接重开，显示重开按钮，保留战报可查
+                        isGameOver = true;
+                        document.getElementById('startCombatBtn').style.display = 'none';
+                        document.getElementById('standbyBtn').style.display = 'none';
+                        document.getElementById('restartBtn').style.display = 'block';
+                    }
+                };
+            }, 100);
+        } // executeCombat ends
+
+        function updateHistoryUI() {
+            var hl = document.getElementById('historyList');
+            if (matchHistory.length === 0) {
+                hl.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px 0;">尚未发生任何交锋。</div>';
+                return;
+            }
+            hl.innerHTML = '';
+            matchHistory.forEach(function (rec) {
+                var d = document.createElement('div');
+                d.className = 'history-turnItem';
+                d.innerHTML = rec;
+                hl.appendChild(d);
+            });
+            hl.scrollTop = hl.scrollHeight;
+        }
+
+        document.getElementById('historyLogBtn').onclick = function () {
+            document.getElementById('historyModal').classList.add('show');
+            document.body.classList.add('history-open');
+        };
+
+        document.getElementById('historyCloseBtn').onclick = function () {
+            document.getElementById('historyModal').classList.remove('show');
+            document.body.classList.remove('history-open');
+        };
+
+        document.getElementById('restartBtn').onclick = function () {
+            location.reload();
+        };
+
+        startCombatBtn.onclick = executeCombat;
+        standbyBtn.onclick = executeCombat;
+    </script>
+</body>
+
+</html>
