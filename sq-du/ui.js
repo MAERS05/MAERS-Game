@@ -261,8 +261,10 @@ function resetForNewTurn() {
   const p1 = snap.players[PlayerId.P1];
   refreshPoints(p1.stamina, p1.speed);
   
+  // 新回合开始：insightUsed 必然被引擎重置为 false，
+  // 此处只需判断精力是否足够（避免在 _beginTurn 还未执行时读到旧 insightUsed）
   const projStam = getProjectedStamina(p1);
-  ui.insightBtn.disabled = p1.insightUsed || projStam < 1;
+  ui.insightBtn.disabled = projStam < 1;
 }
 
 // ═══════════════════════════════════════════════════════

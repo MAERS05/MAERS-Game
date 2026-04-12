@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file engine.js
  * @description 博弈战斗系统 — 战斗引擎（状态机 + 事件总线）
  *
@@ -162,6 +162,8 @@ export class BattleEngine {
 
     // AI 就绪句柄（PVE 模式下持有，用于取消）
     this._aiHandle = null;
+    // AI 历史属性快照（只记原始数値，不记情形名称）
+    this._aiHistory = [];
   }
 
   // ═══════════════════════════════════════════
@@ -312,7 +314,9 @@ export class BattleEngine {
     caster.stamina--;
     caster.insightUsed        = true;
     caster.pendingInsightTarget = targetId; // 标记目标，待其就绪时才揭示
-    target.wasInsighted       = true;
+    // 注意：不设置 target.wasInsighted。
+    // wasInsighted 仅由被动洞察（_onPhaseShift，即时限超 30s）写入，
+    // 是重新决策资格的判定依据；主动洞察不影响此标志。
 
     // 只通知 UI “洞察已发起”，不附带真实行动（尚未就绪）
     this._bus.emit(EngineEvent.ACTIVE_INSIGHT, {
@@ -377,9 +381,10 @@ export class BattleEngine {
       this._aiHandle = null;
     }
 
-    this._state = EngineState.IDLE;
-    this._turn  = 0;
-    this._players = {
+    this._state     = EngineState.IDLE;
+    this._turn      = 0;
+    this._aiHistory = []; // 清空历史：新局 AI 不携带上局记忆
+    this._players   = {
       [PlayerId.P1]: createPlayerState(PlayerId.P1),
       [PlayerId.P2]: createPlayerState(PlayerId.P2),
     };
@@ -611,6 +616,17 @@ export class BattleEngine {
     // 回合末速度归1（加速为临时性的）
     p1.speed = DefaultStats.BASE_SPEED;
     p2.speed = DefaultStats.BASE_SPEED;
+
+    // PVE 模式：记录 P1（玩家）本回合的属性快照，供下回合 AI 分析
+    if (this._mode === EngineMode.PVE && result.p1Action) {
+      this._aiHistory.push({
+        opponentAction:  result.p1Action.action,
+        opponentSpeed:   result.p1Action.speed   ?? DefaultStats.BASE_SPEED,
+        opponentEnhance: result.p1Action.enhance  ?? 0,
+        opponentStamina: result.newState.p1.stamina,
+      });
+      if (this._aiHistory.length > 5) this._aiHistory.shift();
+    }
   }
 
   /**
@@ -659,6 +675,7 @@ export class BattleEngine {
         ai:     { ...this._players[PlayerId.P2] },
         player: { ...this._players[PlayerId.P1] },
       }),
+      getHistory:   () => [...this._aiHistory],
       submitAction: (id, dec) => this.submitAction(id, dec),
       setReady:     (id)      => this.setReady(id),
     });
@@ -715,3 +732,5 @@ export class BattleEngine {
     return 1 + (ctx.enhance || 0);
   }
 }
+
+
