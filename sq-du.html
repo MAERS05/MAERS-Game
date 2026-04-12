@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>博弈战斗系统 UI 演示</title>
+  <link href="font/base/fonts.css" rel="stylesheet">
+  <style>
+    /* ─── CSS 变量 ────────────────────────────────── */
+    :root {
+      --bg-base:        #050505;
+      --panel-bg:       rgba(10, 10, 12, 0.85);
+      --border:         rgba(60, 65, 75, 0.6);
+      --text-main:      #e2e8f0;
+      --text-muted:     #64748b;
+
+      --color-hp:       #b91c1c;
+      --color-stamina:  #38bdf8;
+      --color-atk:      #f59e0b;
+      --color-def:      #64748b;
+      --color-dod:      #14b8a6;
+      --color-insight:  #a78bfa;
+
+      --timer-decision: #38bdf8;
+      --timer-insight:  #ef4444;
+
+      /* SVG 倒计时环参数 */
+      --ring-r:          36;
+      --ring-circ:       226.2; /* 2π×36 ≈ 226.2 */
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+
+    body {
+      font-family: 'Noto Sans SC', sans-serif;
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+      z-index: 0;
+    }
+
+    /* 背景：模糊底层 + 清晰原图 */
+    body::before {
+      content: '';
+      position: absolute;
+      top: -5%; left: -5%; width: 110%; height: 110%;
+      background-image: url('ui/sq-du/background/combat-bg.jpg');
+      background-size: cover;
+      background-position: center;
+      filter: blur(25px) brightness(0.6);
+      z-index: -2;
+      pointer-events: none;
+    }
+    body::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background-image: url('ui/sq-du/background/combat-bg.jpg');
+      background-size: contain;
+      background-position: center;
+      background-repeat: no-repeat;
+      z-index: -1;
+      pointer-events: none;
+      box-shadow: inset 0 0 150px rgba(0,0,0,1);
+    }
+
+    /* ─── HUD 顶部 ───────────────────────────────── */
+    .hud-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 24px 48px;
+      z-index: 10;
+      position: relative;
+      gap: 16px;
+    }
+
+    /* ─── 状态卡 ─────────────────────────────────── */
+    .status-card {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      background: linear-gradient(135deg, rgba(30,30,35,0.7) 0%, rgba(10,10,12,0.9) 100%);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 14px 24px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8), inset 0 1px 1px rgba(255,255,255,0.05);
+      flex-shrink: 0;
+    }
+
+    .status-enemy { flex-direction: row-reverse; }
+
+    /* 倒计时环容器 */
+    .timer-ring-wrap {
+      position: relative;
+      width: 84px;
+      height: 84px;
+      flex-shrink: 0;
+    }
+
+    .timer-ring-svg {
+      width: 84px;
+      height: 84px;
+      transform: rotate(-90deg);
+    }
+
+    /* 环背景 */
+    .ring-bg {
+      fill: none;
+      stroke: rgba(255,255,255,0.07);
+      stroke-width: 5;
+    }
+
+    /* 进度弧 */
+    .ring-arc {
+      fill: none;
+      stroke: var(--timer-decision);
+      stroke-width: 5;
+      stroke-linecap: round;
+      stroke-dasharray: var(--ring-circ);
+      stroke-dashoffset: 0;
+      transition: stroke-dashoffset 0.9s linear, stroke 0.4s;
+    }
+
+    /* 弧进入洞察期：变为红色 */
+    .ring-arc.insight-phase {
+      stroke: var(--timer-insight);
+    }
+
+    /* 环中心数字 */
+    .timer-center {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+    .timer-sec {
+      font-family: 'Cinzel', serif;
+      font-size: 1.25rem;
+      font-weight: 700;
+      line-height: 1;
+      color: var(--text-main);
+    }
+    .timer-phase-label {
+      font-size: 0.52rem;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-top: 2px;
+      text-transform: uppercase;
+    }
+
+    /* 就绪状态覆盖层 */
+    .timer-ready-overlay {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: bold;
+      color: var(--color-stamina);
+      text-align: center;
+      line-height: 1.3;
+    }
+    .timer-ring-wrap.is-ready .timer-center { display: none; }
+    .timer-ring-wrap.is-ready .timer-ready-overlay { display: flex; }
+    .timer-ring-wrap.is-ready .ring-arc { stroke: var(--color-stamina); opacity: 0.5; }
+
+    /* ─── 属性列 ──────────────────────────────────── */
+    .stats-col {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .status-enemy .stats-col { align-items: flex-end; }
+
+    .stat-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .stat-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+      width: 64px;
+    }
+
+    /* 气数（菱形格） */
+    .hp-pip {
+      width: 13px;
+      height: 13px;
+      background: var(--color-hp);
+      transform: rotate(45deg);
+      border-radius: 2px;
+      box-shadow: 0 0 10px rgba(185,28,28,0.8);
+      transition: all 0.3s;
+    }
+    .hp-pip.lost {
+      background: #1e1e24;
+      border: 1px solid rgba(185,28,28,0.2);
+      box-shadow: none;
+      opacity: 0.5;
+    }
+
+    /* 精力格（半球） */
+    .stamina-pip {
+      width: 14px;
+      height: 9px;
+      background: var(--color-stamina);
+      border-radius: 14px 14px 0 0;
+      border-bottom: 2px solid var(--border);
+      box-shadow: 0 -2px 8px rgba(56,189,248,0.5);
+      transition: all 0.3s;
+      margin-top: 5px;
+    }
+    .stamina-pip.spent {
+      background: #1e1e24;
+      box-shadow: none;
+      opacity: 0.4;
+    }
+
+    /* 速度调节行 */
+    .speed-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .speed-val {
+      font-family: 'Cinzel', serif;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--color-dod);
+      min-width: 16px;
+      text-align: center;
+    }
+    .speed-btn {
+      background: rgba(52,211,153,0.12);
+      border: 1px solid rgba(52,211,153,0.3);
+      color: var(--color-dod);
+      border-radius: 50%;
+      width: 19px;
+      height: 19px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      padding: 0;
+    }
+    .speed-btn:hover:not(:disabled) { background: rgba(52,211,153,0.28); transform: scale(1.1); }
+    .speed-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* ─── 回合/中间区 ──────────────────────────────── */
+    .hud-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+    }
+    .turn-indicator {
+      font-family: 'Cinzel', serif;
+      font-size: 1.4rem;
+      font-weight: bold;
+      color: var(--text-muted);
+      letter-spacing: 2px;
+    }
+    .history-btn {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: var(--text-muted);
+      border-radius: 8px;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 1rem;
+    }
+    .history-btn:hover { background: rgba(255,255,255,0.15); color: white; border-color: rgba(255,255,255,0.3); transform: scale(1.08); }
+
+    /* ─── 战场中央 ────────────────────────────────── */
+    .battle-area {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+
+    /* 洞察提示浮字 */
+    .insight-notice {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.8);
+      background: rgba(0,0,0,0.8);
+      border: 1px solid var(--color-insight);
+      color: var(--color-insight);
+      padding: 14px 32px;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s, transform 0.4s;
+      z-index: 30;
+      backdrop-filter: blur(8px);
+    }
+    .insight-notice.show {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    /* 结算日志框 */
+    .battle-log {
+      background: rgba(0,0,0,0.65);
+      padding: 24px 40px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      text-align: center;
+      backdrop-filter: blur(8px);
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.5s;
+      max-width: 620px;
+      line-height: 1.65;
+      cursor: pointer;
+      pointer-events: none;
+    }
+    .battle-log.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+    .clash-name {
+      font-family: 'Cinzel', serif;
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: var(--color-atk);
+      margin-bottom: 6px;
+      letter-spacing: 4px;
+    }
+    .log-detail { font-size: 0.9rem; color: var(--text-main); }
+    .log-hint { font-size: 0.72rem; color: var(--text-muted); margin-top: 14px; }
+
+    /* ─── 底部行动区 ───────────────────────────────── */
+    .bottom-actions {
+      padding: 32px 40px 44px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      gap: 40px;
+      background: linear-gradient(0deg, #06080a 0%, transparent 100%);
+      z-index: 10;
+    }
+
+    .act-btn-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .act-btn {
+      position: relative;
+      width: 108px;
+      height: 108px;
+      background: var(--panel-bg);
+      border: 2px solid var(--border);
+      color: var(--text-main);
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    }
+    .act-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none !important; }
+
+    .act-pt {
+      font-family: 'Cinzel', serif;
+      font-size: 2rem;
+      margin-top: 4px;
+      line-height: 1;
+    }
+
+    /* 各行动的形状 */
+    .act-btn.dodge  { border-radius: 50%; }
+    .act-btn.guard  { border-radius: 4px; width: 100px; height: 100px; }
+    .act-btn.attack {
+      border: none;
+      clip-path: polygon(50% 4%, 100% 96%, 0% 96%);
+      background: linear-gradient(180deg, rgba(30,30,35,0.8) 0%, rgba(10,10,12,0.95) 100%);
+      padding-top: 24px;
+      box-shadow: none;
+    }
+
+    /* 选中状态 */
+    .act-btn.selected { transform: translateY(-18px) scale(1.13); }
+    .act-btn.selected.attack {
+      color: var(--color-atk);
+      background: linear-gradient(180deg, rgba(80,50,15,0.9) 0%, rgba(20,15,10,0.95) 100%);
+    }
+    .act-btn.selected.guard {
+      border-color: var(--color-def);
+      box-shadow: 0 10px 36px rgba(100,116,139,0.5), inset 0 0 14px rgba(100,116,139,0.3);
+      color: var(--color-def);
+    }
+    .act-btn.selected.dodge {
+      border-color: var(--color-dod);
+      box-shadow: 0 10px 36px rgba(20,184,166,0.3), inset 0 0 14px rgba(20,184,166,0.2);
+      color: var(--color-dod);
+    }
+    .act-btn-container:has(.act-btn.attack:not(:disabled):hover),
+    .act-btn-container:has(.act-btn.attack.selected) {
+      filter: drop-shadow(0 0 10px var(--color-atk));
+    }
+
+    .act-sub-label { font-size: 0.72rem; color: var(--text-muted); }
+
+    /* 洞察按钮 */
+    .insight-btn {
+      padding: 6px 16px;
+      background: rgba(167,139,250,0.1);
+      border: 1px solid var(--color-insight);
+      color: var(--color-insight);
+      border-radius: 20px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .insight-btn:hover:not(:disabled) { background: rgba(167,139,250,0.25); transform: scale(1.05); }
+    .insight-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* 确认就绪 / 待命按钮 */
+    .commit-area {
+      position: absolute;
+      bottom: 220px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      z-index: 15;
+    }
+    .commit-btn {
+      background: #fff;
+      color: #000;
+      border: none;
+      padding: 14px 44px;
+      border-radius: 40px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      letter-spacing: 2px;
+      cursor: pointer;
+      box-shadow: 0 0 20px rgba(255,255,255,0.35);
+      transition: all 0.2s;
+    }
+    .commit-btn:hover { transform: scale(1.05); box-shadow: 0 0 28px rgba(255,255,255,0.6); }
+    .commit-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+    .redecide-btn {
+      background: transparent;
+      border: 1px solid var(--color-atk);
+      color: var(--color-atk);
+      padding: 8px 28px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: none;
+    }
+    .redecide-btn.show { display: block; }
+    .redecide-btn:hover { background: rgba(245,158,11,0.15); }
+
+    /* 等待提示 */
+    .waiting-label {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      display: none;
+      animation: pulse 1.6s infinite;
+    }
+    .waiting-label.show { display: block; }
+    @keyframes pulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+    /* ─── 战斗记录浮层 ─────────────────────────────── */
+    .history-modal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -40%);
+      background: rgba(10,15,25,0.96);
+      border: 1px solid rgba(255,255,255,0.1);
+      width: 500px;
+      max-width: 90vw;
+      max-height: 75vh;
+      border-radius: 12px;
+      padding: 24px;
+      z-index: 2000;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s;
+      display: flex;
+      flex-direction: column;
+      backdrop-filter: blur(10px);
+    }
+    .history-modal.show { opacity: 1; transform: translate(-50%, -50%); pointer-events: auto; }
+    .history-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      font-size: 1.05rem;
+      font-weight: bold;
+    }
+    .history-close { cursor: pointer; color: var(--text-muted); }
+    .history-list {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      text-align: left;
+    }
+    .history-list::-webkit-scrollbar { width: 5px; }
+    .history-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+    .history-item {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.83rem;
+      line-height: 1.55;
+    }
+
+    /* ─── 结算锁定（禁止交互）─────────────────────── */
+    body.resolving .bottom-actions,
+    body.resolving .commit-area,
+    body.resolving .hud-top { pointer-events: none !important; opacity: 0.6; }
+
+    /* ─── 响应式 ──────────────────────────────────── */
+    @media (max-width: 640px) {
+      body { height: auto; min-height: 100svh; overflow-y: auto; overflow-x: hidden; }
+      .hud-top { flex-direction: column; padding: 10px 12px; gap: 8px; }
+      .status-card { padding: 8px 12px; gap: 10px; }
+      .timer-ring-wrap { width: 60px; height: 60px; }
+      .timer-ring-svg { width: 60px; height: 60px; }
+      .timer-sec { font-size: 1rem; }
+      .stat-label { width: 44px; font-size: 0.6rem; }
+      .hp-pip { width: 10px; height: 10px; }
+      .stamina-pip { width: 10px; height: 5px; }
+      .bottom-actions { padding: 12px 8px 28px; gap: 16px; }
+      .act-btn { width: 74px; height: 74px; font-size: 0.88rem; }
+      .act-btn.guard { width: 68px; height: 68px; }
+      .act-pt { font-size: 1.5rem; }
+      .commit-area { position: static; transform: none; padding: 12px 16px 0; }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- ═══ HUD 顶部 ═══ -->
+  <header class="hud-top">
+
+    <!-- P1 状态卡 -->
+    <div class="status-card status-player" id="p1Card">
+      <!-- 倒计时环 -->
+      <div class="timer-ring-wrap" id="p1RingWrap">
+        <svg class="timer-ring-svg" viewBox="0 0 84 84">
+          <circle class="ring-bg" cx="42" cy="42" r="36"/>
+          <circle class="ring-arc" id="p1Arc" cx="42" cy="42" r="36"/>
+        </svg>
+        <div class="timer-center">
+          <span class="timer-sec" id="p1Sec">50</span>
+          <span class="timer-phase-label" id="p1Phase">决策期</span>
+        </div>
+        <div class="timer-ready-overlay">已<br>就绪</div>
+      </div>
+
+      <!-- 属性 -->
+      <div class="stats-col">
+        <div class="stat-row">
+          <span class="stat-label">气数</span>
+          <div class="hp-pip" id="p1-hp-1"></div>
+          <div class="hp-pip" id="p1-hp-2"></div>
+          <div class="hp-pip" id="p1-hp-3"></div>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">精力</span>
+          <div class="stamina-pip" id="p1-stam-1"></div>
+          <div class="stamina-pip" id="p1-stam-2"></div>
+          <div class="stamina-pip" id="p1-stam-3"></div>
+        </div>
+        <div class="stat-row speed-row">
+          <span class="stat-label">速度</span>
+          <button class="speed-btn" id="p1SpeedDown" title="降速+1精力">－</button>
+          <span class="speed-val" id="p1SpeedVal">1</span>
+          <button class="speed-btn" id="p1SpeedUp" title="提速-1精力">＋</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 中央回合区 -->
+    <div class="hud-center">
+      <div class="turn-indicator" id="turnIndicator">TURN 1</div>
+      <button class="history-btn" id="historyBtn" title="战事录">📜</button>
+    </div>
+
+    <!-- P2 状态卡（敌方） -->
+    <div class="status-card status-enemy" id="p2Card">
+      <!-- 属性（方向翻转） -->
+      <div class="stats-col">
+        <div class="stat-row">
+          <div class="hp-pip" id="p2-hp-1"></div>
+          <div class="hp-pip" id="p2-hp-2"></div>
+          <div class="hp-pip" id="p2-hp-3"></div>
+          <span class="stat-label" style="text-align:right">气数</span>
+        </div>
+        <div class="stat-row">
+          <div class="stamina-pip" id="p2-stam-1"></div>
+          <div class="stamina-pip" id="p2-stam-2"></div>
+          <div class="stamina-pip" id="p2-stam-3"></div>
+          <span class="stat-label" style="text-align:right">精力</span>
+        </div>
+        <div class="stat-row speed-row" style="justify-content:flex-end">
+          <span class="speed-val" id="p2SpeedVal">1</span>
+          <span class="stat-label" style="text-align:right">速度</span>
+        </div>
+      </div>
+
+      <!-- 倒计时环（镜象） -->
+      <div class="timer-ring-wrap" id="p2RingWrap">
+        <svg class="timer-ring-svg" viewBox="0 0 84 84">
+          <circle class="ring-bg" cx="42" cy="42" r="36"/>
+          <circle class="ring-arc" id="p2Arc" cx="42" cy="42" r="36"/>
+        </svg>
+        <div class="timer-center">
+          <span class="timer-sec" id="p2Sec">50</span>
+          <span class="timer-phase-label" id="p2Phase">决策期</span>
+        </div>
+        <div class="timer-ready-overlay">已<br>就绪</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══ 战场 ═══ -->
+  <main class="battle-area">
+    <!-- 被动洞察提示 -->
+    <div class="insight-notice" id="insightNotice"></div>
+
+    <!-- 结算日志 -->
+    <div class="battle-log" id="battleLog">
+      <div class="clash-name" id="clashName"></div>
+      <div class="log-detail" id="logDetail"></div>
+      <div class="log-hint">点击关闭，开始下一回合</div>
+    </div>
+  </main>
+
+  <!-- ═══ 指令区 ═══ -->
+  <div class="commit-area" id="commitArea">
+    <button class="commit-btn" id="readyBtn">就绪</button>
+    <button class="redecide-btn" id="redecideBtn">重新决策</button>
+    <span class="waiting-label" id="waitingLabel">等待对方就绪…</span>
+
+    <!-- 主动洞察 -->
+    <button class="insight-btn" id="insightBtn">👁 洞察对方（消耗 1 精力）</button>
+  </div>
+
+  <!-- ═══ 底部行动选择 ═══ -->
+  <footer class="bottom-actions">
+    <div class="act-btn-container">
+      <div class="act-btn dodge" id="btn-dodge" tabindex="0">
+        闪避
+        <span class="act-pt" id="pt-dodge">1</span>
+      </div>
+      <span class="act-sub-label">仅由速度决定</span>
+    </div>
+
+    <div class="act-btn-container">
+      <div class="act-btn guard" id="btn-guard" tabindex="0">
+        守备
+        <span class="act-pt" id="pt-guard">1</span>
+      </div>
+      <span class="act-sub-label">消耗精力可强化</span>
+    </div>
+
+    <div class="act-btn-container">
+      <div class="act-btn attack" id="btn-attack" tabindex="0">
+        攻击
+        <span class="act-pt" id="pt-attack">1</span>
+      </div>
+      <span class="act-sub-label">消耗精力可强化</span>
+    </div>
+  </footer>
+
+  <!-- ═══ 战事录浮层 ═══ -->
+  <div class="history-modal" id="historyModal">
+    <div class="history-modal-header">
+      <div>📜 本局战事录</div>
+      <div class="history-close" id="historyClose">✕</div>
+    </div>
+    <div class="history-list" id="historyList">
+      <div style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px 0">
+        尚未发生任何交锋。
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 渲染层脚本 ═══ -->
+  <script type="module">
+    import { BattleEngine }  from './sq-du/base/engine.js';
+    import { EngineEvent, PlayerId, Action, ActionName, ClashName,
+             DefaultStats, TimerConfig, Phase, EngineMode }
+      from './sq-du/base/constants.js';
+
+    // ─── 常量 ─────────────────────────────────────
+    const RING_CIRC = 226.195; // 2π×36
+
+    // ─── 引擎初始化 ───────────────────────────────
+    const engine = new BattleEngine(EngineMode.PVE, {
+      p1Name: '少女',
+      p2Name: '马厄斯',
+    });
+
+    // ─── DOM 引用 ─────────────────────────────────
+    const $ = id => document.getElementById(id);
+
+    const ui = {
+      // 倒计时环
+      p1Arc:      $('p1Arc'),
+      p2Arc:      $('p2Arc'),
+      p1RingWrap: $('p1RingWrap'),
+      p2RingWrap: $('p2RingWrap'),
+      p1Sec:      $('p1Sec'),
+      p2Sec:      $('p2Sec'),
+      p1Phase:    $('p1Phase'),
+      p2Phase:    $('p2Phase'),
+      // 状态
+      p1SpeedVal: $('p1SpeedVal'),
+      p2SpeedVal: $('p2SpeedVal'),
+      // 按钮
+      btnDodge:   $('btn-dodge'),
+      btnGuard:   $('btn-guard'),
+      btnAttack:  $('btn-attack'),
+      ptDodge:    $('pt-dodge'),
+      ptGuard:    $('pt-guard'),
+      ptAttack:   $('pt-attack'),
+      p1SpeedUp:  $('p1SpeedUp'),
+      p1SpeedDown:$('p1SpeedDown'),
+      readyBtn:   $('readyBtn'),
+      redecideBtn:$('redecideBtn'),
+      waitingLabel:$('waitingLabel'),
+      insightBtn: $('insightBtn'),
+      // 日志
+      battleLog:  $('battleLog'),
+      clashName:  $('clashName'),
+      logDetail:  $('logDetail'),
+      insightNotice: $('insightNotice'),
+      // 历史
+      historyBtn: $('historyBtn'),
+      historyModal:$('historyModal'),
+      historyList: $('historyList'),
+      historyClose:$('historyClose'),
+      turnIndicator: $('turnIndicator'),
+    };
+
+    // ─── 本地 UI 状态 ─────────────────────────────
+    let selectedAction = null;  // 当前选中的行动类型
+    let localEnhance   = 0;     // P1 当前强化次数
+    let matchHistory   = [];    // 战事录
+    let isGameOver     = false;
+
+    // ─── 工具：更新倒计时环 SVG ───────────────────
+    function updateRing(arc, ringWrap, secEl, phaseEl, remaining, phase, ready) {
+      const ratio  = remaining / TimerConfig.TOTAL;       // 1→0
+      const offset = RING_CIRC * (1 - ratio);
+
+      arc.style.strokeDashoffset = offset;
+      arc.classList.toggle('insight-phase', phase === Phase.INSIGHT);
+
+      secEl.textContent   = remaining;
+      phaseEl.textContent = phase === Phase.INSIGHT ? '洞察期' : '决策期';
+
+      ringWrap.classList.toggle('is-ready', ready);
+    }
+
+    // ─── 工具：刷新 HP / 精力格 ───────────────────
+    function updatePips(prefix, current, max, type) {
+      for (let i = 1; i <= max; i++) {
+        const el = $(`${prefix}-${i}`);
+        if (!el) continue;
+        if (type === 'hp')     el.classList.toggle('lost', i > current);
+        if (type === 'stam')   el.classList.toggle('spent', i > current);
+      }
+    }
+
+    // ─── 工具：刷新点数显示 ────────────────────────
+    function refreshPoints(stamina, speed) {
+      const atkPt  = 1 + (selectedAction === 'attack' ? localEnhance : 0);
+      const grdPt  = 1 + (selectedAction === 'guard'  ? localEnhance : 0);
+
+      ui.ptAttack.textContent = atkPt;
+      ui.ptGuard.textContent  = grdPt;
+      ui.ptDodge.textContent  = speed;
+
+      // 精力不足时禁用按钮
+      const canAct = stamina >= 1;
+      ui.btnAttack.toggleAttribute('disabled', !canAct);
+      ui.btnGuard.toggleAttribute('disabled',  !canAct);
+      ui.btnDodge.toggleAttribute('disabled',  !canAct);
+
+      // 速度按钮
+      const snap = engine.getSnapshot();
+      const p1   = snap.players[PlayerId.P1];
+      ui.p1SpeedUp.disabled   = p1.stamina <= 1;
+      ui.p1SpeedDown.disabled = p1.speed   <= DefaultStats.BASE_SPEED;
+    }
+
+    // ─── 行动选择 ─────────────────────────────────
+    function selectAction(type, btn) {
+      if (isGameOver) return;
+
+      const snap = engine.getSnapshot();
+      const p1   = snap.players[PlayerId.P1];
+      if (p1.ready) return;
+
+      // 点击已选中的行动 → 取消
+      if (selectedAction === type) {
+        selectedAction = null;
+        localEnhance   = 0;
+        document.querySelectorAll('.act-btn').forEach(b => b.classList.remove('selected'));
+        engine.submitAction(PlayerId.P1, { action: Action.STANDBY, enhance: 0 });
+        refreshPoints(p1.stamina, p1.speed);
+        return;
+      }
+
+      document.querySelectorAll('.act-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedAction = type;
+      localEnhance   = 0;
+
+      engine.submitAction(PlayerId.P1, { action: Action[type.toUpperCase()], enhance: 0 });
+      refreshPoints(p1.stamina, p1.speed);
+    }
+
+    ui.btnDodge.addEventListener('click',  () => selectAction('dodge',  ui.btnDodge));
+    ui.btnGuard.addEventListener('click',  () => selectAction('guard',  ui.btnGuard));
+    ui.btnAttack.addEventListener('click', () => selectAction('attack', ui.btnAttack));
+
+    // ─── 速度调节 ─────────────────────────────────
+    ui.p1SpeedUp.addEventListener('click', () => {
+      engine.adjustSpeed(PlayerId.P1, +1);
+    });
+    ui.p1SpeedDown.addEventListener('click', () => {
+      engine.adjustSpeed(PlayerId.P1, -1);
+    });
+
+    // ─── 就绪按钮 ─────────────────────────────────
+    ui.readyBtn.addEventListener('click', () => {
+      if (isGameOver) return;
+      engine.setReady(PlayerId.P1);
+    });
+
+    // ─── 重新决策 ─────────────────────────────────
+    ui.redecideBtn.addEventListener('click', () => {
+      engine.requestRedecide(PlayerId.P1);
+      ui.redecideBtn.classList.remove('show');
+    });
+
+    // ─── 主动洞察 ─────────────────────────────────
+    ui.insightBtn.addEventListener('click', () => {
+      if (isGameOver) return;
+      engine.useInsight(PlayerId.P1, PlayerId.P2);
+    });
+
+    // ─── 结算日志点击关闭并开始下一回合 ─────────────
+    ui.battleLog.addEventListener('click', () => {
+      if (!ui.battleLog.classList.contains('show')) return;
+      ui.battleLog.classList.remove('show');
+      document.body.classList.remove('resolving');
+      if (!isGameOver) {
+        engine.acknowledgeResolve();
+      }
+    });
+
+    // ─── 战事录 ───────────────────────────────────
+    ui.historyBtn.addEventListener('click', () => ui.historyModal.classList.add('show'));
+    ui.historyClose.addEventListener('click', () => ui.historyModal.classList.remove('show'));
+
+    // ─── 订阅引擎事件 ──────────────────────────────
+
+    // 倒计时 tick
+    engine.on(EngineEvent.TIMER_TICK, payload => {
+      const p1Data = payload[PlayerId.P1];
+      const p2Data = payload[PlayerId.P2];
+      const snap   = engine.getSnapshot();
+
+      updateRing(
+        ui.p1Arc, ui.p1RingWrap, ui.p1Sec, ui.p1Phase,
+        p1Data.remaining, p1Data.phase,
+        snap.players[PlayerId.P1].ready
+      );
+      updateRing(
+        ui.p2Arc, ui.p2RingWrap, ui.p2Sec, ui.p2Phase,
+        p2Data.remaining, p2Data.phase,
+        snap.players[PlayerId.P2].ready
+      );
+    });
+
+    // 行动配置更新（P1 自己的或 P2 的同步）
+    engine.on(EngineEvent.ACTION_UPDATED, ({ playerId, actionCtx }) => {
+      const snap = engine.getSnapshot();
+      const p1   = snap.players[PlayerId.P1];
+      if (playerId === PlayerId.P1) {
+        refreshPoints(p1.stamina, p1.speed);
+        ui.p1SpeedVal.textContent = p1.speed;
+      }
+      if (playerId === PlayerId.P2) {
+        ui.p2SpeedVal.textContent = snap.players[PlayerId.P2].speed;
+      }
+      updatePips('p1-hp',   p1.hp,      DefaultStats.MAX_HP,      'hp');
+      updatePips('p1-stam', p1.stamina, DefaultStats.MAX_STAMINA, 'stam');
+    });
+
+    // 玩家就绪
+    engine.on(EngineEvent.PLAYER_READY, ({ playerId, ready }) => {
+      const snap = engine.getSnapshot();
+      const p1   = snap.players[PlayerId.P1];
+      const p2   = snap.players[PlayerId.P2];
+
+      // 更新环
+      updateRing(ui.p1Arc, ui.p1RingWrap, ui.p1Sec, ui.p1Phase,
+        TimerConfig.TOTAL - 0, Phase.DECISION, p1.ready);
+      updateRing(ui.p2Arc, ui.p2RingWrap, ui.p2Sec, ui.p2Phase,
+        TimerConfig.TOTAL - 0, Phase.DECISION, p2.ready);
+
+      if (playerId === PlayerId.P1) {
+        // P1 就绪后锁定操作区
+        ui.readyBtn.disabled = ready;
+        ui.waitingLabel.classList.toggle('show', ready && !p2.ready);
+        if (ready) {
+          document.querySelectorAll('.act-btn').forEach(b => b.setAttribute('disabled', ''));
+          ui.p1SpeedUp.disabled   = true;
+          ui.p1SpeedDown.disabled = true;
+          ui.insightBtn.disabled  = true;
+        }
+      }
+    });
+
+    // 重新决策资格
+    engine.on(EngineEvent.REDECIDE_OFFER, ({ playerId }) => {
+      if (playerId === PlayerId.P1) {
+        ui.redecideBtn.classList.add('show');
+      }
+    });
+
+    // 玩家执行了重新决策
+    engine.on(EngineEvent.REDECIDED, ({ playerId }) => {
+      if (playerId === PlayerId.P1) {
+        selectedAction = null;
+        localEnhance   = 0;
+        document.querySelectorAll('.act-btn').forEach(b => {
+          b.classList.remove('selected');
+          b.removeAttribute('disabled');
+        });
+        ui.p1SpeedUp.disabled   = false;
+        ui.p1SpeedDown.disabled = false;
+        ui.insightBtn.disabled  = false;
+        ui.readyBtn.disabled    = false;
+        ui.waitingLabel.classList.remove('show');
+
+        const snap = engine.getSnapshot();
+        const p1   = snap.players[PlayerId.P1];
+        refreshPoints(p1.stamina, p1.speed);
+      }
+    });
+
+    // 被动洞察触发（目标方的计时器越过 30s）
+    engine.on(EngineEvent.PASSIVE_INSIGHT, ({ targetId, revealedAction }) => {
+      const isP1Target = targetId === PlayerId.P1;
+      const msg = isP1Target
+        ? '随着时间推移，你的行为已经被洞察。'
+        : `对方拖延太久——${ActionName[revealedAction?.action ?? 'standby']} 的意图已暴露。`;
+
+      showInsightNotice(msg);
+    });
+
+    // 主动洞察完成
+    engine.on(EngineEvent.ACTIVE_INSIGHT, ({ casterId, targetId, revealedAction }) => {
+      if (casterId === PlayerId.P1) {
+        const actName = ActionName[revealedAction?.action] ?? '未知';
+        showInsightNotice(`洞察成功：敌方意图为【${actName}】`);
+
+        // 刷新精力显示
+        const snap = engine.getSnapshot();
+        updatePips('p1-stam', snap.players[PlayerId.P1].stamina, DefaultStats.MAX_STAMINA, 'stam');
+        refreshPoints(snap.players[PlayerId.P1].stamina, snap.players[PlayerId.P1].speed);
+      }
+    });
+
+    // 回合结算
+    engine.on(EngineEvent.TURN_RESOLVED, result => {
+      document.body.classList.add('resolving');
+
+      const snap = engine.getSnapshot();
+      const p1   = snap.players[PlayerId.P1];
+      const p2   = snap.players[PlayerId.P2];
+
+      // 更新 HP / 精力
+      updatePips('p1-hp',   result.newState.p1.hp,      DefaultStats.MAX_HP,      'hp');
+      updatePips('p1-stam', result.newState.p1.stamina, DefaultStats.MAX_STAMINA, 'stam');
+      updatePips('p2-hp',   result.newState.p2.hp,      DefaultStats.MAX_HP,      'hp');
+      updatePips('p2-stam', result.newState.p2.stamina, DefaultStats.MAX_STAMINA, 'stam');
+
+      ui.p1SpeedVal.textContent = DefaultStats.BASE_SPEED;
+      ui.p2SpeedVal.textContent = DefaultStats.BASE_SPEED;
+
+      // 结算日志
+      ui.clashName.textContent = result.clashName;
+      ui.logDetail.innerHTML   = result.clashDesc;
+      ui.battleLog.classList.add('show');
+
+      // 写入战事录
+      const record = `
+        <div style="color:var(--text-main);font-weight:bold;margin-bottom:4px">[TURN ${result.turn}] ${result.clashName}</div>
+        <div style="color:var(--text-muted)">${result.clashDesc}</div>
+        ${result.damageToP1 > 0 ? `<div style="color:var(--color-hp)">你受到 ${result.damageToP1} 次伤害</div>` : ''}
+        ${result.damageToP2 > 0 ? `<div style="color:var(--color-atk)">敌方受到 ${result.damageToP2} 次伤害</div>` : ''}
+      `;
+      matchHistory.push(record);
+      updateHistoryUI();
+
+      // 更新回合数（若游戏未结束）
+      if (!isGameOver) {
+        ui.turnIndicator.textContent = `TURN ${result.turn + 1}`;
+      }
+    });
+
+    // 游戏结束
+    engine.on(EngineEvent.GAME_OVER, ({ winner, reason }) => {
+      isGameOver = true;
+      ui.logDetail.innerHTML += `<br><br><strong style="color:var(--color-atk)">${reason}</strong>`;
+      ui.logDetail.innerHTML += `<br><span style="color:var(--text-muted);font-size:0.78rem">刷新页面重新开始</span>`;
+      ui.readyBtn.disabled    = true;
+      ui.insightBtn.disabled  = true;
+    });
+
+    // ─── 历史记录渲染 ──────────────────────────────
+    function updateHistoryUI() {
+      if (!matchHistory.length) return;
+      ui.historyList.innerHTML = '';
+      matchHistory.forEach(rec => {
+        const div = document.createElement('div');
+        div.className   = 'history-item';
+        div.innerHTML   = rec;
+        ui.historyList.appendChild(div);
+      });
+      ui.historyList.scrollTop = ui.historyList.scrollHeight;
+    }
+
+    // ─── 洞察提示渲染 ──────────────────────────────
+    let insightTimer = null;
+    function showInsightNotice(msg) {
+      ui.insightNotice.textContent = msg;
+      ui.insightNotice.classList.add('show');
+      if (insightTimer) clearTimeout(insightTimer);
+      insightTimer = setTimeout(() => {
+        ui.insightNotice.classList.remove('show');
+      }, 3500);
+    }
+
+    // ─── 初始化 UI 状态 ────────────────────────────
+    function initUI() {
+      updatePips('p1-hp',   DefaultStats.MAX_HP,      DefaultStats.MAX_HP,      'hp');
+      updatePips('p1-stam', DefaultStats.MAX_STAMINA, DefaultStats.MAX_STAMINA, 'stam');
+      updatePips('p2-hp',   DefaultStats.MAX_HP,      DefaultStats.MAX_HP,      'hp');
+      updatePips('p2-stam', DefaultStats.MAX_STAMINA, DefaultStats.MAX_STAMINA, 'stam');
+      refreshPoints(DefaultStats.MAX_STAMINA, DefaultStats.BASE_SPEED);
+
+      // 初始化倒计时环为满
+      const initOffset = 0;
+      ui.p1Arc.style.strokeDashoffset = initOffset;
+      ui.p2Arc.style.strokeDashoffset = initOffset;
+      ui.p1Sec.textContent = TimerConfig.TOTAL;
+      ui.p2Sec.textContent = TimerConfig.TOTAL;
+    }
+
+    // ─── 启动 ──────────────────────────────────────
+    initUI();
+    engine.startGame();
+  </script>
+</body>
+</html>

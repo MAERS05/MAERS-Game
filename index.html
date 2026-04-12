@@ -1,1918 +1,436 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>博弈战斗系统 UI 演示</title>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap"
-        rel="stylesheet">
+    <title>MAERS PROTOCOL // MODULES</title>
+    <link href="font/base/fonts.css" rel="stylesheet">
     <style>
         :root {
-            /* 方形暗狱与漆黑的镜子 */
+            /* 与 sq-du 战斗模块保持一致的色系 */
             --bg-base: #050505;
             --panel-bg: rgba(10, 10, 12, 0.85);
             --border: rgba(60, 65, 75, 0.6);
+            --border-hover: rgba(150, 155, 165, 0.8);
             --text-main: #e2e8f0;
             --text-muted: #64748b;
-
-            /* 殷红的鲜血与肉茧 */
-            --color-hp: #b91c1c;
-            /* 散发出的光比最稀薄的月色还要冷黯(半球灯具) */
-            --color-stamina: #38bdf8;
-
-            /* 炽黄色的武器 */
-            --color-atk: #f59e0b;
-            /* 严丝合缝的正方体建筑(冷灰色) */
-            --color-def: #64748b;
-            /* 迅捷的残影 */
-            --color-dod: #14b8a6;
+            --accent: #f59e0b; /* 炽黄色 */
         }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            user-select: none;
+        
+        * { 
+            box-sizing: border-box; 
+            margin: 0; 
+            padding: 0; 
         }
-
+        
         body {
-            font-family: 'Noto Sans SC', sans-serif;
             background-color: var(--bg-base);
             color: var(--text-main);
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            position: relative;
-            z-index: 0;
-        }
-
-        /* 底部第 1 层：无限延伸的高频模糊大图 */
-        body::before {
-            content: '';
-            position: absolute;
-            top: -5%; left: -5%; width: 110%; height: 110%;
-            background-image: url('ui/combat-bg.jpg');
-            background-size: cover;
-            background-position: center;
-            filter: blur(25px) brightness(0.6);
-            z-index: -2;
-            pointer-events: none;
-        }
-
-        /* 底部第 2 层：保证原比例、绝不被截断的居中清晰原图 */
-        body::after {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background-image: url('ui/combat-bg.jpg');
-            background-size: contain;
-            background-position: center;
-            background-repeat: no-repeat;
-            z-index: -1;
-            pointer-events: none;
-            box-shadow: inset 0 0 150px rgba(0, 0, 0, 1);
-        }
-
-        .hud-top {
-            display: flex;
-            justify-content: space-between;
-            padding: 30px 50px;
-            z-index: 10;
-            position: relative;
-        }
-
-        .turn-group {
-            position: absolute;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            z-index: 15;
-        }
-
-        .turn-indicator {
-            font-family: 'Cinzel', serif;
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: var(--text-muted);
-            letter-spacing: 2px;
-            pointer-events: none;
-        }
-
-        .log-btn {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            color: var(--text-muted);
-            border-radius: 8px;
-            width: 34px;
-            height: 34px;
+            font-family: 'Noto Sans SC', sans-serif;
+            min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-size: 1.1rem;
+            /* 极简网格背景 */
+            background-image: 
+                linear-gradient(rgba(60, 65, 75, 0.08) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(60, 65, 75, 0.08) 1px, transparent 1px);
+            background-size: 40px 40px;
         }
 
-        .log-btn:hover {
-            background: rgba(255, 255, 255, 0.15);
-            color: white;
-            border-color: rgba(255, 255, 255, 0.3);
-            transform: scale(1.1);
-        }
-
-        .status-card {
-            position: relative;
-            display: flex;
-            align-items: center;
-            gap: 24px;
-            background: linear-gradient(135deg, rgba(30, 30, 35, 0.7) 0%, rgba(10, 10, 12, 0.9) 100%);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            padding: 16px 28px;
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.05);
-            transition: transform 0.3s;
-        }
-
-        .status-enemy {
-            flex-direction: row-reverse;
-            cursor: pointer;
-        }
-
-        .status-enemy:hover {
-            transform: scale(1.02);
-            box-shadow: 0 0 30px rgba(0, 0, 0, 0.9);
-            border-color: rgba(255, 255, 255, 0.3);
-        }
-
-        .avatar {
-            width: 72px;
-            height: 72px;
-            background: linear-gradient(135deg, #1e293b, #09090b);
-            border-radius: 4px;
-            border: 2px solid var(--border);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 1.3rem;
-            white-space: nowrap;
-            position: relative;
-            box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.8);
-        }
-
-        .status-enemy .avatar::after {
-            content: '📃 点击查看情报';
-            position: absolute;
-            bottom: -24px;
-            font-size: 12px;
-            white-space: nowrap;
-            color: var(--text-muted);
-            opacity: 0;
-            transition: 0.2s;
-        }
-
-        .status-enemy:hover .avatar::after {
-            opacity: 1;
-        }
-
-        .insight-btn {
-            position: absolute;
-            top: 0px;
-            left: 6px;
-            padding: 2px;
-            background: transparent;
-            border: none;
-            color: var(--color-stamina);
-            font-size: 1.2rem;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            transition: all 0.2s;
-            z-index: 5;
-            opacity: 0.75;
-        }
-
-        .insight-btn:hover:not(:disabled) {
-            opacity: 1;
-            transform: scale(1.15);
-            color: #fff;
-        }
-
-        .insight-btn:disabled {
-            filter: grayscale(1);
-            opacity: 0.3;
-            cursor: not-allowed;
-            transform: scale(1);
-        }
-
-        .insight-tooltip {
-            position: absolute;
-            top: -30px;
-            left: 8px;
-            background: rgba(0, 0, 0, 0.85);
-            border: 1px solid rgba(14, 165, 233, 0.5);
-            color: #fff;
-            font-size: 0.8rem;
-            padding: 4px 10px;
-            border-radius: 6px;
-            white-space: nowrap;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.2s;
-            z-index: 10;
-        }
-
-        .insight-active .insight-tooltip {
-            opacity: 1;
-        }
-
-        .status-buffs {
-            position: absolute;
-            bottom: 4px;
-            left: 8px;
-            display: flex;
-            gap: 4px;
-            font-size: 1.2rem;
-            cursor: help;
-        }
-
-        .status-enemy .status-buffs {
-            left: auto;
-            right: 8px;
-            flex-direction: row-reverse;
-        }
-
-        .buff-icon {
-            display: none;
-            filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.4));
-        }
-
-        .stats-col {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .status-enemy .stats-col {
-            align-items: flex-end;
-        }
-
-        .stat-row {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-
-        .stat-label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            letter-spacing: 1px;
-            width: 70px;
-        }
-
-        .hp-pip {
-            width: 14px;
-            height: 14px;
-            background: var(--color-hp);
-            transform: rotate(45deg);
-            border-radius: 2px;
-            box-shadow: 0 0 12px rgba(185, 28, 28, 0.8);
-            transition: all 0.3s;
-        }
-
-        .hp-pip.lost {
-            background: #1e1e24;
-            border: 1px solid rgba(185, 28, 28, 0.2);
-            box-shadow: none;
-            opacity: 0.5;
-        }
-
-        .stamina-pip {
-            width: 16px;
-            height: 10px;
-            background: var(--color-stamina);
-            border-radius: 16px 16px 0 0;
-            border-bottom: 2px solid var(--border);
-            box-shadow: 0 -2px 10px rgba(56, 189, 248, 0.5);
-            transition: all 0.3s;
-            margin-top: 6px;
-        }
-
-        .stamina-pip.spent {
-            background: #1e1e24;
-            box-shadow: none;
-            opacity: 0.4;
-        }
-
-        .speed-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .speed-val {
-            font-family: 'Cinzel', serif;
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: var(--color-dod);
-            min-width: 18px;
-            text-align: center;
-        }
-
-        .speed-down-btn,
-        .speed-up-btn {
-            background: rgba(52, 211, 153, 0.12);
-            border: 1px solid rgba(52, 211, 153, 0.35);
-            color: var(--color-dod);
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            font-size: 0.85rem;
-            line-height: 1;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s;
-            padding: 0;
-        }
-
-        .speed-down-btn:hover:not(:disabled),
-        .speed-up-btn:hover:not(:disabled) {
-            background: rgba(52, 211, 153, 0.28);
-            transform: scale(1.12);
-        }
-
-        .speed-down-btn:disabled,
-        .speed-up-btn:disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-        }
-
-        .battle-area {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-        }
-
-        .vs-text {
-            font-family: 'Cinzel', serif;
-            font-size: 6rem;
-            color: rgba(255, 255, 255, 0.03);
-            pointer-events: none;
-            position: absolute;
-        }
-
-        .battle-log {
-            background: rgba(0, 0, 0, 0.6);
-            padding: 20px 40px;
-            border-radius: 12px;
-            border: 1px solid var(--border);
-            text-align: center;
-            backdrop-filter: blur(8px);
-            opacity: 0;
-            transform: translateY(20px);
-            transition: all 0.5s;
-            max-width: 600px;
-            line-height: 1.6;
-        }
-
-        .battle-log.show {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        .log-title {
-            font-size: 1.5rem;
-            color: var(--color-atk);
-            margin-bottom: 10px;
-            font-weight: bold;
-        }
-
-        .left-panel {
-            position: absolute;
-            left: -430px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 400px;
-            background: var(--panel-bg);
-            backdrop-filter: blur(16px);
-            border: 1px solid var(--border);
-            border-left: none;
-            border-radius: 0 24px 24px 0;
-            padding: 30px;
-            transition: left 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-            box-shadow: 10px 0 30px rgba(0, 0, 0, 0.3);
-            z-index: 20;
-        }
-
-        .left-panel.active {
-            left: 0;
-        }
-
-        .panel-title {
-            font-size: 1.1rem;
-            font-weight: 500;
-            margin-bottom: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .panel-collapse-btn {
-            background: transparent;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            color: var(--text-muted);
-            border-radius: 6px;
-            width: 26px;
-            height: 26px;
-            font-size: 0.85rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s;
-            margin-left: auto;
-            flex-shrink: 0;
-        }
-
-        .panel-collapse-btn:hover {
-            background: rgba(255, 255, 255, 0.1);
-            color: var(--text-main);
-            border-color: rgba(255, 255, 255, 0.3);
-        }
-
-        .enhance-wrapper {
+        .container {
             width: 100%;
-            padding: 8px 14px;
-            background: rgba(14, 165, 233, 0.1);
-            border: 1px solid var(--color-stamina);
-            border-radius: 10px;
-            margin-bottom: 24px;
+            max-width: 1000px;
+            padding: 40px;
+        }
+
+        header {
+            margin-bottom: 60px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 20px;
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            transition: all 0.3s;
-        }
-
-        .enhance-wrapper.active {
-            background: var(--color-stamina);
-            box-shadow: 0 0 15px rgba(14, 165, 233, 0.5);
-        }
-
-        .enhance-sub-btn {
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
-            border: none;
-            background: rgba(14, 165, 233, 0.2);
-            color: var(--color-stamina);
-            font-size: 1.1rem;
-            font-weight: bold;
-            cursor: pointer;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            transition: all 0.2s;
-        }
-
-        .enhance-wrapper.active .enhance-sub-btn {
-            background: rgba(0, 0, 0, 0.15);
-            color: #000;
-        }
-
-        .enhance-sub-btn:hover:not(:disabled) {
-            transform: scale(1.1);
-            background: rgba(14, 165, 233, 0.4);
-        }
-
-        .enhance-wrapper.active .enhance-sub-btn:hover:not(:disabled) {
-            background: rgba(0, 0, 0, 0.3);
-        }
-
-        .enhance-sub-btn:disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-            transform: scale(1);
-        }
-
-        .enhance-center {
-            font-size: 0.95rem;
-            font-weight: bold;
-            color: var(--color-stamina);
-        }
-
-        .enhance-wrapper.active .enhance-center {
-            color: #000;
-        }
-
-        .effect-section-title {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            margin-bottom: 12px;
-        }
-
-        .effect-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .effect-item {
-            padding: 14px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .effect-item:hover {
-            background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(255, 255, 255, 0.2);
-        }
-
-        .effect-item.selected {
-            border-color: var(--text-main);
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        .effect-name {
-            font-weight: bold;
-            font-size: 0.95rem;
-        }
-
-        .effect-desc {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-        }
-
-        .bottom-actions {
-            padding: 40px;
-            display: flex;
-            justify-content: center;
             align-items: flex-end;
-            gap: 40px;
-            background: linear-gradient(0deg, #06080a 0%, transparent 100%);
-            z-index: 10;
         }
 
-        .act-btn-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .act-btn {
-            position: relative;
-            width: 110px;
-            height: 110px;
-            background: var(--panel-bg);
-            border: 2px solid var(--border);
-            color: var(--text-main);
-            font-size: 1.1rem;
-            font-weight: bold;
-            cursor: pointer;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-            backdrop-filter: blur(10px);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-        }
-
-        .act-pt {
+        h1 {
             font-family: 'Cinzel', serif;
-            font-size: 2.2rem;
-            margin-top: 4px;
-            line-height: 1;
+            font-size: 2.5rem;
+            letter-spacing: 4px;
+            font-weight: 500;
+            color: #fff;
+            display: flex;
+            align-items: center;
         }
 
-        .act-btn.dodge {
-            border-radius: 50%;
-        }
-
-        .act-btn.dodge:hover,
-        .act-btn.dodge.selected {
-            border-color: var(--color-dod);
-        }
-
-        .act-btn.guard {
-            width: 102px;
-            height: 102px;
+        .switch-btn {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            margin-left: 20px;
+            padding: 4px 12px;
+            border: 1px solid var(--border);
             border-radius: 4px;
-        }
-
-        .act-btn.guard:hover,
-        .act-btn.guard.selected {
-            border-color: var(--color-def);
-        }
-
-        .act-btn-container:has(.act-btn.attack) {
-            filter: drop-shadow(0 0 2px var(--border));
-            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
-
-        .act-btn-container:has(.act-btn.attack:hover) {
-            filter: drop-shadow(0 0 8px var(--color-atk));
-        }
-
-        .act-btn-container:has(.act-btn.attack.selected) {
-            filter: drop-shadow(0 15px 30px rgba(245, 158, 11, 0.4));
-        }
-
-        .act-btn.attack {
-            border: none;
-            box-shadow: none;
-            clip-path: polygon(50% 5%, 100% 95%, 0% 95%);
-            background: linear-gradient(180deg, rgba(30, 30, 35, 0.8) 0%, rgba(10, 10, 12, 0.95) 100%);
-            padding-top: 25px;
-        }
-
-        .act-btn.selected {
-            transform: translateY(-20px) scale(1.15);
-            background: linear-gradient(180deg, rgba(30, 30, 35, 0.9) 0%, rgba(10, 10, 15, 0.95) 100%);
-        }
-
-        .act-btn.selected.attack {
-            box-shadow: none;
-            color: var(--color-atk);
-            background: linear-gradient(180deg, rgba(80, 50, 15, 0.9) 0%, rgba(20, 15, 10, 0.95) 100%);
-        }
-
-        .act-btn.selected.guard {
-            box-shadow: 0 10px 40px rgba(100, 116, 139, 0.5), inset 0 0 15px rgba(100, 116, 139, 0.3);
-            color: var(--color-def);
-        }
-
-        .act-btn.selected.dodge {
-            box-shadow: 0 10px 40px rgba(20, 184, 166, 0.3), inset 0 0 15px rgba(20, 184, 166, 0.2);
-            color: var(--color-dod);
-        }
-
-        .commit-wrapper {
-            position: absolute;
-            bottom: 240px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 16px;
-            z-index: 15;
-        }
-
-        .commit-btn {
-            background: #fff;
-            color: #000;
-            border: none;
-            padding: 16px 48px;
-            border-radius: 40px;
-            font-size: 1.2rem;
-            font-weight: bold;
-            letter-spacing: 2px;
-            cursor: pointer;
-            box-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
             transition: all 0.2s;
+            font-family: 'Noto Sans SC', sans-serif;
+            letter-spacing: 1px;
+            font-weight: 400;
         }
 
-        .commit-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 0 30px rgba(255, 255, 255, 0.6);
+        .switch-btn:hover {
+            color: var(--text-main);
+            border-color: var(--text-main);
+            background: rgba(255, 255, 255, 0.05);
         }
 
-        .enemy-modal {
-            position: absolute;
-            top: 130px;
-            right: 50px;
+        .sys-info {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-align: right;
+            font-family: monospace;
+            padding-bottom: 8px;
+            line-height: 1.5;
+        }
+
+        .module-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+            gap: 40px;
+        }
+
+        .module-card {
             background: var(--panel-bg);
-            border: 1px solid var(--color-atk);
-            border-radius: 12px;
-            padding: 20px;
-            width: 280px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-            opacity: 0;
-            pointer-events: none;
-            transform: translateY(-10px);
-            transition: all 0.3s;
-            z-index: 50;
-        }
-
-        .enemy-modal.show {
-            opacity: 1;
-            pointer-events: auto;
-            transform: translateY(0);
-        }
-
-        .enemy-modal-title {
-            font-size: 0.9rem;
-            color: var(--color-atk);
-            margin-bottom: 12px;
-            font-weight: bold;
-        }
-
-        .history-modal {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -40%);
-            background: rgba(10, 15, 25, 0.95);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            width: 500px;
-            max-width: 90vw;
-            max-height: 75vh;
-            border-radius: 12px;
-            padding: 24px;
-            z-index: 2000;
-            opacity: 0;
-            pointer-events: none;
-            transition: all 0.3s;
-            display: flex;
-            flex-direction: column;
+            border: 1px solid var(--border);
+            text-decoration: none;
+            color: inherit;
+            display: block;
+            position: relative;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
             backdrop-filter: blur(10px);
         }
 
-        .history-modal.show {
-            opacity: 1;
-            transform: translate(-50%, -50%);
-            pointer-events: auto;
+        .module-card:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-4px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.9);
         }
 
-        .history-modal-header {
+        /* 侧边强调线 */
+        .module-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 3px; height: 100%;
+            background: var(--border);
+            transition: 0.3s;
+            z-index: 2;
+        }
+
+        .module-card:hover::before {
+            background: var(--accent);
+        }
+
+        .card-cover {
+            width: 100%;
+            height: 220px;
+            background: #000;
+            position: relative;
+            overflow: hidden;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .card-cover img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 1;
+            transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .module-card:hover .card-cover img {
+            transform: scale(1.08);
+        }
+
+        .card-body {
+            padding: 24px 30px;
+        }
+
+        .status-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 16px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            font-size: 1.1rem;
+            font-family: 'Cinzel', serif;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+        }
+
+        .status-active {
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        .status-offline {
+            color: var(--text-muted);
+        }
+
+        .tag {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 2px 8px;
+            font-family: 'Noto Sans SC', sans-serif;
+            font-size: 0.75rem;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 500;
+            margin-bottom: 12px;
+            letter-spacing: 1px;
+        }
+
+        p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin-bottom: 28px;
+        }
+
+        .footer-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px dashed var(--border);
+            padding-top: 16px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .launch-btn {
+            font-family: 'Cinzel', serif;
             font-weight: bold;
             color: var(--text-main);
-        }
-
-        .history-list {
-            flex: 1;
-            overflow-y: auto;
-            padding-right: 8px;
             display: flex;
-            flex-direction: column;
-            gap: 12px;
-            text-align: left;
+            align-items: center;
+            gap: 8px;
+            transition: 0.3s;
+            letter-spacing: 1px;
         }
 
-        .history-list::-webkit-scrollbar {
-            width: 6px;
+        .module-card:hover .launch-btn {
+            color: var(--accent);
         }
 
-        .history-list::-webkit-scrollbar-thumb {
+        .empty-icon {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 4rem;
+            color: rgba(60, 65, 75, 0.4);
+            font-family: 'Cinzel', serif;
+            background: repeating-linear-gradient(
+                45deg,
+                rgba(60, 65, 75, 0.05),
+                rgba(60, 65, 75, 0.05) 10px,
+                rgba(0, 0, 0, 0) 10px,
+                rgba(0, 0, 0, 0) 20px
+            );
+        }
+
+        .manual-btn {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            width: 32px;
+            height: 32px;
+            background: rgba(8, 8, 10, 0.6);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 4px;
+            padding: 5px;
+            opacity: 0;
+            transition: opacity 0.3s, background 0.3s;
+            z-index: 10;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            pointer-events: auto; /* allow clicks if parent is pointer-events: none */
+        }
+        .module-card:hover .manual-btn {
+            opacity: 1;
+        }
+        .manual-btn:hover {
             background: rgba(255, 255, 255, 0.2);
-            border-radius: 3px;
+            border-color: rgba(255,255,255,0.4);
+        }
+        .manual-btn img {
+            width: 100%;
+            height: 100%;
         }
 
-        .history-turnItem {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 8px;
-            padding: 12px;
-            font-size: 0.85rem;
-            line-height: 1.5;
-        }
-
-        body.combat-resolving .hud-top,
-        body.combat-resolving .bottom-actions,
-        body.combat-resolving .commit-wrapper,
-        body.combat-resolving .enemy-modal {
-            pointer-events: none !important;
-            opacity: 0.7;
-        }
-
-        body.history-open .hud-top,
-        body.history-open .bottom-actions,
-        body.history-open .enemy-modal {
-            pointer-events: none !important;
-            opacity: 0.7;
-        }
-
-        @media (max-width: 640px) {
-            body {
-                height: auto;
-                min-height: 100svh;
-                overflow-y: auto;
-                overflow-x: hidden;
-            }
-
-            .hud-top {
-                flex-direction: column;
-                align-items: stretch;
-                padding: 10px 12px;
-                gap: 8px;
-            }
-
-            .turn-group {
-                position: static;
-                transform: none;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                gap: 12px;
-                order: 2;
-            }
-
-            .status-player {
-                order: 1;
-            }
-
-            .status-enemy {
-                order: 3;
-                flex-direction: row-reverse;
-            }
-
-            .status-card {
-                padding: 10px 14px;
-                gap: 12px;
-            }
-
-            .avatar {
-                width: 40px;
-                height: 40px;
-                font-size: 0.75rem;
-            }
-
-            .stat-label {
-                width: 46px;
-                font-size: 0.62rem;
-            }
-
-            .hp-pip {
-                width: 10px;
-                height: 10px;
-            }
-
-            .stamina-pip {
-                width: 10px;
-                height: 5px;
-            }
-
-            .turn-indicator {
-                font-size: 1.1rem;
-            }
-
-            .battle-area {
-                min-height: 160px;
-            }
-
-            .commit-wrapper {
-                position: static;
-                transform: none;
-                display: flex;
-                justify-content: center;
-                gap: 12px;
-                padding: 12px 16px 0;
-                z-index: 15;
-            }
-
-            .commit-btn {
-                padding: 12px 28px;
-                font-size: 1rem;
-                letter-spacing: 1px;
-            }
-
-            .left-panel {
-                position: fixed;
-                left: 0;
-                top: auto;
-                bottom: -100%;
-                transform: none;
-                width: 100%;
-                max-height: 55vh;
-                overflow-y: auto;
-                border-radius: 20px 20px 0 0;
-                border-left: 1px solid var(--border);
-                border-top: 1px solid var(--border);
-                transition: bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-                padding: 20px 16px;
-                z-index: 100;
-            }
-
-            .left-panel.active {
-                bottom: 0;
-                left: 0;
-            }
-
-            .bottom-actions {
-                padding: 12px 8px 24px;
-                gap: 16px;
-            }
-
-            .act-btn {
-                width: 75px;
-                height: 75px;
-                font-size: 0.9rem;
-            }
-
-            .act-btn.guard {
-                width: 68px;
-                height: 68px;
-            }
-
-            .act-pt {
-                font-size: 1.6rem;
-            }
-
-            .act-btn-container {
-                gap: 8px;
-            }
-
-            .enemy-modal {
-                right: 10px;
-                left: 10px;
-                width: auto;
-                top: auto;
-                bottom: 90px;
-            }
+        @media (max-width: 768px) {
+            header { flex-direction: column; align-items: flex-start; gap: 10px; }
+            .sys-info { text-align: left; }
+            .module-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
-
 <body>
-    <header class="hud-top">
-        <div class="status-card status-player">
-            <button class="insight-btn" id="insightBtn" title="消耗 1 精力洞察敌方意图">👁︎</button>
-            <div class="insight-tooltip" id="insightTooltip"></div>
-            <div class="avatar" style="border-color: var(--color-stamina);">少女</div>
-            <div class="status-buffs" id="player-buffs">
-                <span class="buff-icon" id="pb-agile" title="轻灵：本次交锋速度+1">🍃</span>
-                <span class="buff-icon" id="pb-depressed" title="低落：最终行动点数-1">😔</span>
-                <span class="buff-icon" id="pb-confused" title="迷惑：下次攻击必定被闪避">🌫︎</span>
-                <span class="buff-icon" id="pb-injured" title="创伤：下回合额外消耗1精力">🗡</span>
-            </div>
-            <div class="stats-col">
-                <div class="stat-row">
-                    <span class="stat-label">受击次数</span>
-                    <div class="hp-pip" id="player-hp-1"></div>
-                    <div class="hp-pip" id="player-hp-2"></div>
-                    <div class="hp-pip" id="player-hp-3"></div>
-                </div>
-                <div class="stat-row">
-                    <span class="stat-label">精力格</span>
-                    <div class="stamina-pip" id="player-stam-1"></div>
-                    <div class="stamina-pip" id="player-stam-2"></div>
-                    <div class="stamina-pip" id="player-stam-3"></div>
-                </div>
-                <div class="stat-row speed-row">
-                    <span class="stat-label">速度</span>
-                    <button class="speed-down-btn" id="speedDownBtn" title="降低速度恢复 1 精力">－</button>
-                    <span class="speed-val" id="player-speed-val">1</span>
-                    <button class="speed-up-btn" id="speedUpBtn" title="消耗 1 精力提升速度">＋</button>
-                </div>
-            </div>
-        </div>
 
-        <div class="turn-group">
-            <button class="log-btn" id="historyLogBtn" title="查看战事录">📜</button>
-            <div class="turn-indicator" id="turnIndicator">TURN 1</div>
-        </div>
-
-        <div class="status-card status-enemy" id="enemyAvatarBtn">
-            <div class="avatar" style="border-color: var(--color-hp);">马厄斯</div>
-            <div class="status-buffs" id="enemy-buffs">
-                <span class="buff-icon" id="eb-agile" title="轻灵：本次交锋速度+1">🍃</span>
-                <span class="buff-icon" id="eb-depressed" title="低落：最终行动点数-1">😔</span>
-                <span class="buff-icon" id="eb-confused" title="迷惑：下次攻击必定被闪避">🌫︎</span>
-                <span class="buff-icon" id="eb-injured" title="创伤：下回合额外消耗1精力">🗡</span>
-            </div>
-            <div class="stats-col">
-                <div class="stat-row">
-                    <div class="hp-pip" id="enemy-hp-1"></div>
-                    <div class="hp-pip" id="enemy-hp-2"></div>
-                    <div class="hp-pip" id="enemy-hp-3"></div>
-                    <span class="stat-label" style="text-align: right;">受击次数</span>
-                </div>
-                <div class="stat-row">
-                    <div class="stamina-pip" id="enemy-stam-1"></div>
-                    <div class="stamina-pip" id="enemy-stam-2"></div>
-                    <div class="stamina-pip" id="enemy-stam-3"></div>
-                    <span class="stat-label" style="text-align: right;">精力格</span>
-                </div>
-                <div class="stat-row speed-row" style="justify-content:flex-end">
-                    <span class="speed-val" id="enemy-speed-val">1</span>
-                    <span class="stat-label" style="text-align: right;">速度</span>
-                </div>
-            </div>
+<div class="container">
+    <header>
+        <h1>MAERS // MODULES <a href="index-admin.html" class="switch-btn" title="切换到管理模式">⇋ ADMIN</a></h1>
+        <div class="sys-info">
+            SYSTEM_STATUS: ONLINE<br>
+            DATETIME: SYNC_CONFIRMED
         </div>
     </header>
 
-    <div class="enemy-modal" id="enemyModal">
-        <div class="enemy-modal-title" id="enemyModalTitle">📋 敌方配装档案</div>
-        <div id="enemyModalContent">
-            <div style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px 0;">
-                尚未获取任何情报。<br />第一轮交锋后，将显示敌方已暴露的配装。
-            </div>
-        </div>
+    <div class="module-grid" id="moduleGrid">
+        <!-- 由 JS 从 /api/list-modules 动态填充 -->
     </div>
+</div>
 
-    <div class="history-modal" id="historyModal">
-        <div class="history-modal-header">
-            <div>📜 本局战事录</div>
-            <div style="cursor:pointer;color:var(--text-muted);" id="historyCloseBtn">✕</div>
-        </div>
-        <div class="history-list" id="historyList">
-            <div style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px 0;">尚未发生任何交锋。</div>
-        </div>
-    </div>
+<script src="/manage/index/brief.js"></script>
+<script>
+(function () {
+    'use strict';
 
-    <main class="battle-area">
-        <div class="vs-text" style="display:none;">CLASH</div>
-        <div class="battle-log" id="battleLog" style="cursor:pointer;">
-            <div class="log-title">战斗结算</div>
-            <div id="logContent"></div>
-            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:14px;">点击结算面板关闭</div>
-        </div>
-    </main>
+    const moduleGrid = document.getElementById('moduleGrid');
 
-    <div class="commit-wrapper" id="commitWrapper">
-        <button class="commit-btn" id="standbyBtn">待命 (恢复1点精力)</button>
-        <button class="commit-btn" id="startCombatBtn"
-            style="display:none; border-color: var(--color-atk);">开始交锋</button>
-        <button class="commit-btn" id="restartBtn" style="display:none; border-color: var(--color-dod);">重新开始局点</button>
-    </div>
+    // ── 从注册表渲染所有模块 ──────────────────────
+    async function loadModules() {
+        try {
+            const res  = await fetch('/api/list-modules');
+            if (!res.ok) throw new Error('server error');
+            const list = await res.json();
+            list.forEach(m => moduleGrid.appendChild(buildModuleCard(m)));
+        } catch (e) {
+            // 服务器不可用时（如直接双击打开）→ 降级提示
+            moduleGrid.appendChild(buildOfflineCard('请通过 MAERS-Game.bat 启动本地服务器以加载模块列表。'));
+        }
+        // 无论如何，末尾始终追加未知扇区占位卡
+        moduleGrid.appendChild(buildUnknownCard());
+    }
 
-    <aside class="left-panel" id="leftPanel">
-        <div class="panel-title">
-            <span>行动配置</span>
-            <button class="panel-collapse-btn" id="panelCollapseBtn" title="收起">✕</button>
-        </div>
+    // ── 未知扇区静态占位卡 ────────────────────────
+    function buildUnknownCard() {
+        const el = document.createElement('div');
+        el.className = 'module-card';
+        el.style.cssText = 'pointer-events:none;opacity:0.6;';
+        el.innerHTML = `
+            <div class="card-cover"><div class="empty-icon">?</div></div>
+            <div class="card-body">
+                <div class="status-row">
+                    <span class="status-offline">[ UNKNOW ]</span>
+                    <span class="tag">---</span>
+                </div>
+                <h2>未知扇区</h2>
+                <p>未知的实验性游戏模块</p>
+                <div class="footer-row">
+                    <span class="launch-btn" style="color:var(--text-muted)">Locked</span>
+                    <span>Restricted</span>
+                </div>
+            </div>`;
+        return el;
+    }
 
-        <div class="enhance-wrapper" id="enhanceBtn">
-            <button class="enhance-sub-btn" id="enhanceDownBtn" title="撤销强化恢复 1 精力" disabled>－</button>
-            <span class="enhance-center" id="enhanceBtnLabel">✦ 消耗 1 精力强化 (+1 点数)</span>
-            <button class="enhance-sub-btn" id="enhanceUpBtn" title="消耗 1 精力强化">＋</button>
-        </div>
+    // ── 服务器离线时的提示卡 ──────────────────────
+    function buildOfflineCard(msg) {
+        const el = document.createElement('div');
+        el.className = 'module-card';
+        el.style.cssText = 'pointer-events:none;opacity:0.4;';
+        el.innerHTML = `
+            <div class="card-cover"><div class="empty-icon">!</div></div>
+            <div class="card-body">
+                <div class="status-row">
+                    <span class="status-offline">[ OFFLINE ]</span>
+                    <span class="tag">---</span>
+                </div>
+                <h2>服务器未连接</h2>
+                <p>${msg}</p>
+                <div class="footer-row">
+                    <span class="launch-btn" style="color:var(--text-muted)">Locked</span>
+                    <span>Restricted</span>
+                </div>
+            </div>`;
+        return el;
+    }
 
-        <div class="effect-section-title">选择注入效果 (最多可选 <span id="maxEffectNum">1</span> 个)</div>
+    // ── 构造卡片 DOM ──────────────────────────────
+    function buildModuleCard(m) {
+        const isActive = m.status === 'active';
+        const el = isActive ? document.createElement('a') : document.createElement('div');
+        if (isActive) el.href = m.url;
+        el.className = 'module-card';
+        if (!isActive) el.style.cssText = 'pointer-events:none;opacity:0.6;';
 
-        <div class="effect-list" id="effectList">
+        const coverInner = m.cover
+            ? `<img src="${esc(m.cover)}" alt="${esc(m.name)}">`
+            : `<div class="empty-icon">?</div>`;
+
+        const statusLabel = isActive
+            ? `<span class="status-active">[ ACTIVE ]</span>`
+            : `<span class="status-offline">[ UNKNOW ]</span>`;
+
+        const launchLabel = isActive
+            ? `<span class="launch-btn">INITIATE &gt;</span>`
+            : `<span class="launch-btn" style="color:var(--text-muted)">Locked</span>`;
+
+        const footerRight = isActive ? 'ARCHIVE UNSEALED' : 'Restricted';
+
+        const manualBtnHTML = isActive ? `
+            <div class="manual-btn" title="查看说明书">
+                <img src="/ui/all/guide-book.svg" alt="manual">
             </div>
-    </aside>
+        ` : '';
 
-    <footer class="bottom-actions">
-        <div class="act-btn-container">
-            <div class="act-btn dodge" onclick="selectAction('dodge', this)">
-                闪避
-                <span class="act-pt" id="pt-dodge">1</span>
-            </div>
-            <span style="font-size: 0.75rem; color: var(--text-muted);">代表速度</span>
-        </div>
-
-        <div class="act-btn-container">
-            <div class="act-btn guard" onclick="selectAction('guard', this)">
-                守备
-                <span class="act-pt" id="pt-guard">1</span>
-            </div>
-            <span style="font-size: 0.75rem; color: var(--text-muted);">额外抗伤次数</span>
-        </div>
-
-        <div class="act-btn-container">
-            <div class="act-btn attack" onclick="selectAction('attack', this)">
-                攻击
-                <span class="act-pt" id="pt-attack">1</span>
-            </div>
-            <span style="font-size: 0.75rem; color: var(--text-muted);">次数与威力</span>
-        </div>
-    </footer>
-
-    <script>
-        var PLAYER_MAX_STAMINA = 3;
-        var PLAYER_MAX_HP = 3;
-        var playerStamina = PLAYER_MAX_STAMINA;
-        var playerHp = PLAYER_MAX_HP;
-        var enemyHp = PLAYER_MAX_HP;
-        var playerSpeed = 1;    // 速度独立于工能，通过消耗精力持续提升
-        var currentTurn = 1;
-        var currentAction = null;
-        var enhanceCount = 0;
-        var selectedEffects = [];
-        var hasUsedInsight = false;
-        var matchHistory = [];
-        var isGameOver = false;
-
-        // 异常状态标记（跨回合持续）
-        var playerInjured = false; // 创伤：下回合精力消耗+1
-        var playerLocked = false; // 破绽：下回合无法闪避/守备
-        var playerDepressed = false; // 低落：下回合最终点数减1
-        var playerAgile = false; // 轻灵：局内临时加算速度
-        var playerConfused = false; // 迷惑：下次攻击必定被闪避
-        var enemyInjured = false;
-        var enemyLocked = false;
-        var enemyDepressed = false;
-        var enemyAgile = false;
-        var enemyConfused = false;
-
-        const uiMap = {
-            attack: { name: '攻击', defaultPt: 1 },
-            guard: { name: '守备', defaultPt: 1 },
-            dodge: { name: '闪避', defaultPt: 1 }
-        };
-
-        const effectLibrary = {
-            attack: [
-                { id: 'a1', name: '创伤', desc: '若命中对方，为其挂上伤标（下回合行动精力+1消耗）' },
-                { id: 'a2', name: '破绽', desc: '若点数比对方高2及以上，使对方下回合只能发起攻击' },
-                { id: 'a3', name: '重整', desc: '若攻击被守备化解或被闪避，且自身未受伤，整理步伐恢复1点精力' }
-            ],
-            guard: [
-                { id: 'g1', name: '反震', desc: '若完美拦截对方攻击（点数不低于对方），反弹1次受击给对方' },
-                { id: 'g2', name: '回气', desc: '若完美拦截对方攻击（点数不低于对方），恢复1点精力' },
-                { id: 'g3', name: '休整', desc: '若本回合对方未发起攻击，恢复1点受击次数' }
-            ],
-            dodge: [
-                { id: 'd1', name: '扰乱', desc: '若闪避成功（躲开对方攻击），给对方附加一层低落（下回合最终行动点数减1）' },
-                { id: 'd2', name: '轻灵', desc: '若闪避成功（躲开对方攻击），提升1点速度' },
-                { id: 'd3', name: '迷踪', desc: '若对方未发起攻击，则附加【迷惑】：对方下次攻击必定被闪避' }
-            ]
-        };
-
-        const leftPanel = document.getElementById('leftPanel');
-        const effectListEl = document.getElementById('effectList');
-        const enhanceBtn = document.getElementById('enhanceBtn');
-        const commitWrapper = document.getElementById('commitWrapper');
-
-        // 收起按钮：点击关闭行动配置面板
-        document.getElementById('panelCollapseBtn').addEventListener('click', function () {
-            leftPanel.classList.remove('active');
-        });
-        const ptDisplayMap = {
-            attack: document.getElementById('pt-attack'),
-            guard: document.getElementById('pt-guard'),
-            dodge: document.getElementById('pt-dodge')
-        };
-
-        // ---- 行动选择 ----
-        window.selectAction = function (type, el) {
-            // 取消选择逻辑
-            if (currentAction === type) {
-                currentAction = null;
-                el.classList.remove('selected');
-                leftPanel.classList.remove('active');
-                document.getElementById('startCombatBtn').style.display = 'none';
-                document.getElementById('standbyBtn').style.display = 'block';
-                enhanceCount = 0;
-                selectedEffects = [];
-                updateStaminaUI();
-                updatePointsDisplay();
-                return;
-            }
-
-            var extraCost = playerInjured ? 1 : 0;
-            // 精力不足（连基础1点+创伤惩罚 都不够）则强制只能待命，无法选择其他动作
-            if (playerStamina < (1 + extraCost)) {
-                el.style.opacity = '0.4';
-                setTimeout(function () { el.style.opacity = ''; }, 500);
-                return;
-            }
-
-            // 【破绽】状态下，无法使用闪避和守备
-            if (playerLocked && (type === 'dodge' || type === 'guard')) {
-                el.style.opacity = '0.4';
-                setTimeout(function () { el.style.opacity = ''; }, 500);
-                // 暂时用弹出的警告形式，因为玩家可能不知道为什么点不动
-                var oldText = el.innerHTML;
-                el.innerHTML = '<span style="color:#ef4444;font-size:0.8rem;">破绽中</span>';
-                setTimeout(function () { el.innerHTML = oldText; }, 800);
-                return;
-            }
-
-            document.querySelectorAll('.act-btn').forEach(b => b.classList.remove('selected'));
-            el.classList.add('selected');
-            currentAction = type;
-            enhanceCount = 0;
-            selectedEffects = [];
-            enhanceBtn.classList.remove('active');
-            enhanceBtn.style.display = ''; // 闪避也可以强化（用于增加效果槽）
-            updateStaminaUI();
-            updatePointsDisplay();
-            updateEnhanceBtnLabel();
-            renderEffects(type);
-            leftPanel.classList.add('active');
-
-            document.getElementById('startCombatBtn').style.display = 'block';
-            document.getElementById('standbyBtn').style.display = 'none';
-        };
-
-        function getMaxEffects() {
-            return 1 + enhanceCount;
-        }
-
-        function renderEffects(type) {
-            document.getElementById('maxEffectNum').textContent = getMaxEffects();
-            effectListEl.innerHTML = '';
-            effectLibrary[type].forEach(function (eff) {
-                var item = document.createElement('div');
-                item.className = 'effect-item' + (selectedEffects.indexOf(eff.id) > -1 ? ' selected' : '');
-                item.innerHTML = '<div class="effect-name">' + eff.name + '</div>'
-                    + '<div class="effect-desc">' + eff.desc + '</div>';
-                item.onclick = function () { toggleEffect(eff.id, item); };
-                effectListEl.appendChild(item);
-            });
-        }
-
-        function toggleEffect(id, el) {
-            var max = getMaxEffects();
-            var index = selectedEffects.indexOf(id);
-            if (index > -1) {
-                selectedEffects.splice(index, 1);
-                el.classList.remove('selected');
-            } else if (selectedEffects.length < max) {
-                selectedEffects.push(id);
-                el.classList.add('selected');
-            }
-        }
-
-        // ---- 精力强化（可多次叠加）----
-        var enhanceDownBtn = document.getElementById('enhanceDownBtn');
-        var enhanceUpBtn = document.getElementById('enhanceUpBtn');
-
-        enhanceUpBtn.onclick = function () {
-            if (!currentAction) return;
-            var extraCost = playerInjured ? 1 : 0;
-            // 基础行动已消耗 1点 + 创伤消耗，强化再消耗 enhanceCount，总计不超过 playerStamina
-            if ((1 + enhanceCount + extraCost) >= playerStamina) return;
-            enhanceCount++;
-            enhanceBtn.classList.add('active');
-            updateStaminaUI();
-            updatePointsDisplay();
-            updateEnhanceBtnLabel();
-            renderEffects(currentAction);
-        };
-
-        enhanceDownBtn.onclick = function () {
-            if (!currentAction || enhanceCount <= 0) return;
-            enhanceCount--;
-            // 若已选效果超过新上限，截断末尾
-            var newMax = 1 + enhanceCount;
-            while (selectedEffects.length > newMax) selectedEffects.pop();
-            if (enhanceCount === 0) enhanceBtn.classList.remove('active');
-            updateStaminaUI();
-            updatePointsDisplay();
-            updateEnhanceBtnLabel();
-            renderEffects(currentAction);
-        };
-
-        function updateStaminaUI() {
-            // 从左往右连续变暗：历史消耗 + 本回合预览，不拆分两端
-            var historicalLoss = PLAYER_MAX_STAMINA - playerStamina;  // 历史已扣
-            var extraCost = playerInjured ? 1 : 0;
-            var previewSpend = currentAction ? (1 + enhanceCount + extraCost) : 0;
-            var totalDark = historicalLoss + previewSpend;
-            for (var i = 1; i <= PLAYER_MAX_STAMINA; i++) {
-                var pip = document.getElementById('player-stam-' + i);
-                if (pip) pip.classList.toggle('spent', i <= totalDark);
-            }
-        }
-
-        function updateEnemyStaminaUI() {
-            var historicalLoss = PLAYER_MAX_STAMINA - enemyAiState.stamina;
-            for (var i = 1; i <= PLAYER_MAX_STAMINA; i++) {
-                var pip = document.getElementById('enemy-stam-' + i);
-                if (pip) pip.classList.toggle('spent', i <= historicalLoss);
-            }
-        }
-
-        function updateEnhanceBtnLabel() {
-            var extraCost = playerInjured ? 1 : 0;
-            // 基础已占 1点 + 附加创伤扣减，剩余可用于强化的精力
-            var canEnhance = playerStamina - (1 + extraCost) - enhanceCount;
-            var label = document.getElementById('enhanceBtnLabel');
-            var suffix = (currentAction === 'dodge') ? '效果槽' : '点数';
-            if (enhanceCount === 0) {
-                label.textContent = '✦ 消耗 1 精力强化 (+1 ' + suffix + ')';
-            } else {
-                label.textContent = '✦ 已强化 ' + enhanceCount + ' 次 (+' + enhanceCount + ' ' + suffix + ')';
-            }
-
-            if (typeof enhanceDownBtn !== 'undefined' && typeof enhanceUpBtn !== 'undefined') {
-                enhanceDownBtn.disabled = (enhanceCount <= 0);
-                enhanceUpBtn.disabled = (canEnhance <= 0);
-            }
-
-            // 无额外精力可强化时 dimmed
-            enhanceBtn.style.opacity = canEnhance <= 0 ? '0.7' : '1';
-        }
-
-        function updatePointsDisplay() {
-            Object.keys(uiMap).forEach(function (key) {
-                var pt;
-                if (key === 'dodge') {
-                    pt = playerSpeed; // 闪避点数和全局速度值同步
-                } else {
-                    pt = uiMap[key].defaultPt + (key === currentAction ? enhanceCount : 0);
-                }
-                ptDisplayMap[key].textContent = pt;
-            });
-        }
-
-        // ---- 速度提升/降级按鈕 ----
-        var speedUpBtn = document.getElementById('speedUpBtn');
-        var speedDownBtn = document.getElementById('speedDownBtn');
-
-        speedUpBtn.onclick = function () {
-            if (isGameOver) return;
-            var extraCost = playerInjured ? 1 : 0;
-            // 提速时，必须确保保底能留出给下一次行动的起步价(基础1点+创伤)。如果精力只剩下行动需要的钱，就不能用来提速了。
-            if (playerStamina <= (1 + extraCost)) return;
-            playerStamina--;
-            playerSpeed++;
-            updateStaminaUI();
-            updateSpeedUI();
-            updatePointsDisplay(); // 刷新途避按鈕上的点数显示
-        };
-
-        speedDownBtn.onclick = function () {
-            if (playerSpeed <= 1) return; // 基础速度为1
-            playerSpeed--;
-            playerStamina++;
-            updateStaminaUI();
-            updateSpeedUI();
-            updatePointsDisplay();
-        };
-
-        function updateSpeedUI() {
-            document.getElementById('player-speed-val').textContent = playerSpeed;
-            document.getElementById('enemy-speed-val').textContent = enemyAiState.speed;
-            var extraCost = playerInjured ? 1 : 0;
-            speedUpBtn.disabled = (playerStamina <= (1 + extraCost));
-            speedDownBtn.disabled = (playerSpeed <= 1);
-
-            document.getElementById('pb-agile').style.display = playerAgile ? 'inline-block' : 'none';
-            document.getElementById('pb-depressed').style.display = playerDepressed ? 'inline-block' : 'none';
-            document.getElementById('pb-confused').style.display = playerConfused ? 'inline-block' : 'none';
-            document.getElementById('pb-injured').style.display = playerInjured ? 'inline-block' : 'none';
-
-            document.getElementById('eb-agile').style.display = enemyAgile ? 'inline-block' : 'none';
-            document.getElementById('eb-depressed').style.display = enemyDepressed ? 'inline-block' : 'none';
-            document.getElementById('eb-confused').style.display = enemyConfused ? 'inline-block' : 'none';
-            document.getElementById('eb-injured').style.display = enemyInjured ? 'inline-block' : 'none';
-        }
-
-        function updateHpUI() {
-            for (var i = 1; i <= PLAYER_MAX_HP; i++) {
-                var pp = document.getElementById('player-hp-' + i);
-                var ep = document.getElementById('enemy-hp-' + i);
-                if (pp) pp.classList.toggle('lost', i > playerHp);
-                if (ep) ep.classList.toggle('lost', i > enemyHp);
-            }
-        }
-
-
-        var enemyAvatarBtn = document.getElementById('enemyAvatarBtn');
-        var enemyModal = document.getElementById('enemyModal');
-        enemyAvatarBtn.onclick = function () {
-            enemyModal.classList.toggle('show');
-        };
-        // ---- 敌方 AI ----
-        var enemyAiState = { stamina: PLAYER_MAX_STAMINA, speed: 1 };
-        var currentEnemyData = null;
-
-        function actionColor(a) { return a === 'attack' ? 'var(--color-atk)' : a === 'guard' ? 'var(--color-def)' : a === 'dodge' ? 'var(--color-dod)' : 'var(--color-stamina)'; }
-        function actionBg(a) { return a === 'attack' ? 'rgba(245,158,11,0.1)' : a === 'guard' ? 'rgba(100,116,139,0.1)' : 'rgba(20,184,166,0.1)'; }
-        function actionBorder(a) { return a === 'attack' ? 'rgba(245,158,11,0.3)' : a === 'guard' ? 'rgba(100,116,139,0.3)' : 'rgba(20,184,166,0.3)'; }
-
-        // 开局生成持久化配装：每个动作固定携带 1-2 个注入效果（全局不变）
-        var enemyLoadout = (function () {
-            var loadout = {};
-            ['attack', 'guard', 'dodge'].forEach(function (act) {
-                var pool = effectLibrary[act].slice().sort(function () { return 0.5 - Math.random(); });
-                var count = Math.random() > 0.5 ? 2 : 1;
-                loadout[act] = pool.slice(0, count);
-            });
-            return loadout;
-        }());
-
-        // 每回合在后台决定行动意图（玩家无法事先得知）
-        function prepareEnemyAction() {
-            var isLocked = enemyLocked;
-            enemyLocked = false; // 破绽状态必定在安排完本回合计划后被清除（不带入下一回合计谋）
-
-            if (enemyAiState.stamina <= 0) {
-                currentEnemyData = { action: 'standby', enhance: false, effects: [], pts: 0 };
-                return;
-            }
-
-            // AI 逻辑：若只剩 1 滴精力，且最大可能造成的伤害无法击杀玩家
-            if (enemyAiState.stamina === 1) {
-                var maxDamage = 1;
-                if (enemyDepressed) maxDamage = 0; 
-                if (playerHp > maxDamage) {
-                    var safeChoice = (isLocked || Math.random() > 0.5) ? 'standby' : 'guard'; 
-                    if (safeChoice === 'standby') {
-                        currentEnemyData = { action: 'standby', enhance: false, effects: [], pts: 0 };
-                    } else {
-                        var activeEffects = enemyLoadout['guard'].slice(0, 1);
-                        currentEnemyData = { action: 'guard', enhance: false, effects: activeEffects, pts: uiMap['guard'].defaultPt };
+        el.innerHTML = `
+            ${manualBtnHTML}
+            <div class="card-cover">${coverInner}</div>
+            <div class="card-body">
+                <div class="status-row">
+                    ${statusLabel}
+                    <span class="tag">${esc(m.gameType) || '---'}</span>
+                </div>
+                <h2>${esc(m.name)}</h2>
+                <p>${esc(m.description) || '暂无简介'}</p>
+                <div class="footer-row">
+                    ${launchLabel}
+                    <span>${footerRight}</span>
+                </div>
+            </div>`;
+            
+        // 绑定说明书按钮事件
+        const btn = el.querySelector('.manual-btn');
+        if (btn) {
+            btn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                try {
+                    const res = await fetch(`/api/get-manual?filename=${encodeURIComponent(m.filename)}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        BriefModal.show(m.name, data.text);
                     }
-                    return;
+                } catch (err) {
+                    BriefModal.show(m.name, '');
                 }
-            }
-
-            // 基础权重
-            var weights = { attack: 1.0, guard: 1.0, dodge: 1.0 };
-            var forceEnhance = false;
-
-            if (playerLocked && !isLocked) {
-                if (enemyHp <= 1) weights.guard += 2.0; 
-                else { weights.guard += 1.5; weights.attack += 1.0; }
-            }
-
-            if (playerDepressed) { weights.attack += 2.0; }
-            if (playerConfused) { weights.attack += 5.0; weights.dodge = 0; weights.guard = 0; }
-
-            if (enemyHp === 1 && playerStamina > 0 && playerHp > 1) {
-                weights.guard += 2.5; weights.dodge += 2.0; weights.attack -= 0.5;
-            }
-
-            if (enemyAiState.stamina >= 2 && playerHp === 1) {
-                weights.attack += 3.0; forceEnhance = true;
-            }
-
-            if (playerAgile) { weights.attack -= 1.0; weights.guard += 1.5; }
-
-            if (enemyAiState.stamina - playerStamina >= 2) { weights.attack += 1.5; }
-
-            if (playerStamina <= 0) {
-                weights.attack += 10.0; weights.dodge = 0; weights.guard = 0; forceEnhance = true;
-            }
-
-            if (isLocked) { weights.dodge = 0; weights.guard = 0; weights.attack = 1.0; }
-
-            weights.attack = Math.max(0, weights.attack);
-            weights.guard = Math.max(0, weights.guard);
-            weights.dodge = Math.max(0, weights.dodge);
-
-            var totalWeight = weights.attack + weights.guard + weights.dodge;
-            if (totalWeight <= 0) { weights.standby = 1; totalWeight = 1; }
-
-            var rand = Math.random() * totalWeight;
-            var chosen = 'attack';
-            if (rand < weights.attack) { chosen = 'attack'; }
-            else if (rand < weights.attack + weights.guard) { chosen = 'guard'; }
-            else { chosen = 'dodge'; }
-
-            var enhance, pts, activeEffects;
-            if (chosen === 'dodge') {
-                pts = enemyAiState.speed;
-                if (enemyHp === 1 && enemyAiState.stamina > 1) { enhance = Math.random() > 0.2; }
-                else {
-                    if (enemyAiState.stamina === 3) enhance = Math.random() > 0.5;
-                    else if (enemyAiState.stamina === 2) enhance = Math.random() > 0.85;
-                    else enhance = false;
-                }
-                activeEffects = enemyLoadout['dodge'].slice(0, 1 + (enhance ? 1 : 0));
-            } else {
-                if (forceEnhance && enemyAiState.stamina > 1) { enhance = true; }
-                else {
-                    if (enemyAiState.stamina === 3) enhance = Math.random() > 0.4;
-                    else if (enemyAiState.stamina === 2) enhance = Math.random() > 0.8;
-                    else enhance = false;
-                }
-                pts = uiMap[chosen].defaultPt + (enhance ? 1 : 0);
-                activeEffects = enemyLoadout[chosen].slice(0, 1 + (enhance ? 1 : 0));
-            }
-
-            currentEnemyData = { action: chosen, enhance: enhance, effects: activeEffects, pts: pts };
-        }
-
-        // 已暴露的行动类型 & 使用过的效果（跨回合累积）
-        var revealedActions = {};
-        var revealedEffectsMap = {};
-
-        function revealEnemyLoadout(usedAction) {
-            if (usedAction === 'standby') return;
-            var names = { attack: '攻击', guard: '守备', dodge: '闪避' };
-            revealedActions[usedAction] = true;
-
-            if (!revealedEffectsMap[usedAction]) revealedEffectsMap[usedAction] = {};
-            currentEnemyData.effects.forEach(function (eff) {
-                revealedEffectsMap[usedAction][eff.id] = eff;
             });
-
-            var html = '<div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:12px;">已累积暴露的敌方配装：</div>';
-
-            ['attack', 'guard', 'dodge'].forEach(function (act) {
-                if (!revealedActions[act]) return;
-                var effs = Object.values(revealedEffectsMap[act] || {});
-                if (effs.length === 0) return;
-                var color = actionColor(act);
-                var bg = actionBg(act);
-                var border = actionBorder(act);
-                html += '<div style="margin-bottom:12px;">';
-                html += '<div style="font-size:0.8rem;font-weight:bold;color:' + color + ';margin-bottom:6px;">' + names[act] + '</div>';
-                effs.forEach(function (eff) {
-                    html += '<div class="effect-item" style="background:' + bg + ';border-color:' + border + ';padding:8px 12px;margin-bottom:6px;">'
-                        + '<div class="effect-name" style="color:' + color + ';font-size:0.85rem;">' + eff.name + '</div>'
-                        + '<div class="effect-desc" style="font-size:0.7rem;">' + eff.desc + '</div>'
-                        + '</div>';
-                });
-                html += '</div>';
-            });
-
-            document.getElementById('enemyModalContent').innerHTML = html;
-            document.getElementById('enemyModalTitle').textContent = '📋 敌方配装档案（已更新）';
         }
+        
+        return el;
+    }
 
-        prepareEnemyAction();
+    function esc(str) {
+        return String(str ?? '')
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
 
-        // ---- 洞察系统 ----
-        document.getElementById('insightBtn').onclick = function (e) {
-            e.stopPropagation();
-            if (isGameOver) return;
-            if (hasUsedInsight || playerStamina <= 0) return;
+    loadModules();
+}());
+</script>
 
-            if (!currentEnemyData) {
-                this.style.opacity = '0.4';
-                setTimeout(() => this.style.opacity = '', 300);
-                return;
-            }
-            playerStamina--;
-            hasUsedInsight = true;
-            updateStaminaUI();
-
-            var actionName = currentEnemyData.action === 'standby' ? '待命' : uiMap[currentEnemyData.action].name;
-            var actionColorText = actionColor(currentEnemyData.action);
-
-            document.getElementById('insightTooltip').innerHTML = '敌方意图：<span style="color:' + actionColorText + ';">' + actionName + '</span>';
-            this.parentNode.classList.add('insight-active');
-            this.disabled = true;
-        };
-
-        // ---- 战斗结算 ----
-        var startCombatBtn = document.getElementById('startCombatBtn');
-        var standbyBtn = document.getElementById('standbyBtn');
-        var battleLog = document.getElementById('battleLog');
-        var logContent = document.getElementById('logContent');
-
-        function executeCombat() {
-            if (isGameOver) return;
-            var pa = currentAction || 'standby';
-            var isPlayerExhausted = (playerStamina <= 0); 
-            var isEnemyExhausted = (enemyAiState.stamina <= 0);
-
-            document.body.classList.add('combat-resolving');
-
-            leftPanel.classList.remove('active');
-            document.getElementById('startCombatBtn').style.display = 'none';
-            document.getElementById('standbyBtn').style.display = 'block';
-            enemyModal.classList.remove('show');
-
-            var extraCost = playerInjured ? 1 : 0;
-            playerInjured = false;  
-            playerLocked = false;
-
-            if (pa !== 'standby') {
-                playerStamina -= (1 + enhanceCount + extraCost);
-                if (playerStamina < 0) playerStamina = 0;
-            }
-
-            var enemyExtraCost = enemyInjured ? 1 : 0;
-            enemyInjured = false;
-            
-            var currentP_Speed = playerSpeed + (playerAgile ? 1 : 0);
-            var currentE_Speed = enemyAiState.speed + (enemyAgile ? 1 : 0);
-
-            playerAgile = false;
-            enemyAgile = false;
-
-            var pPts = (pa === 'standby') ? 0 : (pa === 'dodge' ? currentP_Speed : (uiMap[pa].defaultPt + enhanceCount));
-            var pName = (pa === 'standby') ? '待命' : uiMap[pa].name;
-
-            if (currentEnemyData.action === 'dodge' && enemyAiState.stamina >= 1 && Math.random() > 0.6) {
-                enemyAiState.stamina--;
-                enemyAiState.speed += 1;
-                currentE_Speed += 1; 
-                currentEnemyData.pts = currentE_Speed;
-                updateSpeedUI();
-            }
-
-            var ea = currentEnemyData.action;
-            var ePts = currentEnemyData.pts;
-            var eName = (ea === 'standby') ? '待命' : uiMap[ea].name;
-
-            var effLog = [];
-            
-            if (playerDepressed) {
-                if (pa !== 'standby' && pPts > 0) {
-                    pPts = Math.max(0, pPts - 1);
-                    effLog.push('由于你的【低落】状态，最终行动点数-1！');
-                }
-                playerDepressed = false;
-            }
-
-            if (enemyDepressed) {
-                if (ea !== 'standby' && ePts > 0) {
-                    ePts = Math.max(0, ePts - 1);
-                    effLog.push('由于敌方的【低落】状态，最终行动点数-1！');
-                }
-                enemyDepressed = false;
-            }
-
-            if (ea !== 'standby') {
-                enemyAiState.stamina -= ((ea === 'dodge' ? 0 : 1) + (currentEnemyData.enhance ? 1 : 0) + enemyExtraCost);
-                if (enemyAiState.stamina < 0) enemyAiState.stamina = 0;
-            }
-
-            var clashResult = '';
-            var clashLine = '';
-            var damageToPlayer = 0;
-            var damageToEnemy = 0;
-
-            var pLandedHit = false; 
-            var pWasBlocked = false; 
-            var pWasDodged = false; 
-
-            var eLandedHit = false; 
-            var eWasBlocked = false; 
-            var eWasDodged = false; 
-
-            var pIsConfusedThisTurn = playerConfused && pa === 'attack';
-            var eIsConfusedThisTurn = enemyConfused && ea === 'attack';
-            
-            if (pIsConfusedThisTurn) playerConfused = false;
-            if (eIsConfusedThisTurn) enemyConfused = false;
-
-            // ===== 核心判定表 =====
-            if (pa === 'standby' && ea === 'standby') {
-                clashLine = '双方都在谨慎地观察，什么都没有发生。';
-            }
-            else if (pa === 'attack' && ea === 'standby') {
-                damageToEnemy = pPts; pLandedHit = true;
-                clashLine = '你趁隙重击了敌方（' + pPts + '次）！';
-            }
-            else if (ea === 'attack' && pa === 'standby') {
-                damageToPlayer = ePts; eLandedHit = true;
-                clashLine = '敌方趁隙重击了你（' + ePts + '次）！';
-            }
-            else if (pa === 'attack' && ea === 'attack') {
-                // 不再拼刀，按速度先后结算互相的真实点数伤害
-                if (currentP_Speed > currentE_Speed) {
-                    damageToEnemy = pPts;
-                    damageToPlayer = ePts;
-                    pLandedHit = true;
-                    eLandedHit = true;
-                    clashLine = '你凭借速度优势率先击中敌方（' + pPts + '次），随后敌方反击命中了你（' + ePts + '次）！';
-                } else if (currentE_Speed > currentP_Speed) {
-                    damageToPlayer = ePts;
-                    damageToEnemy = pPts;
-                    eLandedHit = true;
-                    pLandedHit = true;
-                    clashLine = '敌方凭借速度优势率先击中你（' + ePts + '次），随后你反击命中了敌方（' + pPts + '次）！';
-                } else {
-                    damageToEnemy = pPts;
-                    damageToPlayer = ePts;
-                    pLandedHit = true;
-                    eLandedHit = true;
-                    clashLine = '双方速度相当，同时击中了对方！(你命中' + pPts + '次，敌方命中' + ePts + '次)';
-                }
-            }
-            else if (pa === 'attack' && ea === 'guard') {
-                if (pPts > ePts) { damageToEnemy = pPts; pLandedHit = true; clashLine = '你击碎了敌方的防备，造成全部伤害（' + pPts + '次）！'; }
-                else { pWasBlocked = true; clashLine = '你的攻击被敌方稳稳拦下。'; }
-            }
-            else if (ea === 'attack' && pa === 'guard') {
-                if (ePts > pPts) { damageToPlayer = ePts; eLandedHit = true; clashLine = '敌方击碎了你的防备，造成全部伤害（' + ePts + '次）！'; }
-                else { eWasBlocked = true; clashLine = '你稳稳拦下了敌方的攻击。'; }
-            }
-            else if (pa === 'attack' && ea === 'dodge') {
-                if (ea === 'dodge' && pIsConfusedThisTurn) {
-                    pWasDodged = true; clashLine = '由于【迷惑】，你的攻击像挥在空气中，被敌方轻易闪过！';
-                } else if (pPts > ePts) { 
-                    damageToEnemy = pPts; pLandedHit = true; clashLine = '你预判了敌方的动作，一击命中（' + pPts + '次）！'; 
-                }
-                else { pWasDodged = true; clashLine = '敌方如鬼魅般躲开了你的攻击。'; }
-            }
-            else if (ea === 'attack' && pa === 'dodge') {
-                if (pa === 'dodge' && eIsConfusedThisTurn) {
-                    eWasDodged = true; clashLine = '由于【迷惑】，敌方乱了阵脚，你轻易闪过其攻击！';
-                } else if (ePts > pPts) { 
-                    damageToPlayer = ePts; eLandedHit = true; clashLine = '敌方预判了你的闪避路线，一击命中（' + ePts + '次）！'; 
-                }
-                else { eWasDodged = true; clashLine = '你如残影般躲开了敌方的攻击。'; }
-            }
-            else {
-                clashLine = '双方错开了动作，并未发生实质交锋。';
-            }
-
-            // ==== 词条效果判定 ====
-            var playerEffs = selectedEffects; 
-            var enemyEffs = currentEnemyData.effects.map(function(e){ return e.id; }); 
-
-            if (pa === 'attack') {
-                if (playerEffs.indexOf('a1') > -1 && pLandedHit) { enemyInjured = true; effLog.push('你对敌方造成了【创伤】！'); }
-                if (playerEffs.indexOf('a2') > -1 && (pPts - ePts >= 2)) { enemyLocked = true; effLog.push('你打出了敌方的【破绽】！'); }
-                if (playerEffs.indexOf('a3') > -1 && (pWasBlocked || pWasDodged) && damageToPlayer === 0) {
-                    playerStamina = Math.min(PLAYER_MAX_STAMINA, playerStamina + 1); effLog.push('你的【重整】生效，恢复1点精力。');
-                }
-            }
-            if (pa === 'guard') {
-                if (playerEffs.indexOf('g1') > -1 && eWasBlocked) { damageToEnemy += 1; effLog.push('你的【反震】生效，反伤敌方！'); }
-                if (playerEffs.indexOf('g2') > -1 && eWasBlocked) {
-                    playerStamina = Math.min(PLAYER_MAX_STAMINA, playerStamina + 1); effLog.push('你的【回气】生效，恢复1点精力。');
-                }
-                if (playerEffs.indexOf('g3') > -1 && ea !== 'attack') {
-                    playerHp = Math.min(PLAYER_MAX_HP, playerHp + 1); effLog.push('你的【休整】生效，恢复1点生命。');
-                }
-            }
-            if (pa === 'dodge') {
-                if (playerEffs.indexOf('d1') > -1 && eWasDodged) { enemyDepressed = true; effLog.push('你的【扰乱】生效，敌方陷入【低落】！'); }
-                if (playerEffs.indexOf('d2') > -1 && eWasDodged) { playerAgile = true; effLog.push('你的【轻灵】生效，速度短暂提升！'); }
-                if (playerEffs.indexOf('d3') > -1 && ea !== 'attack') { enemyConfused = true; effLog.push('你的【迷踪】生效，敌方陷入【迷惑】！'); }
-            }
-
-            if (ea === 'attack') {
-                if (enemyEffs.indexOf('a1') > -1 && eLandedHit) { playerInjured = true; effLog.push('敌方对你造成了【创伤】！'); }
-                if (enemyEffs.indexOf('a2') > -1 && (ePts - pPts >= 2)) { playerLocked = true; effLog.push('敌方打出了你的【破绽】！'); }
-                if (enemyEffs.indexOf('a3') > -1 && (eWasBlocked || eWasDodged) && damageToEnemy === 0) {
-                    enemyAiState.stamina = Math.min(PLAYER_MAX_STAMINA, enemyAiState.stamina + 1); effLog.push('敌方的【重整】生效，恢复1点精力。');
-                }
-            }
-            if (ea === 'guard') {
-                if (enemyEffs.indexOf('g1') > -1 && pWasBlocked) { damageToPlayer += 1; effLog.push('敌方的【反震】生效，将你击伤！'); }
-                if (enemyEffs.indexOf('g2') > -1 && pWasBlocked) {
-                    enemyAiState.stamina = Math.min(PLAYER_MAX_STAMINA, enemyAiState.stamina + 1); effLog.push('敌方的【回气】生效，恢复1点精力。');
-                }
-                if (enemyEffs.indexOf('g3') > -1 && pa !== 'attack') {
-                    enemyHp = Math.min(PLAYER_MAX_HP, enemyHp + 1); effLog.push('敌方的【休整】生效，恢复1点生命。');
-                }
-            }
-            if (ea === 'dodge') {
-                if (enemyEffs.indexOf('d1') > -1 && pWasDodged) { playerDepressed = true; effLog.push('敌方的【扰乱】生效，你陷入【低落】！'); }
-                if (enemyEffs.indexOf('d2') > -1 && pWasDodged) { enemyAgile = true; effLog.push('敌方的【轻灵】生效，速度短暂提升！'); }
-                if (enemyEffs.indexOf('d3') > -1 && pa !== 'attack') { playerConfused = true; effLog.push('敌方的【迷踪】生效，你陷入【迷惑】！'); }
-            }
-
-            // ==== 结算生命值 ====
-            playerHp -= damageToPlayer;
-            enemyHp -= damageToEnemy;
-
-            // ==== 日志生成与UI呈现 ====
-            var eEffStr = currentEnemyData.effects.map(function(e){ return e.name; }).join('、');
-
-            var html = '你释放了<span style="color:' + actionColor(pa) + ';">【' + pName + (pa !== 'standby' ? ' ' + pPts + '点' : ' 0点') + '】</span>。<br/>'
-                + '敌方释放了<span style="color:' + actionColor(ea) + ';">【' + eName + (ea !== 'standby' ? ' ' + ePts + '点' : ' 0点') + '】</span>'
-                + (eEffStr ? '（注入了：' + eEffStr + '）' : '') + '。<br/><br/>'
-                + clashLine;
-
-            if (effLog.length > 0) {
-                html += '<br/><br/><div style="font-size:0.82rem;color:#a5f3fc;border-top:1px solid rgba(255,255,255,0.1);margin-top:8px;padding-top:8px;text-align:left;">'
-                    + '✨ 效果结算：<br/>'
-                    + effLog.map(function (s) { return '· ' + s; }).join('<br/>')
-                    + '</div>';
-            }
-            if (extraCost > 0) {
-                html += '<br/><span style="font-size:0.8rem;color:#fca5a5;">（创伤debuff：本回合额外消耗了1点精力）</span>';
-            }
-
-            // 记录到战事录
-            var recordHtml = '<div class="history-turnTitle" style="color:var(--text-main);font-weight:bold;margin-bottom:6px;">[TURN ' + currentTurn + ']</div>'
-                + '双方行动：你 <span style="color:' + actionColor(pa) + ';">' + pName + ' ' + pPts + '</span> vs 敌 <span style="color:' + actionColor(ea) + ';">' + eName + ' ' + ePts + '</span><br/>'
-                + '<div style="color:var(--text-muted); margin-top:4px;">' + clashLine + '</div>';
-            if (effLog.length > 0) {
-                recordHtml += '<div style="color:#a5f3fc;margin-top:4px;font-size:0.8rem;">' + effLog.join(' ') + '</div>';
-            }
-            matchHistory.push(recordHtml);
-            updateHistoryUI();
-
-            logContent.innerHTML = html;
-            battleLog.classList.add('show');
-
-            // 待命状态恢复精力
-            if (pa === 'standby') {
-                playerStamina = Math.min(playerStamina + 1, PLAYER_MAX_STAMINA);
-            }
-            if (ea === 'standby') {
-                enemyAiState.stamina = Math.min(enemyAiState.stamina + 1, PLAYER_MAX_STAMINA);
-            }
-
-            // 重置回合状态
-            enhanceCount = 0;
-            selectedEffects = [];
-            currentAction = null;
-            document.querySelectorAll('.act-btn').forEach(function (b) { b.classList.remove('selected'); });
-            updateEnhanceBtnLabel();
-            enhanceBtn.classList.remove('active');
-            enhanceBtn.style.display = ''; 
-
-            playerSpeed = 1;
-            enemyAiState.speed = 1;
-
-            currentTurn++;
-            document.getElementById('turnIndicator').innerText = 'TURN ' + currentTurn;
-
-            hasUsedInsight = false;
-            var insBtn = document.getElementById('insightBtn');
-            var insTooltip = document.getElementById('insightTooltip');
-            if (insBtn && insTooltip) {
-                insBtn.disabled = false;
-                insTooltip.innerHTML = '';
-                insBtn.parentNode.classList.remove('insight-active');
-            }
-
-            // 检查胜负条件
-            var gameOverMsg = '';
-            if (playerHp <= 0 && enemyHp <= 0) gameOverMsg = "【同归于尽】双方同时倒下，欢迎再次尝试，寻找书中人物胜利的方式。";
-            else if (playerHp <= 0) gameOverMsg = "【败北】你的受击次数已空，被击倒在地，欢迎再次尝试，寻找书中人物胜利的方式。";
-            else if (enemyHp <= 0) gameOverMsg = "【胜利】敌方受击次数清零，你赢得了胜利！";
-            else if (isPlayerExhausted && ea === 'attack' && ePts > 0) {
-                gameOverMsg = "【败北】力竭时遭遇致命攻击，被敌人彻底斩杀！欢迎再次尝试，寻找书中人物胜利的方式。";
-                playerHp = 0;
-                playerStamina = 0;
-            }
-            else if (isEnemyExhausted && pa === 'attack' && pPts > 0) {
-                gameOverMsg = "【胜利】敌方彻底力竭，被你一招致命斩杀！";
-                enemyHp = 0;
-                enemyAiState.stamina = 0;
-            }
-
-            updateHpUI();
-            updateStaminaUI();
-            updateEnemyStaminaUI();
-            updateSpeedUI();
-            updatePointsDisplay();
-            revealEnemyLoadout(ea);
-
-            if (gameOverMsg) {
-                html += '<div style="margin-top:20px;padding-top:15px;border-top:2px solid var(--color-atk);">';
-                html += '<div style="font-size:1.2rem;font-weight:bold;color:var(--color-atk);">' + gameOverMsg + '</div>';
-                html += '<div style="font-size:0.8rem;color:var(--text-muted);margin-top:8px;">点击结算面板重新开始</div>';
-                html += '</div>';
-                logContent.innerHTML = html;
-            }
-
-            if (!gameOverMsg) {
-                prepareEnemyAction();
-            }
-
-            setTimeout(function () {
-                battleLog.onclick = function () {
-                    battleLog.classList.remove('show');
-                    document.body.classList.remove('combat-resolving');
-                    battleLog.onclick = null;
-                    if (gameOverMsg) {
-                        isGameOver = true;
-                        document.getElementById('startCombatBtn').style.display = 'none';
-                        document.getElementById('standbyBtn').style.display = 'none';
-                        document.getElementById('restartBtn').style.display = 'block';
-                    }
-                };
-            }, 100);
-        }
-
-        function updateHistoryUI() {
-            var hl = document.getElementById('historyList');
-            if (matchHistory.length === 0) {
-                hl.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px 0;">尚未发生任何交锋。</div>';
-                return;
-            }
-            hl.innerHTML = '';
-            matchHistory.forEach(function (rec) {
-                var d = document.createElement('div');
-                d.className = 'history-turnItem';
-                d.innerHTML = rec;
-                hl.appendChild(d);
-            });
-            hl.scrollTop = hl.scrollHeight;
-        }
-
-        document.getElementById('historyLogBtn').onclick = function () {
-            document.getElementById('historyModal').classList.add('show');
-            document.body.classList.add('history-open');
-        };
-
-        document.getElementById('historyCloseBtn').onclick = function () {
-            document.getElementById('historyModal').classList.remove('show');
-            document.body.classList.remove('history-open');
-        };
-
-        document.getElementById('restartBtn').onclick = function () {
-            location.reload();
-        };
-
-        startCombatBtn.onclick = executeCombat;
-        standbyBtn.onclick = executeCombat;
-    </script>
 </body>
-(
 </html>
+

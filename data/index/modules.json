@@ -1,0 +1,14 @@
+{
+  "_comment": "MAERS-Game 模块注册表，由 indexmanage/server.py 维护，禁止手动破坏结构",
+  "modules": [
+    {
+      "filename": "sq-du.html",
+      "name": "SQ-DU",
+      "gameType": "回合制",
+      "description": "回合制对弈系统。\n一个实验性的高阶战斗交互与数值推理演示。",
+      "url": "/sq-du.html",
+      "status": "active",
+      "cover": "ui/sq-du/background/combat-bg.jpg"
+    }
+  ]
+}
