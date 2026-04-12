@@ -33,6 +33,7 @@ import {
 
 import { DualTimer } from './timer.js';
 import { resolve }   from './resolver.js';
+import { scheduleAI } from '../ai/ai-base.js';
 
 // ─────────────────────────────────────────────
 // 事件总线（内部工具类）
@@ -159,8 +160,8 @@ export class BattleEngine {
       onTimeout:    this._onTimeout.bind(this),
     });
 
-    // AI 就绪延时句柄（PVE 模式下持有，用于清除）
-    this._aiReadyTimeout = null;
+    // AI 就绪句柄（PVE 模式下持有，用于取消）
+    this._aiHandle = null;
   }
 
   // ═══════════════════════════════════════════
@@ -371,9 +372,9 @@ export class BattleEngine {
   /** 重置引擎到初始状态（重新开始对局） */
   restartGame() {
     this._timer.stop();
-    if (this._aiReadyTimeout) {
-      clearTimeout(this._aiReadyTimeout);
-      this._aiReadyTimeout = null;
+    if (this._aiHandle) {
+      this._aiHandle.cancel();
+      this._aiHandle = null;
     }
 
     this._state = EngineState.IDLE;
@@ -641,83 +642,26 @@ export class BattleEngine {
   }
 
   // ═══════════════════════════════════════════
-  // AI 驱动（PVE 模式内部实现）
+  // AI 驱动（委托 ai/ai-base.js）
   // ═══════════════════════════════════════════
 
   /**
-   * 在回合开始时，为 AI 安排异步决策
-   * （AI 不使用计时器，而是在随机时间点调用相同的公共 API）
+   * 在回合开始时，把 AI 决策调度委托给 ai-base.scheduleAI。
+   * 引擎只负责提供操作接口（类似依赖注入），
+   * 具体的时机和决策逻辑完全封装在 ai-base.js 中。
    */
   _scheduleAI() {
-    if (this._aiReadyTimeout) clearTimeout(this._aiReadyTimeout);
+    if (this._aiHandle) this._aiHandle.cancel();
 
-    // 60% 概率 5-30s 内就绪，40% 概率 30-50s 内就绪
-    const earlyDecision = Math.random() < 0.6;
-    const delay = earlyDecision
-      ? (5  + Math.random() * 25) * 1000   // 5 ~ 30s
-      : (30 + Math.random() * 20) * 1000;  // 30 ~ 50s
-
-    this._aiReadyTimeout = setTimeout(() => {
-      if (this._state !== EngineState.TICKING) return;
-
-      const aiDecision = this._buildAIDecision();
-      this.submitAction(PlayerId.P2, aiDecision);
-      this.setReady(PlayerId.P2);
-    }, delay);
-  }
-
-  /**
-   * AI 决策逻辑：权重随机策略
-   * 可替换为更复杂的 MCTS 或规则树而无需修改引擎其他部分
-   * @returns {Partial<import('./constants.js').ActionCtx>}
-   */
-  _buildAIDecision() {
-    const ai     = this._players[PlayerId.P2];
-    const player = this._players[PlayerId.P1];
-
-    // 精力为 0 → 只能待命
-    if (ai.stamina <= 0) {
-      return { action: Action.STANDBY, enhance: 0, speed: DefaultStats.BASE_SPEED };
-    }
-
-    // 权重表
-    const w = { attack: 1.0, guard: 1.0, dodge: 1.0 };
-
-    // 玩家精力耗尽 → 大幅倾向攻击
-    if (player.stamina <= 0) {
-      w.attack += 10; w.guard = 0; w.dodge = 0;
-    }
-
-    // 自身气数危急 → 倾向防守
-    if (ai.hp === 1) {
-      w.guard += 2; w.dodge += 1.5;
-    }
-
-    // 玩家气数危急 → 倾向攻击
-    if (player.hp === 1 && ai.stamina >= 2) {
-      w.attack += 3;
-    }
-
-    // 精力充足 → 可能强化
-    const enhance = (ai.stamina >= 3 && Math.random() > 0.5) ? 1 : 0;
-
-    // 按权重随机选择
-    const actions = [Action.ATTACK, Action.GUARD, Action.DODGE];
-    const weights = [w.attack, w.guard, w.dodge];
-    const total   = weights.reduce((a, b) => a + b, 0);
-    let rand      = Math.random() * total;
-
-    let chosen = Action.STANDBY;
-    for (let i = 0; i < actions.length; i++) {
-      rand -= weights[i];
-      if (rand <= 0) { chosen = actions[i]; break; }
-    }
-
-    return {
-      action:  chosen,
-      enhance: chosen === Action.DODGE ? 0 : enhance,
-      speed:   DefaultStats.BASE_SPEED,
-    };
+    this._aiHandle = scheduleAI({
+      engineState:  () => this._state,
+      getState:     () => ({
+        ai:     { ...this._players[PlayerId.P2] },
+        player: { ...this._players[PlayerId.P1] },
+      }),
+      submitAction: (id, dec) => this.submitAction(id, dec),
+      setReady:     (id)      => this.setReady(id),
+    });
   }
 
   // ═══════════════════════════════════════════
