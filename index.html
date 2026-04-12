@@ -421,14 +421,14 @@
                 </div>
             </div>`;
 
-                // 绑定说明书按钮事件（直接拉取静态 md 文件，无需后端）
+                // 绑定说明书按钮事件（直接拉取静态 txt 文件，无需后端）
                 const btn = el.querySelector('.manual-btn');
                 if (btn) {
                     btn.addEventListener('click', async (e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         try {
-                            const mdPath = `data/briefs/${encodeURIComponent(m.filename.replace(/\.html$/, '.md'))}`;
+                            const mdPath = `data/manuals/${encodeURIComponent(m.filename.replace(/\.html$/, '.txt'))}`;
                             const res = await fetch(mdPath);
                             const text = res.ok ? await res.text() : '';
                             BriefModal.show(m.name, text);
