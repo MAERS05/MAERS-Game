@@ -100,6 +100,8 @@ export const Clash = Object.freeze({
   ATTACK_OVERPOWERS: 'ATTACK_OVERPOWERS',   // 强突
   /** 同速，闪避幅度 = 攻击点数，双方互中 */
   MUTUAL_HIT: 'MUTUAL_HIT',          // 侥幸
+  /** 无法归入常规情形的特殊操作（如蓄力等未执行常规攻击的场合） */
+  OTHER: 'OTHER',                    // 其它
   /** 双方均经历了洞察（主动或被动），回合直接结束 */
   INSIGHT_CLASH: 'INSIGHT_CLASH',        // 识破
   /** 一方攻击另一方非攻击（且未命中） */
@@ -125,6 +127,7 @@ export const ClashName = Object.freeze({
   [Clash.DODGE_OUTMANEUVERED]: '虚步',
   [Clash.ATTACK_OVERPOWERS]: '强突',
   [Clash.MUTUAL_HIT]: '侥幸',
+  [Clash.OTHER]: '其它',
   [Clash.INSIGHT_CLASH]: '识破',
   [Clash.WASTED_ACTION]: '落空',
 });
@@ -252,7 +255,10 @@ export const EngineEvent = Object.freeze({
  */
 export const EffectId = Object.freeze({
   // ── 攻击类效果 ──
-  WOUND: 'wound',    // 创伤：命中后为目标附加伤口（下回合行动额外消耗 1 精力）
+  WOUND:       'wound',       // 创伤：命中后为目标附加伤口（下回合行动额外消耗 1 精力）
+  BREAK_QI:    'break_qi',    // 破气：消耗自身 1 点气数，本回合攻击 +1 点数
+  BREAK_LIMIT: 'break_limit', // 破限：消耗自身 1 点气数，本回合攻击 +1 速度
+  CHARGE:      'charge',      // 蓄力：本回合攻击不执行，下回合攻击 +1 点数
   // ── 守备类效果 ──
   REBOUND: 'rebound',  // 反震：守备成功抵挡攻击时，对攻击方反弹一次攻击
   // ── 闪避类效果 ──
@@ -280,15 +286,30 @@ export const EffectDefs = Object.freeze({
     desc: '命中后为目标附加伤口——下回合行动额外消耗 1 精力',
     applicableTo: [Action.ATTACK],
   },
+  [EffectId.BREAK_QI]: {
+    id: EffectId.BREAK_QI, name: '破气',
+    desc: '消耗自身 1 点气数，本回合攻击 +1 点数',
+    applicableTo: [Action.ATTACK],
+  },
+  [EffectId.BREAK_LIMIT]: {
+    id: EffectId.BREAK_LIMIT, name: '破限',
+    desc: '消耗自身 1 点气数，本回合攻击 +1 速度',
+    applicableTo: [Action.ATTACK],
+  },
   [EffectId.REBOUND]: {
     id: EffectId.REBOUND, name: '反震',
-    desc: '守备成功抵挡攻击时，对攻击方反弹一次伤害',
+    desc: '守备成功抵挡攻击时，对攻击方反弹 1 次伤害',
     applicableTo: [Action.GUARD],
   },
   [EffectId.AGILITY]: {
     id: EffectId.AGILITY, name: '灵巧',
     desc: '闪避成功后下回合速度 +1',
     applicableTo: [Action.DODGE],
+  },
+  [EffectId.CHARGE]: {
+    id: EffectId.CHARGE, name: '蓄力',
+    desc: '本回合攻击不执行，下回合攻击 +1 点数',
+    applicableTo: [Action.ATTACK],
   },
 });
 

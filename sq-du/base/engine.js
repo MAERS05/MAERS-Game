@@ -744,8 +744,10 @@ export class BattleEngine {
 
     p1.hp = result.newState.p1.hp;
     p1.stamina = result.newState.p1.stamina;
+    p1.chargeBoost = result.newState.p1.chargeBoost ?? 0;
     p2.hp = result.newState.p2.hp;
     p2.stamina = result.newState.p2.stamina;
+    p2.chargeBoost = result.newState.p2.chargeBoost ?? 0;
 
     // 回合末速度归1（加速为临时性的）
     p1.speed = DefaultStats.BASE_SPEED;

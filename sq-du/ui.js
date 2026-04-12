@@ -356,8 +356,10 @@ ui.battleLog.addEventListener('click', () => {
 ui.historyBtn.addEventListener('click',   () => ui.historyModal.classList.add('show'));
 ui.historyClose.addEventListener('click', () => ui.historyModal.classList.remove('show'));
 
-// 行动配置面板
-ui.configCloseBtn.addEventListener('click', cancelSelection);
+// 行动配置面板：关闭只收起面板，不取消已选行动
+ui.configCloseBtn.addEventListener('click', () => {
+  ui.actionConfigPanel.classList.remove('show');
+});
 
 ui.enhancePlusBtn.addEventListener('click', () => {
   localEnhance++;

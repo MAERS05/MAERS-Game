@@ -35,6 +35,7 @@ import {
   EffectDefs,
   EFFECT_SLOTS,
 } from './constants.js';
+import { EffectHandlers } from './effect-handlers.js';
 
 // ═══════════════════════════════════════════════════════════
 // 内部常量：时间轴事件类型
@@ -72,6 +73,16 @@ export function resolve(p1Ctx, p2Ctx, p1State, p2State, bothInsighted, turn) {
       '双方心思彼此透明——任何行动在此刻都失去意义。【识破】',
       0, 0, false, false
     );
+  }
+
+  // ── 蓄力跨回合增益（基础设施，非效果定义）─────────────────
+  if (p1Ctx.action === Action.ATTACK && p1State.chargeBoost) {
+    p1Ctx = { ...p1Ctx, pts: p1Ctx.pts + p1State.chargeBoost };
+    p1State.chargeBoost = 0; // 已消耗，重置（newState 将同步回零）
+  }
+  if (p2Ctx.action === Action.ATTACK && p2State.chargeBoost) {
+    p2Ctx = { ...p2Ctx, pts: p2Ctx.pts + p2State.chargeBoost };
+    p2State.chargeBoost = 0;
   }
 
   // ── 效果层：顺位失效 + 前置修正（如铁壁、破甲）────────────
@@ -610,15 +621,13 @@ function _applyEffects(ctx, state, oppCtxEff = null) {
     // 验证适用性（安全检查）
     if (!def.applicableTo.includes(ctx.action)) continue;
 
-    // 触发记录（不管精力是否够，都暴露情报；精力不足会在 engine 层扣除时截停）
+    // 触发记录
     triggered.push(effectId);
 
-    // 前置修正：改变 pts 等属性
-    switch (effectId) {
-      case EffectId.IRON_WALL:
-        patchedCtx = { ...patchedCtx, pts: patchedCtx.pts + 1 };
-        break;
-      // BLEED、COUNTER、BLUR、REPOSITION 是后置效果，在 executeTimeline 里处理
+    // 前置 hook：巧播给对应效果模块文件处理，不在底层硬编码
+    const handler = EffectHandlers[effectId];
+    if (handler?.onPre) {
+      patchedCtx = handler.onPre(patchedCtx, state) ?? patchedCtx;
     }
   }
 
