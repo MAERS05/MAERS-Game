@@ -367,6 +367,20 @@
         .form-group textarea:focus { border-color: var(--accent); }
         .form-group textarea { height: 80px; }
 
+        /* 说明书编辑专用 */
+        #inputManualText {
+            height: 280px;
+            resize: none;
+            line-height: 1.7;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255,255,255,0.15) transparent;
+        }
+        #inputManualText::-webkit-scrollbar { width: 5px; }
+        #inputManualText::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 3px;
+        }
+
         .modal-actions {
             display: flex;
             justify-content: flex-end;
@@ -484,7 +498,7 @@
             <h3 id="manualModalTitle">// MANUAL EDITOR</h3>
             <input type="hidden" id="manualFilename">
             <div class="form-group">
-                <textarea id="inputManualText" rows="12" style="font-family: inherit; resize: vertical; width: 100%;" placeholder="在此编写游戏简介与游玩说明，支持多行..."></textarea>
+                <textarea id="inputManualText" placeholder="在此编写游戏简介与游玩说明，支持多行..."></textarea>
             </div>
             <div class="modal-actions">
                 <button class="btn-cancel" id="btnCancelManual">关闭</button>
