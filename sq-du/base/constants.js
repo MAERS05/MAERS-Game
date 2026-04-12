@@ -103,7 +103,7 @@ export const Clash = Object.freeze({
 /** 情形的中文名称 */
 export const ClashName = Object.freeze({
   [Clash.MUTUAL_STANDBY]:  '相持',
-  [Clash.ONE_SIDE_ATTACK]: '趁隙',
+  [Clash.ONE_SIDE_ATTACK]: '遇袭',
   [Clash.CONFRONT]:        '对峙',
   [Clash.PREEMPT]:         '抢攻',
   [Clash.SUPPRESS]:        '压制',

@@ -410,13 +410,15 @@ export class BattleEngine {
     // 重置回合状态（不重置 hp / stamina / speed）
     [PlayerId.P1, PlayerId.P2].forEach(id => {
       const p = this._players[id];
-      p.ready        = false;
-      p.insightUsed  = false;
-      p.wasInsighted = false;
-      p.canRedecide  = false;
-      p.didRedecide  = false;
-      p.speed        = DefaultStats.BASE_SPEED;
-      p.actionCtx    = createActionCtx(Action.STANDBY);
+      p.ready               = false;
+      p.insightUsed         = false;
+      p.wasInsighted        = false;
+      p.pendingInsightTarget = null;  // Bug #1: 必须跨轮清除
+      p.pendingPassiveReveal = false; // Bug #1: 必须跨轮清除
+      p.canRedecide         = false;
+      p.didRedecide         = false;
+      p.speed               = DefaultStats.BASE_SPEED;
+      p.actionCtx           = createActionCtx(Action.STANDBY);
     });
 
     this._timer.reset();
@@ -431,6 +433,10 @@ export class BattleEngine {
   _triggerResolve() {
     this._timer.stop();
     this._setState(EngineState.RESOLVING);
+
+    // Bug #2: 结算前强制校验精力，防止因洞察/加速透支形成的白嫖行动
+    this._enforceStaminaLimit(PlayerId.P1);
+    this._enforceStaminaLimit(PlayerId.P2);
 
     const p1 = this._players[PlayerId.P1];
     const p2 = this._players[PlayerId.P2];
@@ -472,6 +478,10 @@ export class BattleEngine {
   _triggerInsightClash() {
     this._timer.stop();
     this._setState(EngineState.RESOLVING);
+
+    // Bug #2: 识破强制结算前也要校验精力（玩家可能尚未就绪，action 仍是意向配置）
+    this._enforceStaminaLimit(PlayerId.P1);
+    this._enforceStaminaLimit(PlayerId.P2);
 
     const p1 = this._players[PlayerId.P1];
     const p2 = this._players[PlayerId.P2];
@@ -712,6 +722,35 @@ export class BattleEngine {
 
   // ═══════════════════════════════════════════
   // 工具函数（内部）
+  // ═══════════════════════════════════════════
+
+  /**
+   * 强制校验并修正玩家当前的行动配置消耗
+   * 无论由何种原因（先挂行动后洞察/加速，或被迫识破未配置完），绝不允许透支精力
+   */
+  _enforceStaminaLimit(playerId) {
+    const p = this._players[playerId];
+    if (!p.actionCtx || p.actionCtx.action === Action.STANDBY) return;
+
+    // TODO: 未来增加带耗能的 effectDefs 时，可在此纳入 effectCost 的累计
+    const effectCost = 0; 
+    
+    // 闪避基础消耗为 1（速度消耗已提前支付），其它基础消耗为 1
+    const baseCost = 1;
+    const currentCost = baseCost + (p.actionCtx.enhance || 0) + effectCost;
+
+    if (p.stamina < currentCost) {
+      if (p.stamina < baseCost + effectCost) {
+        // 连基础模型或必带效果的耗能都出不起，直接崩盘破防转待命
+        p.actionCtx = createActionCtx(Action.STANDBY);
+      } else {
+        // 付得起基础模型，但多挂的强化付不起，强行剥离超额强化
+        p.actionCtx.enhance = Math.max(0, p.stamina - baseCost - effectCost);
+        p.actionCtx.cost = baseCost + p.actionCtx.enhance + effectCost;
+        p.actionCtx.pts  = (p.actionCtx.action === Action.DODGE ? p.speed : 1) + p.actionCtx.enhance;
+      }
+    }
+  }
   // ═══════════════════════════════════════════
 
   _setState(newState) {

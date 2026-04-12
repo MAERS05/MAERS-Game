@@ -252,7 +252,6 @@ function resetForNewTurn() {
   ui.p1RingWrap.classList.remove('is-ready');
   ui.standbyBtn.disabled  = false;
   ui.readyBtn.disabled    = false;
-  ui.insightBtn.disabled  = false;
   ui.p1SpeedUp.disabled   = false;
   ui.p1SpeedDown.disabled = false;
   ui.redecideBtn.classList.remove('show');
@@ -261,6 +260,9 @@ function resetForNewTurn() {
   const snap = engine.getSnapshot();
   const p1 = snap.players[PlayerId.P1];
   refreshPoints(p1.stamina, p1.speed);
+  
+  const projStam = getProjectedStamina(p1);
+  ui.insightBtn.disabled = p1.insightUsed || projStam < 1;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -354,10 +356,30 @@ engine.on(EngineEvent.TIMER_TICK, payload => {
   );
 });
 
+// 强制保证 UI 表象与可用精力一致
+function enforceUIConstraints(p1) {
+  if (selectedAction) {
+    if (selectedAction !== 'dodge') {
+      const maxEnhance = Math.max(0, p1.stamina - 1);
+      if (localEnhance > maxEnhance) {
+        localEnhance = maxEnhance;
+        engine.submitAction(PlayerId.P1, { enhance: localEnhance });
+        updateConfigPanel();
+        return false; // 下调导致触发了新的 ACTION_UPDATED，终止当前执行链
+      }
+    } else if (p1.stamina < 1) {
+      cancelSelection();
+      return false;
+    }
+  }
+  return true;
+}
+
 engine.on(EngineEvent.ACTION_UPDATED, ({ playerId }) => {
   const snap = engine.getSnapshot();
   const p1   = snap.players[PlayerId.P1];
   if (playerId === PlayerId.P1) {
+    if (!enforceUIConstraints(p1)) return;
     refreshPoints(p1.stamina, p1.speed);
     ui.p1SpeedVal.textContent = p1.speed;
   }
@@ -365,7 +387,12 @@ engine.on(EngineEvent.ACTION_UPDATED, ({ playerId }) => {
     ui.p2SpeedVal.textContent = snap.players[PlayerId.P2].speed;
   }
   updatePips('p1-hp',   p1.hp,      DefaultStats.MAX_HP,      'hp');
-  updatePips('p1-stam', getProjectedStamina(p1), DefaultStats.MAX_STAMINA, 'stam');
+  const projStam = getProjectedStamina(p1);
+  updatePips('p1-stam', projStam, DefaultStats.MAX_STAMINA, 'stam');
+  
+  if (!p1.ready) {
+    ui.insightBtn.disabled = p1.insightUsed || projStam < 1;
+  }
 });
 
 engine.on(EngineEvent.PLAYER_READY, ({ playerId, ready }) => {
@@ -409,12 +436,13 @@ engine.on(EngineEvent.REDECIDED, ({ playerId }) => {
     ui.actionConfigPanel.classList.remove('show');
     ui.p1SpeedUp.disabled   = false;
     ui.p1SpeedDown.disabled = false;
-    ui.insightBtn.disabled  = false;
     ui.standbyBtn.disabled  = false;
     ui.readyBtn.disabled    = false;
     ui.waitingLabel.classList.remove('show');
     const snap = engine.getSnapshot();
-    refreshPoints(snap.players[PlayerId.P1].stamina, snap.players[PlayerId.P1].speed);
+    const p1State = snap.players[PlayerId.P1];
+    refreshPoints(p1State.stamina, p1State.speed);
+    ui.insightBtn.disabled = p1State.insightUsed || getProjectedStamina(p1State) < 1;
   }
 });
 
@@ -440,8 +468,15 @@ engine.on(EngineEvent.ACTIVE_INSIGHT, ({ casterId, revealedAction, revealed }) =
     }
     const snap = engine.getSnapshot();
     const p1 = snap.players[PlayerId.P1];
-    updatePips('p1-stam', getProjectedStamina(p1), DefaultStats.MAX_STAMINA, 'stam');
+    if (!enforceUIConstraints(p1)) return;
+    
+    const projStam = getProjectedStamina(p1);
+    updatePips('p1-stam', projStam, DefaultStats.MAX_STAMINA, 'stam');
     refreshPoints(p1.stamina, p1.speed);
+    
+    if (!p1.ready) {
+      ui.insightBtn.disabled = p1.insightUsed || projStam < 1;
+    }
   }
 });
 
