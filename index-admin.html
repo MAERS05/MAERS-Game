@@ -754,7 +754,7 @@
         if (isActive) {
             el.style.cursor = 'pointer';
             el.addEventListener('click', e => {
-                if (!e.target.closest('.ctrl-btn')) window.location.href = m.url;
+                if (!e.target.closest('.ctrl-btn') && !e.target.closest('.manual-btn')) window.location.href = m.url;
             });
         }
 

@@ -143,7 +143,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._json_error(400, '缺少 filename 参数')
         
         name_only = Path(filename).stem
-        txt_file = MANUALS_DIR / f"{name_only}.txt"
+        # 路径穿越防护
+        if '/' in name_only or '\\' in name_only or name_only.startswith('.'):
+            return self._json_error(400, f'非法文件名: {filename}')
+        txt_file = (MANUALS_DIR / f"{name_only}.txt").resolve()
+        if MANUALS_DIR.resolve() not in (txt_file, *txt_file.parents):
+            return self._json_error(400, f'路径穿越检测: {filename}')
         
         text_content = ""
         if txt_file.exists():
@@ -165,7 +170,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 return self._json_error(400, '缺少 filename')
                 
             name_only = Path(filename).stem
-            txt_file = MANUALS_DIR / f"{name_only}.txt"
+            # 路径穿越防护
+            if '/' in name_only or '\\' in name_only or name_only.startswith('.'):
+                return self._json_error(400, f'非法文件名: {filename}')
+            txt_file = (MANUALS_DIR / f"{name_only}.txt").resolve()
+            if MANUALS_DIR.resolve() not in (txt_file, *txt_file.parents):
+                return self._json_error(400, f'路径穿越检测: {filename}')
             txt_file.write_text(text, encoding='utf-8')
             
             print(f'[MAERS] 更新说明书：{txt_file.name}')
