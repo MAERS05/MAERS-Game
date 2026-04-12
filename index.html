@@ -296,7 +296,7 @@
 
     <div class="container">
         <header>
-            <h1>MAERS // MODULES <a href="index-admin.html" class="switch-btn" title="切换到管理模式">⇋ ADMIN</a></h1>
+            <h1 id="maersTitle" style="user-select:none;cursor:default;">MAERS // MODULES</h1>
             <div class="sys-info">
                 SYSTEM_STATUS: ONLINE<br>
                 DATETIME: SYNC_CONFIRMED
@@ -308,7 +308,7 @@
         </div>
     </div>
 
-    <script src="/manage/index/brief.js"></script>
+    <script src="manage/index/brief.js"></script>
     <script>
         (function () {
             'use strict';
@@ -401,7 +401,7 @@
 
                 const manualBtnHTML = isActive ? `
             <div class="manual-btn" title="查看说明书">
-                <img src="/ui/all/guide-book.svg" alt="manual">
+                <img src="ui/all/guide-book.svg" alt="manual">
             </div>
         ` : '';
 
@@ -421,18 +421,17 @@
                 </div>
             </div>`;
 
-                // 绑定说明书按钮事件
+                // 绑定说明书按钮事件（直接拉取静态 md 文件，无需后端）
                 const btn = el.querySelector('.manual-btn');
                 if (btn) {
                     btn.addEventListener('click', async (e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         try {
-                            const res = await fetch(`/api/get-manual?filename=${encodeURIComponent(m.filename)}`);
-                            if (res.ok) {
-                                const data = await res.json();
-                                BriefModal.show(m.name, data.text);
-                            }
+                            const mdPath = `data/briefs/${encodeURIComponent(m.filename.replace(/\.html$/, '.md'))}`;
+                            const res = await fetch(mdPath);
+                            const text = res.ok ? await res.text() : '';
+                            BriefModal.show(m.name, text);
                         } catch (err) {
                             BriefModal.show(m.name, '');
                         }
@@ -449,6 +448,15 @@
             }
 
             loadModules();
+
+            // ── 暗门：快速三连击标题进入后台 ──────────────
+            let _ac = 0, _at = null;
+            document.getElementById('maersTitle').addEventListener('click', () => {
+                _ac++;
+                if (_ac >= 3) { window.location.href = 'index-admin.html'; return; }
+                clearTimeout(_at);
+                _at = setTimeout(() => { _ac = 0; }, 600);
+            });
         }());
     </script>
 
