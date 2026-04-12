@@ -29,6 +29,7 @@
 import {
   Action,
   DefaultStats,
+  EffectDefs,
   EngineState,
   PlayerId,
 } from '../base/constants.js';
@@ -104,7 +105,10 @@ export function buildDecision(ai, player, history = []) {
   // ── Axis 3：强化轴打分（不感知 action / speed 的语义）─
   const enhance = _pickEnhance(snap, action, ai);
 
-  return { action, enhance, speed };
+  // ── Axis 4：效果轴（直接从效果库报满，不走装备期）──
+  const effects = _pickEffects(action, enhance, ai);
+
+  return { action, enhance, speed, effects };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -214,32 +218,28 @@ function _pickAction(snap, ai) {
 function _pickSpeed(snap, action, ai) {
   const BASE  = DefaultStats.BASE_SPEED;
 
-  // 闪避时，速度是闪避的核心属性，独立打分偏高
-  // 但不是"因为是闪避才加速"，而是因为速度性质对闪避拦截有效
   let speedBoostWeight = 0;
 
-  // 对手速度倾向高 → 速度性质的价值升高（无论我用什么行动）
-  // oppSpeedTrend 是 1~MAX，均值 1 时无修正，越高越值得加速
+  // 对手速度倾向高 → 速度性质的价值升高
   speedBoostWeight += (snap.oppSpeedTrend - BASE) * 0.8;
 
-  // 对手进攻倾向高 → 速度性质对闪避/守备拦截价值升高
+  // 对手进攻倾向高 → 快就能抢先或弹开攻击
   speedBoostWeight += snap.oppAggression * 0.5;
 
   // 自身精力充足时加速性价比高
   speedBoostWeight += (snap.aiStaminaRatio - 0.5) * 1.0;
 
-  // 闪避时速度是唯一有效维度，额外加成
-  if (action === Action.DODGE) speedBoostWeight += 1.0;
+  // 闪避时：速度决定能否在攻击前挂载闪避 buff
+  // “如果对手进攻倾向高，我需要更快雨年花彈”
+  if (action === Action.DODGE) speedBoostWeight += snap.oppAggression * 1.2;
 
   // 精力不足时降低加速意愿（需给行动本身留出 1 格）
-  const availableForBoost = ai.stamina - 1; // 行动本身消耗 1
+  const availableForBoost = ai.stamina - 1;  // 行动本身消耗 1
   if (availableForBoost <= 0) return BASE;
 
-  // 按权重决定是否加速一格（最多加速 1 格，避免精力崩盘）
   const boostProb = Math.max(0, Math.min(0.9, 0.3 + speedBoostWeight * 0.3));
   const boost = Math.random() < boostProb ? 1 : 0;
 
-  // 再次确认精力可承担（行动 1 + 加速 boost）
   const canAfford = ai.stamina >= 1 + boost;
   return BASE + (canAfford ? boost : 0);
 }
@@ -250,16 +250,27 @@ function _pickSpeed(snap, action, ai) {
 
 /**
  * 强化决策与行动类型和速度解耦：
- *  - 不是"因为对手守备点数高所以我强化"
- *  - 而是"对手强化倾向高 → 点数性质的价值升高 → 强化权重增加"
- *
- * 闪避的点数由速度决定，强化对其无效，直接返回 0。
+ *  - 攻击/守备：对手强化倾向高 → 我的点数性质价值升高
+ *  - 闪避：对手攻击点数高 → 需提升闪避幅度来对抗（防“强突”）
+ *  - 待命无需强化
  */
 function _pickEnhance(snap, action, ai) {
-  // 闪避点数 = 速度，强化无意义
-  if (action === Action.DODGE) return 0;
   if (action === Action.STANDBY) return 0;
 
+  // ─── 闪避强化分支：决定是否提升闪避幅度 ───
+  if (action === Action.DODGE) {
+    // 闪避幅度强化的价値：对手攻击倾向高时，提升幅度可防止“强突”
+    let dodgeEnhWeight = snap.oppEnhanceTrend * 0.9;    // 对手倾向大力度则我需提升幅度
+    dodgeEnhWeight += snap.oppAggression * 0.7;         // 对手进攻性高
+
+    const dodgeEnhanceable = snap.aiStaminaRatio > 0.67;
+    if (!dodgeEnhanceable) return 0;
+
+    const dodgeEnhProb = Math.max(0, Math.min(0.85, 0.15 + dodgeEnhWeight * 0.4));
+    return Math.random() < dodgeEnhProb ? 1 : 0;
+  }
+
+  // ─── 攻击/守备强化分支 ───
   // 对手越倾向于强化（高点数），我越需要提升点数来对抗
   let enhWeight = snap.oppEnhanceTrend * 0.8;
 
@@ -315,3 +326,175 @@ function _pickWeighted(weightMap) {
  * @property {number} opponentEnhance  - 对手上一回合的强化次数
  * @property {number} opponentStamina  - 对手上一回合结算后的精力值
  */
+
+// ═══════════════════════════════════════════════════════════
+// AI 重新决策（已知对手意图时的完美信息决策）
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * AI 收到重新决策邀请时的调度器。
+ *
+ * AI 不总是选择重决策：
+ *  - 30% 概率直接弃权（对当前选择有信心，或不值得改变）
+ *  - 70% 概率利用已知信息重新决策，反应时间 0.3~1.5s（比正常决策更快）
+ *
+ * @param {{
+ *   engineState:    () => string,
+ *   getState:       () => { ai: PlayerState, player: PlayerState, revealedAction: ActionCtx },
+ *   requestRedecide: (id: string) => void,
+ *   declineRedecide: (id: string) => void,
+ *   submitAction:   (id: string, dec: object) => void,
+ *   setReady:       (id: string) => void,
+ * }} ctx
+ * @returns {{ cancel: () => void }}
+ */
+export function scheduleAIRedecide(ctx) {
+  // 反应时间比正常快：已有信息，0.3~1.5s
+  const delay = (300 + Math.random() * 1200);
+
+  const handle = setTimeout(() => {
+    if (ctx.engineState() !== EngineState.TICKING) return;
+
+    const { ai, player, revealedAction } = ctx.getState();
+
+    // 30% 直接弃权：AI 对已有决策有信心，或局势让改变无意义
+    if (ai.stamina <= 0 || Math.random() < 0.30) {
+      ctx.declineRedecide(PlayerId.P2);
+      return;
+    }
+
+    const decision = buildRedecideDecision(ai, player, revealedAction);
+    ctx.requestRedecide(PlayerId.P2);
+    ctx.submitAction(PlayerId.P2, decision);
+    ctx.setReady(PlayerId.P2);
+  }, delay);
+
+  return { cancel: () => clearTimeout(handle) };
+}
+
+/**
+ * AI 重新决策核心：已知对手意图时的完美信息分轴决策。
+ *
+ * 架构原则（同 buildDecision）：
+ *  - 不做情形配对（不是"对手攻击 → 我就守备"）
+ *  - 对手的已知属性（行动性质、速度值、点数值）各作为独立的新轴
+ *    影响对应的决策轴权重，最终由各轴叠加涌现出反制方向
+ *
+ * @param {import('./constants.js').PlayerState} ai
+ * @param {import('./constants.js').PlayerState} player
+ * @param {import('./constants.js').ActionCtx}   revealedAction - 对手已揭示的意图
+ * @returns {Partial<import('./constants.js').ActionCtx>}
+ */
+export function buildRedecideDecision(ai, player, revealedAction) {
+  if (ai.stamina <= 0) {
+    return { action: Action.STANDBY, enhance: 0, speed: DefaultStats.BASE_SPEED };
+  }
+
+  const snap     = _snapshot(ai, player, []);
+  const revealed = revealedAction ?? {
+    action: Action.STANDBY, speed: DefaultStats.BASE_SPEED, enhance: 0, pts: 0,
+  };
+
+  // ── Axis 1：行动类型打分（完美信息版）─────────────────────────────
+  const w = { attack: 1.0, guard: 1.0, dodge: 1.0 };
+
+  // 基础情势权重（与正常决策相同，保持连续性）
+  if (player.stamina <= 0) { w.attack += 8; w.guard *= 0.1; w.dodge *= 0.1; }
+  const aiHpPressure = 1 - snap.aiHpRatio;
+  w.guard  += aiHpPressure * 2.0;
+  w.dodge  += aiHpPressure * 1.2;
+  if (ai.stamina >= 2) w.attack += (1 - snap.playerHpRatio) * 2.5;
+
+  // ── 已知对手意图的「进攻性」和「防御被动性」两个独立属性轴 ─────────
+  //    不直接用情形名，用这两个连续值代替，各自独立影响不同决策轴
+  const REVEAL_W = 5.0; // 完美信息的权重放大系数
+
+  // 进攻性（对手意图对我的威胁程度，0~1 连续值）
+  const attackNature = {
+    [Action.ATTACK]:  1.0,   // 强威胁
+    [Action.DODGE]:   0.2,   // 轻微威胁（对我的攻击会规避）
+    [Action.GUARD]:  -0.2,   // 反威胁（守备本身不主动攻我）
+    [Action.STANDBY]:-0.5,   // 无威胁
+  }[revealed.action] ?? 0;
+
+  // 防御被动性（对手意图在多大程度上「等待被击」）
+  const passiveNature = {
+    [Action.STANDBY]: 1.2,   // 完全被动
+    [Action.GUARD]:   1.0,   // 被动防守
+    [Action.DODGE]:   0.4,   // 躲避中
+    [Action.ATTACK]: -0.3,   // 主动进攻
+  }[revealed.action] ?? 0;
+
+  // 进攻性高 → 防御价值上升
+  w.guard  += attackNature * REVEAL_W * 1.3;
+  w.dodge  += attackNature * REVEAL_W * 0.8;
+  w.attack -= attackNature * REVEAL_W * 0.4;
+
+  // 防御被动性高 → 攻击价值上升
+  w.attack += passiveNature * REVEAL_W * 1.5;
+  w.guard  -= passiveNature * REVEAL_W * 0.3;
+  w.dodge  -= passiveNature * REVEAL_W * 0.3;
+
+  const action = _pickWeighted({
+    [Action.ATTACK]: Math.max(0, w.attack),
+    [Action.GUARD]:  Math.max(0, w.guard),
+    [Action.DODGE]:  Math.max(0, w.dodge),
+  });
+
+  // ── Axis 2：速度轴（对手速度值作为独立轴影响我的速度决策）──────────
+  const revealedSpeed = revealed.speed ?? DefaultStats.BASE_SPEED;
+  let speedBoostWeight = 0;
+  // 对手速度越高，速度性质的价值越高（对双方都是）
+  speedBoostWeight += (revealedSpeed - DefaultStats.BASE_SPEED) * 1.5;
+  // 我选闪避时，速度是核心（与行动无关的轴性质）
+  if (action === Action.DODGE) speedBoostWeight += 1.5;
+
+  const availableForBoost = ai.stamina - 1;
+  const boostProb = Math.max(0, Math.min(0.9, 0.25 + speedBoostWeight * 0.35));
+  const boost     = (availableForBoost > 0 && Math.random() < boostProb) ? 1 : 0;
+  const speed     = DefaultStats.BASE_SPEED + (ai.stamina >= 1 + boost ? boost : 0);
+
+  // ── Axis 3：强化轴（对手点数值作为独立轴影响我的强化决策）──────────
+  if (action === Action.STANDBY) {
+    return { action, enhance: 0, speed };
+  }
+
+  const revealedPts = revealed.pts ?? (1 + (revealed.enhance ?? 0));
+  let enhWeight = 0;
+  // 对手点数越高，「我需要提升点数」的性质越强
+  enhWeight += revealedPts * 0.5;
+
+  const canEnhance = ai.stamina >= (1 + boost + 1);
+  if (!canEnhance) return { action, enhance: 0, speed };
+
+  const enhProb = Math.max(0, Math.min(0.85, 0.15 + enhWeight * 0.3));
+  const enhance = Math.random() < enhProb ? 1 : 0;
+
+  return { action, enhance, speed };
+}
+
+// ═══════════════════════════════════════════════════════════
+// Axis 4：效果轴（AI 直接从效果库取用，不走装备期）
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * AI 效果选取：从该行动的效果库中取出所有可用效果，
+ * 按 pts = 1 + enhance 个槽位填满，其余补 null。
+ *
+ * @param {string}  action  - Action 枚举值
+ * @param {number}  enhance - 本回合强化次数
+ * @param {import('../base/constants.js').PlayerState} ai
+ * @returns {(string|null)[]} 长度为 EFFECT_SLOTS 的效果数组
+ */
+function _pickEffects(action, enhance, ai) {
+  const EFFECT_SLOTS = 3;
+  const slots        = Math.min(1 + enhance, EFFECT_SLOTS);
+  const inventory    = (ai.effectInventory?.[action] ?? [])
+    .filter(id => EffectDefs[id]?.applicableTo.includes(action));
+
+  const result = Array(EFFECT_SLOTS).fill(null);
+  for (let i = 0; i < slots && i < inventory.length; i++) {
+    result[i] = inventory[i];
+  }
+  return result;
+}

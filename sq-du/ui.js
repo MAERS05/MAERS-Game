@@ -18,8 +18,9 @@
 
 import { BattleEngine } from './base/engine.js';
 import {
-  EngineEvent, PlayerId, Action, ActionName,
+  EngineEvent, EngineState, PlayerId, Action, ActionName,
   DefaultStats, TimerConfig, Phase, EngineMode,
+  EffectId, EffectDefs, EFFECT_SLOTS,
 } from './base/constants.js';
 
 // ─── 常量 ─────────────────────────────────────────────
@@ -58,11 +59,12 @@ const ui = {
   p1SpeedUp:    $('p1SpeedUp'),
   p1SpeedDown:  $('p1SpeedDown'),
   // 指令区
-  standbyBtn:    $('standbyBtn'),
-  readyBtn:      $('readyBtn'),
-  redecideBtn:   $('redecideBtn'),
-  waitingLabel:  $('waitingLabel'),
-  insightBtn:    $('insightBtn'),
+  standbyBtn:         $('standbyBtn'),
+  readyBtn:           $('readyBtn'),
+  redecideBtn:        $('redecideBtn'),
+  declineRedecideBtn: $('declineRedecideBtn'),
+  waitingLabel:       $('waitingLabel'),
+  insightBtn:         $('insightBtn'),
   // 行动配置面板
   actionConfigPanel: $('actionConfigPanel'),
   configCloseBtn:    $('configCloseBtn'),
@@ -83,6 +85,15 @@ const ui = {
   historyList:    $('historyList'),
   historyClose:   $('historyClose'),
   turnIndicator:  $('turnIndicator'),
+  // 情报框
+  intelBox:       $('intelBox'),
+  intelList:      $('intelList'),
+  // 装备期
+  equipOverlay:   $('equipOverlay'),
+  equipCountdown: $('equipCountdown'),
+  effectPicker:   $('effectPicker'),
+  effectPickerClose: $('effectPickerClose'),
+  effectPickerList:  $('effectPickerList'),
 };
 
 // ─── 本地 UI 状态 ─────────────────────────────────────
@@ -129,13 +140,9 @@ function updatePips(prefix, current, max, type) {
 function getProjectedStamina(player) {
   let s = player.stamina;
   if (player.actionCtx && player.actionCtx.action !== Action.STANDBY) {
-    if (player.actionCtx.action === Action.DODGE) {
-      s -= (player.speed - DefaultStats.BASE_SPEED + 1);
-    } else {
-      s -= (1 + (player.actionCtx.enhance || 0));
-    }
+    // 闪避、攻击、守备的消耗统一为 1 + enhance
+    s -= (1 + (player.actionCtx.enhance || 0));
   }
-  // 待命的 +1 恢复是回合结算后效果，不在这里预测
   return Math.max(0, Math.min(DefaultStats.MAX_STAMINA, s));
 }
 
@@ -143,10 +150,11 @@ function getProjectedStamina(player) {
 function refreshPoints(stamina, speed) {
   const atkPt = 1 + (selectedAction === 'attack' ? localEnhance : 0);
   const grdPt = 1 + (selectedAction === 'guard'  ? localEnhance : 0);
+  const dgePt = 1 + (selectedAction === 'dodge'  ? localEnhance : 0);
 
   ui.ptAttack.textContent = atkPt;
   ui.ptGuard.textContent  = grdPt;
-  ui.ptDodge.textContent  = speed;
+  ui.ptDodge.textContent  = dgePt;
 
   const canAct = stamina >= 1;
   ui.btnAttack.toggleAttribute('disabled', !canAct);
@@ -163,46 +171,54 @@ function refreshPoints(stamina, speed) {
 // 行动配置面板
 // ═══════════════════════════════════════════════════════
 
-/** 同步强化栏与效果槽数显示 */
+/** 同步强化栏与效果槽数显示，并展示当前行动对应的已装配效果 */
 function updateConfigPanel() {
-  const isDodge  = selectedAction === 'dodge';
-  ui.enhanceRow.classList.toggle('disabled', isDodge);
+  ui.enhanceRow.classList.remove('disabled'); // 闪避幅度同样可强化
 
   const snap    = engine.getSnapshot();
   const p1      = snap.players[PlayerId.P1];
-  const basePts = isDodge ? p1.speed : 1;
-  const totalPts = basePts + localEnhance;
+  const totalPts = 1 + localEnhance; // 攻击/守备/闪避统一为 1+enhance
 
   ui.enhanceInfo.textContent = `✦ 强化 +${localEnhance} 点数（消耗 ${localEnhance} 精力）`;
   ui.maxEffectSlots.textContent = totalPts;
 
   // 强化按钮可用性
   ui.enhanceMinusBtn.disabled = localEnhance <= 0;
-  // 再加一次强化需要在现有消耗基础上再有 1 精力余量
-  const nextCost = isDodge ? 1 : (1 + localEnhance + 1);
-  ui.enhancePlusBtn.disabled = isDodge || nextCost > p1.stamina;
-}
+  const nextCost = 1 + localEnhance + 1; // 再加一次强化的总消耗
+  ui.enhancePlusBtn.disabled = nextCost > p1.stamina;
 
-/**
- * 渲染效果列表。
- * 效果定义由外部通过 effectDefs 数组传入，此处负责纯 DOM 渲染与点击绑定。
- * @param {Array<{id:string, name:string, desc:string}>} effectDefs
- * @param {string[]} selectedEffects - 当前已选效果 id 列表
- * @param {Function} onToggle - 点击效果项时的回调 (effectId: string) => void
- */
-export function renderEffectList(effectDefs, selectedEffects, onToggle) {
+  // 渲染已装备的效果（根据 pts 决定前端显示失效状态）
   ui.effectList.innerHTML = '';
-  effectDefs.forEach(def => {
+  const actionEnum = Action[selectedAction.toUpperCase()];
+  const equipped = p1.equippedEffects[actionEnum] || [];
+  
+  for (let i = 0; i < EFFECT_SLOTS; i++) {
+    const effectId = equipped[i];
     const item = document.createElement('div');
-    item.className = 'effect-item' + (selectedEffects.includes(def.id) ? ' selected' : '');
-    item.dataset.effect = def.id;
-    item.innerHTML = `
-      <div class="effect-item-name">${def.name}</div>
-      <div class="effect-item-desc">${def.desc}</div>
-    `;
-    item.addEventListener('click', () => onToggle(def.id));
+    const isValid = i < totalPts;
+    
+    item.className = 'effect-item' + (!isValid ? ' incompatible' : '') + (effectId && isValid ? ' selected' : '');
+    
+    if (effectId && EffectDefs[effectId]) {
+      const def = EffectDefs[effectId];
+      item.innerHTML = `
+        <div class="effect-item-main">
+          <div class="effect-item-name">${def.name}</div>
+          <div class="effect-item-desc">${def.desc}</div>
+        </div>
+      `;
+    } else {
+      item.innerHTML = `
+        <div class="effect-item-main">
+          <div class="effect-item-name" style="color:#64748b">槽位 ${i + 1} - 未装配</div>
+          <div class="effect-item-desc" style="color:#475569">在装备期点击 + 号装配效果</div>
+        </div>
+      `;
+    }
+    
+    item.style.cursor = 'default';
     ui.effectList.appendChild(item);
-  });
+  }
 }
 
 /** 选中行动：打开配置面板 */
@@ -255,6 +271,7 @@ function resetForNewTurn() {
   ui.p1SpeedUp.disabled   = false;
   ui.p1SpeedDown.disabled = false;
   ui.redecideBtn.classList.remove('show');
+  ui.declineRedecideBtn.classList.remove('show');
   ui.waitingLabel.classList.remove('show');
   
   const snap = engine.getSnapshot();
@@ -302,6 +319,13 @@ ui.readyBtn.addEventListener('click', () => {
 ui.redecideBtn.addEventListener('click', () => {
   engine.requestRedecide(PlayerId.P1);
   ui.redecideBtn.classList.remove('show');
+  ui.declineRedecideBtn.classList.remove('show');
+});
+
+ui.declineRedecideBtn.addEventListener('click', () => {
+  engine.declineRedecide(PlayerId.P1);
+  ui.redecideBtn.classList.remove('show');
+  ui.declineRedecideBtn.classList.remove('show');
 });
 
 ui.insightBtn.addEventListener('click', () => {
@@ -313,7 +337,20 @@ ui.battleLog.addEventListener('click', () => {
   if (!ui.battleLog.classList.contains('show')) return;
   ui.battleLog.classList.remove('show');
   document.body.classList.remove('resolving');
-  if (!isGameOver) engine.acknowledgeResolve();
+  if (!isGameOver) {
+    engine.acknowledgeResolve();
+  } else {
+    // 重新开局
+    isGameOver = false;
+    matchHistory = [];
+    updateHistoryUI();
+    ui.turnIndicator.textContent = "TURN 1";
+    ui.battleLog.querySelector('.log-hint').textContent = "点击关闭，开始下一回合";
+    
+    initUI();
+    engine.restartGame();
+    resetForNewTurn();
+  }
 });
 
 ui.historyBtn.addEventListener('click',   () => ui.historyModal.classList.add('show'));
@@ -323,7 +360,6 @@ ui.historyClose.addEventListener('click', () => ui.historyModal.classList.remove
 ui.configCloseBtn.addEventListener('click', cancelSelection);
 
 ui.enhancePlusBtn.addEventListener('click', () => {
-  if (selectedAction === 'dodge') return;
   localEnhance++;
   engine.submitAction(PlayerId.P1, { enhance: localEnhance });
   updateConfigPanel();
@@ -424,26 +460,23 @@ engine.on(EngineEvent.PLAYER_READY, ({ playerId, ready }) => {
 });
 
 engine.on(EngineEvent.REDECIDE_OFFER, ({ playerId }) => {
-  if (playerId === PlayerId.P1) ui.redecideBtn.classList.add('show');
+  if (playerId === PlayerId.P1) {
+    ui.redecideBtn.classList.add('show');
+    ui.declineRedecideBtn.classList.add('show');
+  }
 });
 
 engine.on(EngineEvent.REDECIDED, ({ playerId }) => {
   if (playerId === PlayerId.P1) {
-    selectedAction = null;
-    localEnhance   = 0;
-    document.querySelectorAll('.act-btn').forEach(b => {
-      b.classList.remove('selected');
-      b.removeAttribute('disabled');
-    });
-    ui.actionConfigPanel.classList.remove('show');
-    ui.p1SpeedUp.disabled   = false;
-    ui.p1SpeedDown.disabled = false;
+    // 重新决策：只恢复操作控件的可用性，不清除已选行动
+    // 玩家知道对手意图，允许在已有选择基础上微调（或保持原选择直接就绪）
     ui.standbyBtn.disabled  = false;
     ui.readyBtn.disabled    = false;
+    ui.p1SpeedUp.disabled   = false;
+    ui.p1SpeedDown.disabled = false;
     ui.waitingLabel.classList.remove('show');
-    const snap = engine.getSnapshot();
+    const snap    = engine.getSnapshot();
     const p1State = snap.players[PlayerId.P1];
-    refreshPoints(p1State.stamina, p1State.speed);
     ui.insightBtn.disabled = p1State.insightUsed || getProjectedStamina(p1State) < 1;
   }
 });
@@ -513,12 +546,15 @@ engine.on(EngineEvent.TURN_RESOLVED, result => {
     ui.turnIndicator.textContent = `TURN ${result.turn + 1}`;
     resetForNewTurn();
   }
+
+  // 情报框：每回合结算后刷新
+  updateIntelBox();
 });
 
 engine.on(EngineEvent.GAME_OVER, ({ reason }) => {
   isGameOver = true;
   ui.logDetail.innerHTML += `<br><br><strong style="color:var(--color-atk)">${reason}</strong>`;
-  ui.logDetail.innerHTML += `<br><span style="color:var(--text-muted);font-size:0.78rem">刷新页面重新开始</span>`;
+  ui.battleLog.querySelector('.log-hint').textContent = '点击屏幕，重新开局';
   ui.standbyBtn.disabled = true;
   ui.readyBtn.disabled   = true;
   ui.insightBtn.disabled = true;
@@ -558,8 +594,189 @@ function initUI() {
 
   ui.p1Arc.style.strokeDashoffset = 0;
   ui.p2Arc.style.strokeDashoffset = 0;
-  ui.p1Sec.textContent = TimerConfig.TOTAL;
-  ui.p2Sec.textContent = TimerConfig.TOTAL;
+  ui.p1Sec.textContent = TimerConfig.DECISION_TIME;
+  ui.p2Sec.textContent = TimerConfig.DECISION_TIME;
+}
+
+// ═══════════════════════════════════════════════════════
+// 装备期 UI 系统
+// ═══════════════════════════════════════════════════════
+
+// 当前正在选择的槽位上下文
+let _pickCtx = null; // { action, slot }
+
+/** 刷新装备面板上所有槽位的显示，基于 engine 当前 equippedEffects */
+function refreshEquipSlots() {
+  const snap = engine.getSnapshot();
+  const p1   = snap.players[PlayerId.P1];
+  if (!p1.equippedEffects) return;
+
+  [Action.ATTACK, Action.GUARD, Action.DODGE].forEach(action => {
+    const container = $(`equipSlots-${action}`);
+    if (!container) return;
+
+    const slots = container.querySelectorAll('.equip-slot');
+    slots.forEach((slotEl, idx) => {
+      const effectId = p1.equippedEffects[action]?.[idx] ?? null;
+      slotEl.innerHTML = '';
+      slotEl.classList.toggle('filled', !!effectId);
+
+      if (effectId && EffectDefs[effectId]) {
+        const def = EffectDefs[effectId];
+        const nameEl   = document.createElement('div');
+        nameEl.className = 'slot-name';
+        nameEl.textContent = def.name;
+
+        const changeEl = document.createElement('div');
+        changeEl.className = 'slot-change';
+        changeEl.textContent = '更换';
+
+        slotEl.appendChild(nameEl);
+        slotEl.appendChild(changeEl);
+      } else {
+        const plus  = document.createElement('span');
+        plus.className = 'slot-add';
+        plus.textContent = '+';
+        slotEl.appendChild(plus);
+      }
+    });
+  });
+}
+
+/** 打开效果库弹窗，供指定 (action, slot) 选择 */
+function openEffectPicker(action, slot) {
+  _pickCtx = { action, slot };
+
+  const snap = engine.getSnapshot();
+  const p1   = snap.players[PlayerId.P1];
+  const inv  = p1.effectInventory?.[action] ?? [];
+
+  ui.effectPickerList.innerHTML = '';
+
+  // 已装备在其他槽的效果 ID 集合（不含当前槽）
+  const equippedElsewhere = new Set(
+    (p1.equippedEffects?.[action] ?? []).filter((id, i) => i !== slot && id !== null)
+  );
+
+  inv.forEach(effectId => {
+    const def = EffectDefs[effectId];
+    if (!def) return;
+    // 同效果只能装备一格，已在其他槽的不显示
+    if (equippedElsewhere.has(effectId)) return;
+
+    const item = document.createElement('div');
+    item.className = 'effect-item';
+
+    item.innerHTML = `
+      <div class="effect-item-main">
+        <div class="effect-item-name">${def.name}</div>
+        <div class="effect-item-desc">${def.desc}</div>
+      </div>
+    `;
+
+    item.addEventListener('click', () => {
+      engine.assignEffect(PlayerId.P1, action, slot, effectId);
+      ui.effectPicker.classList.remove('show');
+      _pickCtx = null;
+      refreshEquipSlots();
+    });
+
+    ui.effectPickerList.appendChild(item);
+  });
+
+  // 同时提供"清空"选项
+  const clearItem = document.createElement('div');
+  clearItem.className = 'effect-item';
+  clearItem.innerHTML = `<div class="effect-item-main"><div class="effect-item-name" style="color:#64748b">清空此槽</div></div>`;
+  clearItem.addEventListener('click', () => {
+    engine.assignEffect(PlayerId.P1, action, slot, null);
+    ui.effectPicker.classList.remove('show');
+    _pickCtx = null;
+    refreshEquipSlots();
+  });
+  ui.effectPickerList.appendChild(clearItem);
+
+  ui.effectPicker.classList.add('show');
+}
+
+// 效果库关闭按钮
+ui.effectPickerClose.addEventListener('click', () => {
+  ui.effectPicker.classList.remove('show');
+  _pickCtx = null;
+});
+
+// 委托所有装备槽的点击（在 equip-overlay 内）
+ui.equipOverlay.addEventListener('click', e => {
+  const slotEl = e.target.closest('.equip-slot');
+  if (!slotEl) return;
+  // 如果弹窗已打开则关闭
+  if (ui.effectPicker.classList.contains('show')) {
+    ui.effectPicker.classList.remove('show');
+    _pickCtx = null;
+    return;
+  }
+  const action = slotEl.dataset.action;
+  const slot   = parseInt(slotEl.dataset.slot, 10);
+  openEffectPicker(action, slot);
+});
+
+// 监听装备期开始事件 → 显示覆盖面板并倒计时
+engine.on(EngineEvent.EQUIP_PHASE_START, ({ secondsLeft }) => {
+  ui.equipCountdown.textContent = secondsLeft;
+  if (!ui.equipOverlay.classList.contains('active')) {
+    ui.equipOverlay.classList.add('active');
+    // 每次进入装备期都刷新槽位显示
+    refreshEquipSlots();
+    // 主操作区禁用
+    ui.standbyBtn.disabled = true;
+    ui.readyBtn.disabled   = true;
+    ui.insightBtn.disabled = true;
+  }
+});
+
+// 监听装备期结束事件 → 隐藏覆盖面板，启用主操作区
+engine.on(EngineEvent.EQUIP_PHASE_END, () => {
+  ui.equipOverlay.classList.remove('active');
+  ui.effectPicker.classList.remove('show');
+  
+  const snap = engine.getSnapshot();
+  const p1 = snap.players[PlayerId.P1];
+  
+  if (!p1.ready) {
+    ui.standbyBtn.disabled = false;
+    ui.readyBtn.disabled = false;
+    const projStam = getProjectedStamina(p1);
+    ui.insightBtn.disabled = p1.insightUsed || projStam < 1;
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// 情报框更新
+// ═══════════════════════════════════════════════════════
+
+function updateIntelBox() {
+  const snap  = engine.getSnapshot();
+  const intel = snap.players[PlayerId.P1].effectIntel ?? [];
+
+  ui.intelList.innerHTML = '';
+
+  if (intel.length === 0) {
+    const empty = document.createElement('span');
+    empty.className = 'intel-empty';
+    empty.textContent = '尚未获取任何情报';
+    ui.intelList.appendChild(empty);
+    return;
+  }
+
+  intel.forEach(effectId => {
+    const def = EffectDefs[effectId];
+    if (!def) return;
+
+    const tag = document.createElement('div');
+    tag.className = 'intel-tag';
+    tag.innerHTML = `${def.name}<span>${def.desc}</span>`;
+    ui.intelList.appendChild(tag);
+  });
 }
 
 initUI();

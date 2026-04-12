@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file engine.js
  * @description 博弈战斗系统 — 战斗引擎（状态机 + 事件总线）
  *
@@ -29,11 +29,14 @@ import {
   TimerConfig,
   Phase,
   InsightType,
+  EffectId,
+  EffectDefs,
+  EFFECT_SLOTS,
 } from './constants.js';
 
 import { DualTimer } from './timer.js';
-import { resolve }   from './resolver.js';
-import { scheduleAI } from '../ai/ai-base.js';
+import { resolve } from './resolver.js';
+import { scheduleAI, scheduleAIRedecide } from '../ai/ai-base.js';
 
 // ─────────────────────────────────────────────
 // 事件总线（内部工具类）
@@ -92,19 +95,38 @@ class EventBus {
  * @returns {import('./constants.js').PlayerState}
  */
 function createPlayerState(id, overrides = {}) {
+  // 每个行动独立维护自己的效果库
+  const allAttackEffects = Object.values(EffectId).filter(id => EffectDefs[id]?.applicableTo.includes(Action.ATTACK));
+  const allGuardEffects  = Object.values(EffectId).filter(id => EffectDefs[id]?.applicableTo.includes(Action.GUARD));
+  const allDodgeEffects  = Object.values(EffectId).filter(id => EffectDefs[id]?.applicableTo.includes(Action.DODGE));
+  // 创建每个行为的空槽位（长度固定为 EFFECT_SLOTS）
+  const emptySlots = () => Array(EFFECT_SLOTS).fill(null);
+
   return {
     id,
-    hp:           DefaultStats.MAX_HP,
-    stamina:      DefaultStats.MAX_STAMINA,
-    speed:        DefaultStats.BASE_SPEED,
-    ready:        false,
-    insightUsed:  false,
+    hp: DefaultStats.MAX_HP,
+    stamina: DefaultStats.MAX_STAMINA,
+    speed: DefaultStats.BASE_SPEED,
+    ready: false,
+    insightUsed: false,
     wasInsighted: false,
     pendingInsightTarget: null,
-    pendingPassiveReveal: false, // 进入洞察期但尚未就绪揭示行动
-    canRedecide:  false,
-    didRedecide:  false,
+    pendingPassiveReveal: false,
+    canRedecide: false,
+    didRedecide: false,
     actionCtx: null,
+    // 效果相关状态：每个行动独立维护自己的效果库
+    effectInventory: {
+      [Action.ATTACK]: [...allAttackEffects],
+      [Action.GUARD]:  [...allGuardEffects],
+      [Action.DODGE]:  [...allDodgeEffects],
+    },
+    equippedEffects: {                            // 跨回合缓存的快捷槽担
+      [Action.ATTACK]: emptySlots(),
+      [Action.GUARD]: emptySlots(),
+      [Action.DODGE]: emptySlots(),
+    },
+    effectIntel: [],                              // 已获取的敌方效果情报
     ...overrides,
   };
 }
@@ -117,11 +139,12 @@ function createPlayerState(id, overrides = {}) {
 function createActionCtx(action = Action.STANDBY) {
   return {
     action,
-    enhance:     0,
-    speed:       DefaultStats.BASE_SPEED,
-    pts:         0,
-    cost:        0,
+    enhance: 0,
+    speed: DefaultStats.BASE_SPEED,
+    pts: 0,
+    cost: 0,
     insightUsed: false,
+    effects: Array(EFFECT_SLOTS).fill(null), // 长度固定为3，null 表示空槽
   };
 }
 
@@ -137,10 +160,10 @@ export class BattleEngine {
    * @param {string} [options.p2Name] - P2 显示名（AI 时可为 NPC 名）
    */
   constructor(mode = EngineMode.PVE, options = {}) {
-    this._mode    = mode;
-    this._bus     = new EventBus();
-    this._state   = EngineState.IDLE;
-    this._turn    = 0;
+    this._mode = mode;
+    this._bus = new EventBus();
+    this._state = EngineState.IDLE;
+    this._turn = 0;
 
     this._names = {
       [PlayerId.P1]: options.p1Name ?? '玩家',
@@ -155,9 +178,11 @@ export class BattleEngine {
 
     // 初始化计时器（回调绑定到引擎方法）
     this._timer = new DualTimer({
-      onTick:       this._onTimerTick.bind(this),
+      onEquipTick: this._onEquipTick.bind(this),
+      onEquipEnd: this._onEquipEnd.bind(this),
+      onTick: this._onTimerTick.bind(this),
       onPhaseShift: this._onPhaseShift.bind(this),
-      onTimeout:    this._onTimeout.bind(this),
+      onTimeout: this._onTimeout.bind(this),
     });
 
     // AI 就绪句柄（PVE 模式下持有，用于取消）
@@ -187,6 +212,48 @@ export class BattleEngine {
   }
 
   /**
+   * 装备期：玩家将某个效果放置到某行为的某个槽位（或清空，传 null）
+   * 效果更改持久跨回合，直到玩家主动替换。
+   *
+   * @param {string}      playerId - PlayerId
+   * @param {string}      action   - Action 枚举值（攻击/守备/闪避）
+   * @param {number}      slot     - 槽位编号 0-based（0,1,2）
+   * @param {string|null} effectId - EffectId 枚举值，或 null 表示清空
+   */
+  assignEffect(playerId, action, slot, effectId) {
+    // 只允许在装备期或待机期操作（IDLE 或 EQUIPPING）
+    if (this._state !== EngineState.EQUIPPING && this._state !== EngineState.IDLE) return;
+
+    const p = this._players[playerId];
+    if (!p) return;
+
+    // 效果必须存在于该行动对应的库中
+    if (effectId !== null && !(p.effectInventory[action] ?? []).includes(effectId)) return;
+
+    // 行为必须合法
+    if (![Action.ATTACK, Action.GUARD, Action.DODGE].includes(action)) return;
+
+    // 验证效果对该行为的适用性
+    if (effectId !== null) {
+      const def = EffectDefs[effectId];
+      if (!def || !def.applicableTo.includes(action)) return;
+    }
+
+    // 同一效果只能占用一个槽位
+    if (effectId !== null) {
+      const slots = p.equippedEffects[action];
+      if (slots.some((id, i) => id === effectId && i !== slot)) return;
+    }
+
+    // 写入槽位
+    p.equippedEffects[action][slot] = effectId;
+
+    this._bus.emit(EngineEvent.EFFECT_SLOT_UPDATED, {
+      playerId, action, slot, effectId,
+    });
+  }
+
+  /**
    * 玩家更新行动配置（未就绪时可多次调用，用于实时预览与联机同步）
    *
    * @param {string} playerId - PlayerId
@@ -202,7 +269,7 @@ export class BattleEngine {
       ...patch,
     };
     // 重新计算 pts 与 cost（以保证一致性）
-    p.actionCtx.pts  = this._calcPts(p.actionCtx, p);
+    p.actionCtx.pts = this._calcPts(p.actionCtx, p);
     p.actionCtx.cost = this._calcCost(p.actionCtx, p);
 
     this._bus.emit(EngineEvent.ACTION_UPDATED, {
@@ -235,7 +302,7 @@ export class BattleEngine {
     // 同步更新行动配置中的速度
     if (p.actionCtx) {
       p.actionCtx.speed = p.speed;
-      p.actionCtx.pts   = this._calcPts(p.actionCtx, p);
+      p.actionCtx.pts = this._calcPts(p.actionCtx, p);
     }
 
     this._bus.emit(EngineEvent.ACTION_UPDATED, {
@@ -258,21 +325,31 @@ export class BattleEngine {
     }
 
     p.ready = true;
+
+    // 将玩家在快捷槽里预装的效果合并进本次行动
+    // 仅限有意义的行动（待命没有效果槽）
+    const action = p.actionCtx.action;
+    if (action !== Action.STANDBY && p.equippedEffects[action]) {
+      p.actionCtx.effects = [...p.equippedEffects[action]];
+    } else {
+      p.actionCtx.effects = Array(EFFECT_SLOTS).fill(null);
+    }
+
     this._timer.pause(playerId);
 
     this._bus.emit(EngineEvent.PLAYER_READY, { playerId, ready: true });
 
     const otherId = playerId === PlayerId.P1 ? PlayerId.P2 : PlayerId.P1;
-    const other   = this._players[otherId];
+    const other = this._players[otherId];
 
     // 1. 此方就绪：揭示被动洞察（如果有）
     if (p.pendingPassiveReveal) {
       p.pendingPassiveReveal = false;
       this._bus.emit(EngineEvent.PASSIVE_INSIGHT, {
-        targetId:       playerId,
+        targetId: playerId,
         revealedAction: { ...p.actionCtx },
-        revealed:       true,
-        type:           InsightType.PASSIVE,
+        revealed: true,
+        type: InsightType.PASSIVE,
       });
     }
 
@@ -312,7 +389,7 @@ export class BattleEngine {
     if (caster.ready) return;            // 已就绪则无需洞察
 
     caster.stamina--;
-    caster.insightUsed        = true;
+    caster.insightUsed = true;
     caster.pendingInsightTarget = targetId; // 标记目标，待其就绪时才揭示
     // 注意：不设置 target.wasInsighted。
     // wasInsighted 仅由被动洞察（_onPhaseShift，即时限超 30s）写入，
@@ -362,7 +439,7 @@ export class BattleEngine {
     const p = this._players[playerId];
     if (!p || !p.canRedecide || p.didRedecide) return;
 
-    p.ready       = false;
+    p.ready = false;
     p.canRedecide = false;
     p.didRedecide = true;
 
@@ -373,6 +450,24 @@ export class BattleEngine {
     this._bus.emit(EngineEvent.PLAYER_READY, { playerId, ready: false });
   }
 
+  /**
+   * 玩家（或AI）放弃重新决策机会
+   * @param {string} playerId 
+   */
+  declineRedecide(playerId) {
+    const p = this._players[playerId];
+    if (!p || !p.canRedecide) return;
+
+    p.canRedecide = false;
+
+    // 如果双方都已经准备好并且都不再等待重决策，强制进入结算
+    const p1 = this._players[PlayerId.P1];
+    const p2 = this._players[PlayerId.P2];
+    if (p1.ready && p2.ready && !p1.canRedecide && !p2.canRedecide) {
+      this._triggerResolve();
+    }
+  }
+
   /** 重置引擎到初始状态（重新开始对局） */
   restartGame() {
     this._timer.stop();
@@ -381,10 +476,10 @@ export class BattleEngine {
       this._aiHandle = null;
     }
 
-    this._state     = EngineState.IDLE;
-    this._turn      = 0;
+    this._state = EngineState.IDLE;
+    this._turn = 0;
     this._aiHistory = []; // 清空历史：新局 AI 不携带上局记忆
-    this._players   = {
+    this._players = {
       [PlayerId.P1]: createPlayerState(PlayerId.P1),
       [PlayerId.P2]: createPlayerState(PlayerId.P2),
     };
@@ -397,7 +492,7 @@ export class BattleEngine {
   getSnapshot() {
     return {
       state: this._state,
-      turn:  this._turn,
+      turn: this._turn,
       players: {
         [PlayerId.P1]: { ...this._players[PlayerId.P1] },
         [PlayerId.P2]: { ...this._players[PlayerId.P2] },
@@ -411,29 +506,30 @@ export class BattleEngine {
 
   _beginTurn() {
     this._turn++;
-    this._setState(EngineState.TICKING);
 
-    // 重置回合状态（不重置 hp / stamina / speed）
+    // 重置回合状态（不重置 hp / stamina / speed / equippedEffects / effectIntel）
     [PlayerId.P1, PlayerId.P2].forEach(id => {
       const p = this._players[id];
-      p.ready               = false;
-      p.insightUsed         = false;
-      p.wasInsighted        = false;
-      p.pendingInsightTarget = null;  // Bug #1: 必须跨轮清除
-      p.pendingPassiveReveal = false; // Bug #1: 必须跨轮清除
-      p.canRedecide         = false;
-      p.didRedecide         = false;
-      p.speed               = DefaultStats.BASE_SPEED;
-      p.actionCtx           = createActionCtx(Action.STANDBY);
+      p.ready = false;
+      p.insightUsed = false;
+      p.wasInsighted = false;
+      p.pendingInsightTarget = null;
+      p.pendingPassiveReveal = false;
+      p.canRedecide = false;
+      p.didRedecide = false;
+      p.speed = DefaultStats.BASE_SPEED;
+      p.actionCtx = createActionCtx(Action.STANDBY);
+    });
+
+    // 先进入装备期
+    this._setState(EngineState.EQUIPPING);
+    this._bus.emit(EngineEvent.EQUIP_PHASE_START, {
+      secondsLeft: TimerConfig.EQUIP_TIME,
     });
 
     this._timer.reset();
     this._timer.start();
-
-    // PVE 模式：驱动 AI 行为
-    if (this._mode === EngineMode.PVE) {
-      this._scheduleAI();
-    }
+    // 注：AI 调度呈在 _onEquipEnd 里发起，装备期结束名同时进入决策期
   }
 
   _triggerResolve() {
@@ -510,10 +606,29 @@ export class BattleEngine {
   // 计时器回调（内部）
   // ═══════════════════════════════════════════
 
+  /** 装备期 tick：将剩余秒数展平到 UI */
+  _onEquipTick(secondsLeft) {
+    this._bus.emit(EngineEvent.EQUIP_PHASE_START, { secondsLeft });
+  }
+
+  /** 装备期结束：将快捷效果槽同步入 actionCtx，切换到决策期 */
+  _onEquipEnd() {
+    // 将每个玩家快捷槽里的效果同步到初始配置中
+    // （在决策期选眼了行动后，将对应行为的快捷槽和 lastingSlots 坥加入 actionCtx.effects）
+    // 这里只凉异状态，真正合并在 setReady() 的内部实现
+    this._setState(EngineState.TICKING);
+    this._bus.emit(EngineEvent.EQUIP_PHASE_END, {});
+
+    // PVE 模式：装备期结束后才调度 AI
+    if (this._mode === EngineMode.PVE) {
+      this._scheduleAI();
+    }
+  }
+
   _onTimerTick(p1Elapsed, p2Elapsed, phases) {
     this._bus.emit(EngineEvent.TIMER_TICK, {
-      [PlayerId.P1]: { elapsed: p1Elapsed, remaining: TimerConfig.TOTAL - p1Elapsed, phase: phases[PlayerId.P1] },
-      [PlayerId.P2]: { elapsed: p2Elapsed, remaining: TimerConfig.TOTAL - p2Elapsed, phase: phases[PlayerId.P2] },
+      [PlayerId.P1]: { elapsed: p1Elapsed, remaining: TimerConfig.DECISION_TIME - p1Elapsed, phase: phases[PlayerId.P1] },
+      [PlayerId.P2]: { elapsed: p2Elapsed, remaining: TimerConfig.DECISION_TIME - p2Elapsed, phase: phases[PlayerId.P2] },
     });
   }
 
@@ -522,11 +637,11 @@ export class BattleEngine {
    * @param {string} playerId - 被洞察方
    */
   _onPhaseShift(playerId) {
-    const target  = this._players[playerId];
+    const target = this._players[playerId];
     const otherId = playerId === PlayerId.P1 ? PlayerId.P2 : PlayerId.P1;
 
     // 只标记进入洞察期，行动就绪后才揭示
-    target.wasInsighted      = true;
+    target.wasInsighted = true;
     target.pendingPassiveReveal = true;
 
     this._bus.emit(EngineEvent.PHASE_SHIFT, { playerId });
@@ -566,7 +681,7 @@ export class BattleEngine {
     let offered = false;
     const tryOffer = (earlyId, lateId) => {
       const early = this._players[earlyId];
-      const late  = this._players[lateId];
+      const late = this._players[lateId];
       if (
         early.ready &&
         !early.didRedecide &&
@@ -576,6 +691,25 @@ export class BattleEngine {
         early.canRedecide = true;
         offered = true;
         this._bus.emit(EngineEvent.REDECIDE_OFFER, { playerId: earlyId });
+
+        // PVE 模式：AI 利用已知的对手意图进行重决策
+        if (this._mode === EngineMode.PVE && earlyId === PlayerId.P2) {
+          scheduleAIRedecide({
+            engineState: () => this._state,
+            getState: () => ({
+              ai: { ...this._players[PlayerId.P2] },
+              player: { ...this._players[PlayerId.P1] },
+              // 暴露已揭示的对手行动——这就是重决策的信息优势
+              revealedAction: this._players[PlayerId.P1].actionCtx
+                ? { ...this._players[PlayerId.P1].actionCtx }
+                : null,
+            }),
+            requestRedecide: (id) => this.requestRedecide(id),
+            declineRedecide: (id) => this.declineRedecide(id),
+            submitAction: (id, dec) => this.submitAction(id, dec),
+            setReady: (id) => this.setReady(id),
+          });
+        }
       }
     };
 
@@ -608,21 +742,33 @@ export class BattleEngine {
     const p1 = this._players[PlayerId.P1];
     const p2 = this._players[PlayerId.P2];
 
-    p1.hp      = result.newState.p1.hp;
+    p1.hp = result.newState.p1.hp;
     p1.stamina = result.newState.p1.stamina;
-    p2.hp      = result.newState.p2.hp;
+    p2.hp = result.newState.p2.hp;
     p2.stamina = result.newState.p2.stamina;
 
     // 回合末速度归1（加速为临时性的）
     p1.speed = DefaultStats.BASE_SPEED;
     p2.speed = DefaultStats.BASE_SPEED;
 
+    // 情报同步：将本回合对方生效的效果追加进己方的 effectIntel（去重）
+    if (result.p2ExposedEffects?.length) {
+      for (const eff of result.p2ExposedEffects) {
+        if (!p1.effectIntel.includes(eff)) p1.effectIntel.push(eff);
+      }
+    }
+    if (result.p1ExposedEffects?.length) {
+      for (const eff of result.p1ExposedEffects) {
+        if (!p2.effectIntel.includes(eff)) p2.effectIntel.push(eff);
+      }
+    }
+
     // PVE 模式：记录 P1（玩家）本回合的属性快照，供下回合 AI 分析
     if (this._mode === EngineMode.PVE && result.p1Action) {
       this._aiHistory.push({
-        opponentAction:  result.p1Action.action,
-        opponentSpeed:   result.p1Action.speed   ?? DefaultStats.BASE_SPEED,
-        opponentEnhance: result.p1Action.enhance  ?? 0,
+        opponentAction: result.p1Action.action,
+        opponentSpeed: result.p1Action.speed ?? DefaultStats.BASE_SPEED,
+        opponentEnhance: result.p1Action.enhance ?? 0,
         opponentStamina: result.newState.p1.stamina,
       });
       if (this._aiHistory.length > 5) this._aiHistory.shift();
@@ -670,14 +816,14 @@ export class BattleEngine {
     if (this._aiHandle) this._aiHandle.cancel();
 
     this._aiHandle = scheduleAI({
-      engineState:  () => this._state,
-      getState:     () => ({
-        ai:     { ...this._players[PlayerId.P2] },
+      engineState: () => this._state,
+      getState: () => ({
+        ai: { ...this._players[PlayerId.P2] },
         player: { ...this._players[PlayerId.P1] },
       }),
-      getHistory:   () => [...this._aiHistory],
+      getHistory: () => [...this._aiHistory],
       submitAction: (id, dec) => this.submitAction(id, dec),
-      setReady:     (id)      => this.setReady(id),
+      setReady: (id) => this.setReady(id),
     });
   }
 
@@ -694,8 +840,8 @@ export class BattleEngine {
     if (!p.actionCtx || p.actionCtx.action === Action.STANDBY) return;
 
     // TODO: 未来增加带耗能的 effectDefs 时，可在此纳入 effectCost 的累计
-    const effectCost = 0; 
-    
+    const effectCost = 0;
+
     // 闪避基础消耗为 1（速度消耗已提前支付），其它基础消耗为 1
     const baseCost = 1;
     const currentCost = baseCost + (p.actionCtx.enhance || 0) + effectCost;
@@ -708,7 +854,7 @@ export class BattleEngine {
         // 付得起基础模型，但多挂的强化付不起，强行剥离超额强化
         p.actionCtx.enhance = Math.max(0, p.stamina - baseCost - effectCost);
         p.actionCtx.cost = baseCost + p.actionCtx.enhance + effectCost;
-        p.actionCtx.pts  = (p.actionCtx.action === Action.DODGE ? p.speed : 1) + p.actionCtx.enhance;
+        p.actionCtx.pts = 1 + p.actionCtx.enhance; // 闪避幅度也是 1+enhance
       }
     }
   }
@@ -719,9 +865,11 @@ export class BattleEngine {
     this._bus.emit(EngineEvent.STATE_CHANGED, { state: newState });
   }
 
-  /** 计算行动最终点数 */
-  _calcPts(ctx, playerState) {
-    if (ctx.action === Action.DODGE)   return playerState.speed;
+  /** 计算行动最终点数
+   * 攻击/守备/闪避均为 1 + enhance
+   * 闪避幅度已与速度解耦，速度仅影响时序
+   */
+  _calcPts(ctx, _playerState) {
     if (ctx.action === Action.STANDBY) return 0;
     return 1 + (ctx.enhance || 0);
   }
