@@ -9,28 +9,34 @@
   <style>
     /* ─── CSS 变量 ────────────────────────────────── */
     :root {
-      --bg-base:        #050505;
-      --panel-bg:       rgba(10, 10, 12, 0.85);
-      --border:         rgba(60, 65, 75, 0.6);
-      --text-main:      #e2e8f0;
-      --text-muted:     #64748b;
+      --bg-base: #050505;
+      --panel-bg: rgba(10, 10, 12, 0.85);
+      --border: rgba(60, 65, 75, 0.6);
+      --text-main: #e2e8f0;
+      --text-muted: #64748b;
 
-      --color-hp:       #b91c1c;
-      --color-stamina:  #38bdf8;
-      --color-atk:      #f59e0b;
-      --color-def:      #64748b;
-      --color-dod:      #14b8a6;
-      --color-insight:  #a78bfa;
+      --color-hp: #b91c1c;
+      --color-stamina: #38bdf8;
+      --color-atk: #f59e0b;
+      --color-def: #64748b;
+      --color-dod: #14b8a6;
+      --color-insight: #a78bfa;
 
       --timer-decision: #38bdf8;
-      --timer-insight:  #ef4444;
+      --timer-insight: #ef4444;
 
       /* SVG 倒计时环参数 */
-      --ring-r:          36;
-      --ring-circ:       226.2; /* 2π×36 ≈ 226.2 */
+      --ring-r: 36;
+      --ring-circ: 226.2;
+      /* 2π×36 ≈ 226.2 */
     }
 
-    * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+    }
 
     body {
       font-family: 'Noto Sans SC', sans-serif;
@@ -48,7 +54,10 @@
     body::before {
       content: '';
       position: absolute;
-      top: -5%; left: -5%; width: 110%; height: 110%;
+      top: -5%;
+      left: -5%;
+      width: 110%;
+      height: 110%;
       background-image: url('ui/sq-du/background/combat-bg.jpg');
       background-size: cover;
       background-position: center;
@@ -56,17 +65,21 @@
       z-index: -2;
       pointer-events: none;
     }
+
     body::after {
       content: '';
       position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
       background-image: url('ui/sq-du/background/combat-bg.jpg');
       background-size: contain;
       background-position: center;
       background-repeat: no-repeat;
       z-index: -1;
       pointer-events: none;
-      box-shadow: inset 0 0 150px rgba(0,0,0,1);
+      box-shadow: inset 0 0 150px rgba(0, 0, 0, 1);
     }
 
     /* ─── HUD 顶部 ───────────────────────────────── */
@@ -84,36 +97,56 @@
     .status-card {
       display: flex;
       align-items: center;
-      gap: 20px;
-      background: linear-gradient(135deg, rgba(30,30,35,0.7) 0%, rgba(10,10,12,0.9) 100%);
+      gap: 16px;
+      background: linear-gradient(135deg, rgba(30, 30, 35, 0.7) 0%, rgba(10, 10, 12, 0.9) 100%);
       border: 1px solid var(--border);
       border-radius: 4px;
-      padding: 14px 24px;
+      padding: 14px 20px;
       backdrop-filter: blur(16px);
-      box-shadow: 0 10px 30px rgba(0,0,0,0.8), inset 0 1px 1px rgba(255,255,255,0.05);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.05);
       flex-shrink: 0;
+      position: relative;
     }
 
-    .status-enemy { flex-direction: row-reverse; }
+    .status-enemy {
+      flex-direction: row-reverse;
+    }
 
-    /* 倒计时环容器 */
+    /* 倒计时环容器 — 小型角标，绝对定位在卡片左上角 */
     .timer-ring-wrap {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      width: 44px;
+      height: 44px;
+      z-index: 5;
+    }
+
+    /* 角标暗色衬底，保证数字在头像上可读 */
+    .timer-ring-wrap::before {
+      content: '';
+      position: absolute;
+      inset: 2px;
+      background: rgba(5, 5, 8, 0.82);
+      border-radius: 50%;
+      z-index: 0;
+    }
+
+    .timer-ring-wrap>* {
       position: relative;
-      width: 84px;
-      height: 84px;
-      flex-shrink: 0;
+      z-index: 1;
     }
 
     .timer-ring-svg {
-      width: 84px;
-      height: 84px;
+      width: 44px;
+      height: 44px;
       transform: rotate(-90deg);
     }
 
     /* 环背景 */
     .ring-bg {
       fill: none;
-      stroke: rgba(255,255,255,0.07);
+      stroke: rgba(255, 255, 255, 0.07);
       stroke-width: 5;
     }
 
@@ -143,37 +176,87 @@
       justify-content: center;
       pointer-events: none;
     }
+
     .timer-sec {
       font-family: 'Cinzel', serif;
-      font-size: 1.25rem;
+      font-size: 0.75rem;
       font-weight: 700;
       line-height: 1;
       color: var(--text-main);
     }
+
     .timer-phase-label {
-      font-size: 0.52rem;
-      letter-spacing: 0.5px;
-      color: var(--text-muted);
-      margin-top: 2px;
-      text-transform: uppercase;
+      display: none;
+      /* 角标太小，不显示阶段文字 */
     }
 
-    /* 就绪状态覆盖层 */
+    /* 就绪状态覆盖层 — 小环只显示 ✓ */
     .timer-ready-overlay {
       position: absolute;
       inset: 0;
       display: none;
       align-items: center;
       justify-content: center;
-      font-size: 0.7rem;
+      font-size: 1.1rem;
       font-weight: bold;
       color: var(--color-stamina);
-      text-align: center;
-      line-height: 1.3;
     }
-    .timer-ring-wrap.is-ready .timer-center { display: none; }
-    .timer-ring-wrap.is-ready .timer-ready-overlay { display: flex; }
-    .timer-ring-wrap.is-ready .ring-arc { stroke: var(--color-stamina); opacity: 0.5; }
+
+    .timer-ring-wrap.is-ready .timer-center {
+      display: none;
+    }
+
+    .timer-ring-wrap.is-ready .timer-ready-overlay {
+      display: flex;
+    }
+
+    .timer-ring-wrap.is-ready .ring-arc {
+      stroke: var(--color-stamina);
+      opacity: 0.5;
+    }
+
+    /* 对手倒计时环：完全隐藏，不以任何方式向己方泄露信息 */
+    .opponent-ring {
+      display: none !important;
+    }
+
+    /* 方形头像框 */
+    .avatar-frame {
+      width: 84px;
+      height: 84px;
+      background: linear-gradient(145deg, rgba(25, 25, 32, 0.9) 0%, rgba(8, 8, 12, 0.95) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 4px;
+      flex-shrink: 0;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255, 255, 255, 0.07);
+      font-size: 2.8rem;
+      font-family: 'Cinzel', serif;
+      position: relative;
+    }
+
+    /* 头像框内十字定位线（装饰） */
+    .avatar-frame::before,
+    .avatar-frame::after {
+      content: '';
+      position: absolute;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .avatar-frame::before {
+      width: 100%;
+      height: 1px;
+      top: 50%;
+    }
+
+    .avatar-frame::after {
+      width: 1px;
+      height: 100%;
+      left: 50%;
+    }
 
     /* ─── 属性列 ──────────────────────────────────── */
     .stats-col {
@@ -181,7 +264,10 @@
       flex-direction: column;
       gap: 10px;
     }
-    .status-enemy .stats-col { align-items: flex-end; }
+
+    .status-enemy .stats-col {
+      align-items: flex-end;
+    }
 
     .stat-row {
       display: flex;
@@ -203,12 +289,13 @@
       background: var(--color-hp);
       transform: rotate(45deg);
       border-radius: 2px;
-      box-shadow: 0 0 10px rgba(185,28,28,0.8);
+      box-shadow: 0 0 10px rgba(185, 28, 28, 0.8);
       transition: all 0.3s;
     }
+
     .hp-pip.lost {
       background: #1e1e24;
-      border: 1px solid rgba(185,28,28,0.2);
+      border: 1px solid rgba(185, 28, 28, 0.2);
       box-shadow: none;
       opacity: 0.5;
     }
@@ -220,10 +307,11 @@
       background: var(--color-stamina);
       border-radius: 14px 14px 0 0;
       border-bottom: 2px solid var(--border);
-      box-shadow: 0 -2px 8px rgba(56,189,248,0.5);
+      box-shadow: 0 -2px 8px rgba(56, 189, 248, 0.5);
       transition: all 0.3s;
       margin-top: 5px;
     }
+
     .stamina-pip.spent {
       background: #1e1e24;
       box-shadow: none;
@@ -236,6 +324,7 @@
       align-items: center;
       gap: 6px;
     }
+
     .speed-val {
       font-family: 'Cinzel', serif;
       font-size: 1.05rem;
@@ -244,9 +333,10 @@
       min-width: 16px;
       text-align: center;
     }
+
     .speed-btn {
-      background: rgba(52,211,153,0.12);
-      border: 1px solid rgba(52,211,153,0.3);
+      background: rgba(52, 211, 153, 0.12);
+      border: 1px solid rgba(52, 211, 153, 0.3);
       color: var(--color-dod);
       border-radius: 50%;
       width: 19px;
@@ -259,8 +349,138 @@
       transition: all 0.2s;
       padding: 0;
     }
-    .speed-btn:hover:not(:disabled) { background: rgba(52,211,153,0.28); transform: scale(1.1); }
-    .speed-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .speed-btn:hover:not(:disabled) {
+      background: rgba(52, 211, 153, 0.28);
+      transform: scale(1.1);
+    }
+
+    .speed-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    /* ─── 行动配置侧边栏 ────────────────────── */
+    .action-config-panel {
+      position: fixed;
+      left: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 320px;
+      background: linear-gradient(135deg, rgba(22,22,28,0.96), rgba(8,8,12,0.99));
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 16px 20px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 12px 36px rgba(0,0,0,0.85);
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+      z-index: 200;
+      color: var(--text-muted);
+    }
+    .action-config-panel.show {
+      display: flex;
+      animation: cfgSlideIn 0.25s cubic-bezier(0.25,0.46,0.45,0.94);
+    }
+    @keyframes cfgSlideIn {
+      from { opacity: 0; transform: translate(-12px, -50%); }
+      to   { opacity: 1; transform: translate(0, -50%); }
+    }
+
+    .config-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .config-title {
+      font-family: 'Cinzel', serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: 1px;
+    }
+    .config-close {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.2);
+      color: var(--text-muted);
+      border-radius: 5px;
+      padding: 2px 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background 0.2s;
+    }
+    .config-close:hover { background: rgba(255,255,255,0.08); }
+
+    /* 强化栏 */
+    .config-enhance-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      background: rgba(20,184,166,0.06);
+      border: 1px solid rgba(20,184,166,0.45);
+      border-radius: 8px;
+      padding: 8px 10px;
+      transition: opacity 0.25s;
+    }
+    .config-enhance-row.disabled { opacity: 0.25; pointer-events: none; }
+    .enhance-btn {
+      background: rgba(20,184,166,0.12);
+      border: none;
+      color: rgba(20,184,166,0.95);
+      width: 34px;
+      height: 34px;
+      border-radius: 6px;
+      font-size: 1.2rem;
+      line-height: 1;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .enhance-btn:hover:not(:disabled) { background: rgba(20,184,166,0.3); }
+    .enhance-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+    .enhance-info {
+      flex: 1;
+      text-align: center;
+      font-size: 0.82rem;
+      font-weight: bold;
+      color: rgba(20,184,166,0.9);
+      line-height: 1.4;
+    }
+
+    /* 效果注入区（框架，内容由逆辑层填充） */
+    .effect-section-title {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    .effect-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 32px;
+    }
+    .effect-item {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 6px;
+      padding: 10px 14px;
+      cursor: pointer;
+      transition: background 0.18s, border-color 0.18s;
+    }
+    .effect-item:hover { background: rgba(255,255,255,0.07); }
+    .effect-item.selected {
+      background: rgba(245,158,11,0.09);
+      border-color: rgba(245,158,11,0.5);
+    }
+    .effect-item-name {
+      font-size: 0.88rem;
+      font-weight: bold;
+      color: var(--text-main);
+    }
+    .effect-item.selected .effect-item-name { color: var(--color-atk); }
+    .effect-item-desc { font-size: 0.7rem; color: #777; margin-top: 3px; line-height: 1.4; }
 
     /* ─── 回合/中间区 ──────────────────────────────── */
     .hud-center {
@@ -270,6 +490,7 @@
       gap: 6px;
       flex: 1;
     }
+
     .turn-indicator {
       font-family: 'Cinzel', serif;
       font-size: 1.4rem;
@@ -277,9 +498,10 @@
       color: var(--text-muted);
       letter-spacing: 2px;
     }
+
     .history-btn {
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.15);
       color: var(--text-muted);
       border-radius: 8px;
       width: 32px;
@@ -291,7 +513,13 @@
       transition: all 0.2s;
       font-size: 1rem;
     }
-    .history-btn:hover { background: rgba(255,255,255,0.15); color: white; border-color: rgba(255,255,255,0.3); transform: scale(1.08); }
+
+    .history-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: white;
+      border-color: rgba(255, 255, 255, 0.3);
+      transform: scale(1.08);
+    }
 
     /* ─── 战场中央 ────────────────────────────────── */
     .battle-area {
@@ -309,7 +537,7 @@
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%) scale(0.8);
-      background: rgba(0,0,0,0.8);
+      background: rgba(0, 0, 0, 0.8);
       border: 1px solid var(--color-insight);
       color: var(--color-insight);
       padding: 14px 32px;
@@ -322,6 +550,7 @@
       z-index: 30;
       backdrop-filter: blur(8px);
     }
+
     .insight-notice.show {
       opacity: 1;
       transform: translate(-50%, -50%) scale(1);
@@ -329,7 +558,7 @@
 
     /* 结算日志框 */
     .battle-log {
-      background: rgba(0,0,0,0.65);
+      background: rgba(0, 0, 0, 0.65);
       padding: 24px 40px;
       border-radius: 12px;
       border: 1px solid var(--border);
@@ -343,7 +572,12 @@
       cursor: pointer;
       pointer-events: none;
     }
-    .battle-log.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+    .battle-log.show {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
 
     .clash-name {
       font-family: 'Cinzel', serif;
@@ -353,8 +587,17 @@
       margin-bottom: 6px;
       letter-spacing: 4px;
     }
-    .log-detail { font-size: 0.9rem; color: var(--text-main); }
-    .log-hint { font-size: 0.72rem; color: var(--text-muted); margin-top: 14px; }
+
+    .log-detail {
+      font-size: 0.9rem;
+      color: var(--text-main);
+    }
+
+    .log-hint {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 14px;
+    }
 
     /* ─── 底部行动区 ───────────────────────────────── */
     .bottom-actions {
@@ -362,7 +605,7 @@
       display: flex;
       justify-content: center;
       align-items: flex-end;
-      gap: 40px;
+      gap: 20px;
       background: linear-gradient(0deg, #06080a 0%, transparent 100%);
       z-index: 10;
     }
@@ -388,11 +631,38 @@
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      /* 将 transform 从 all 中独立出来，避免 hover 意外缩放 */
+      transition: border-color 0.2s, box-shadow 0.2s, color 0.2s, background 0.3s,
+        transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.2s;
       backdrop-filter: blur(10px);
-      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
     }
-    .act-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none !important; }
+
+    .act-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* 删掉 hover 放大的同时，增加仅高亮的纯光效 */
+    .act-btn.dodge:hover:not(:disabled):not(.selected) {
+      border-color: rgba(20, 184, 166, 0.65);
+      box-shadow: 0 0 18px rgba(20, 184, 166, 0.25);
+      color: var(--color-dod);
+      transform: none;
+    }
+
+    .act-btn.guard:hover:not(:disabled):not(.selected) {
+      border-color: rgba(100, 116, 139, 0.75);
+      box-shadow: 0 0 18px rgba(100, 116, 139, 0.25);
+      color: var(--color-def);
+      transform: none;
+    }
+
+    .act-btn.attack:hover:not(:disabled):not(.selected) {
+      color: var(--color-atk);
+      transform: none;
+    }
 
     .act-pt {
       font-family: 'Cinzel', serif;
@@ -402,43 +672,62 @@
     }
 
     /* 各行动的形状 */
-    .act-btn.dodge  { border-radius: 50%; }
-    .act-btn.guard  { border-radius: 4px; width: 100px; height: 100px; }
+    .act-btn.dodge {
+      border-radius: 50%;
+    }
+
+    .act-btn.guard {
+      border-radius: 4px;
+      width: 100px;
+      height: 100px;
+    }
+
     .act-btn.attack {
       border: none;
       clip-path: polygon(50% 4%, 100% 96%, 0% 96%);
-      background: linear-gradient(180deg, rgba(30,30,35,0.8) 0%, rgba(10,10,12,0.95) 100%);
+      background: linear-gradient(180deg, rgba(30, 30, 35, 0.8) 0%, rgba(10, 10, 12, 0.95) 100%);
       padding-top: 24px;
       box-shadow: none;
     }
 
     /* 选中状态 */
-    .act-btn.selected { transform: translateY(-18px) scale(1.13); }
+    .act-btn.selected {
+      transform: none;
+    }
+
     .act-btn.selected.attack {
       color: var(--color-atk);
-      background: linear-gradient(180deg, rgba(80,50,15,0.9) 0%, rgba(20,15,10,0.95) 100%);
+      background: linear-gradient(180deg, rgba(80, 50, 15, 0.9) 0%, rgba(20, 15, 10, 0.95) 100%);
     }
+
     .act-btn.selected.guard {
       border-color: var(--color-def);
-      box-shadow: 0 10px 36px rgba(100,116,139,0.5), inset 0 0 14px rgba(100,116,139,0.3);
+      box-shadow: 0 10px 36px rgba(100, 116, 139, 0.5), inset 0 0 14px rgba(100, 116, 139, 0.3);
       color: var(--color-def);
     }
+
     .act-btn.selected.dodge {
       border-color: var(--color-dod);
-      box-shadow: 0 10px 36px rgba(20,184,166,0.3), inset 0 0 14px rgba(20,184,166,0.2);
+      box-shadow: 0 10px 36px rgba(20, 184, 166, 0.3), inset 0 0 14px rgba(20, 184, 166, 0.2);
       color: var(--color-dod);
     }
+
     .act-btn-container:has(.act-btn.attack:not(:disabled):hover),
     .act-btn-container:has(.act-btn.attack.selected) {
       filter: drop-shadow(0 0 10px var(--color-atk));
     }
 
-    .act-sub-label { font-size: 0.72rem; color: var(--text-muted); }
+    .act-sub-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
 
     /* 洞察按钮 */
     .insight-btn {
       padding: 6px 16px;
-      background: rgba(167,139,250,0.1);
+      background: rgba(15, 10, 25, 0.85);
+      backdrop-filter: blur(6px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
       border: 1px solid var(--color-insight);
       color: var(--color-insight);
       border-radius: 20px;
@@ -446,13 +735,21 @@
       cursor: pointer;
       transition: all 0.2s;
     }
-    .insight-btn:hover:not(:disabled) { background: rgba(167,139,250,0.25); transform: scale(1.05); }
-    .insight-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .insight-btn:hover:not(:disabled) {
+      background: rgba(45, 30, 80, 0.9);
+      box-shadow: 0 0 16px rgba(167, 139, 250, 0.4);
+    }
+
+    .insight-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
 
     /* 确认就绪 / 待命按钮 */
     .commit-area {
       position: absolute;
-      bottom: 220px;
+      bottom: 188px;
       left: 50%;
       transform: translateX(-50%);
       display: flex;
@@ -461,6 +758,7 @@
       gap: 12px;
       z-index: 15;
     }
+
     .commit-btn {
       background: #fff;
       color: #000;
@@ -471,11 +769,19 @@
       font-weight: bold;
       letter-spacing: 2px;
       cursor: pointer;
-      box-shadow: 0 0 20px rgba(255,255,255,0.35);
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.35);
       transition: all 0.2s;
     }
-    .commit-btn:hover { transform: scale(1.05); box-shadow: 0 0 28px rgba(255,255,255,0.6); }
-    .commit-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+    .commit-btn:hover {
+      box-shadow: 0 0 28px rgba(255, 255, 255, 0.6);
+    }
+
+    .commit-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+      transform: none;
+    }
 
     .redecide-btn {
       background: transparent;
@@ -488,8 +794,14 @@
       transition: all 0.2s;
       display: none;
     }
-    .redecide-btn.show { display: block; }
-    .redecide-btn:hover { background: rgba(245,158,11,0.15); }
+
+    .redecide-btn.show {
+      display: block;
+    }
+
+    .redecide-btn:hover {
+      background: rgba(245, 158, 11, 0.15);
+    }
 
     /* 等待提示 */
     .waiting-label {
@@ -498,8 +810,22 @@
       display: none;
       animation: pulse 1.6s infinite;
     }
-    .waiting-label.show { display: block; }
-    @keyframes pulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+    .waiting-label.show {
+      display: block;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 0.4;
+      }
+
+      50% {
+        opacity: 1;
+      }
+    }
 
     /* ─── 战斗记录浮层 ─────────────────────────────── */
     .history-modal {
@@ -507,8 +833,8 @@
       top: 50%;
       left: 50%;
       transform: translate(-50%, -40%);
-      background: rgba(10,15,25,0.96);
-      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(10, 15, 25, 0.96);
+      border: 1px solid rgba(255, 255, 255, 0.1);
       width: 500px;
       max-width: 90vw;
       max-height: 75vh;
@@ -522,18 +848,29 @@
       flex-direction: column;
       backdrop-filter: blur(10px);
     }
-    .history-modal.show { opacity: 1; transform: translate(-50%, -50%); pointer-events: auto; }
+
+    .history-modal.show {
+      opacity: 1;
+      transform: translate(-50%, -50%);
+      pointer-events: auto;
+    }
+
     .history-modal-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 16px;
       padding-bottom: 12px;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
       font-size: 1.05rem;
       font-weight: bold;
     }
-    .history-close { cursor: pointer; color: var(--text-muted); }
+
+    .history-close {
+      cursor: pointer;
+      color: var(--text-muted);
+    }
+
     .history-list {
       flex: 1;
       overflow-y: auto;
@@ -543,11 +880,19 @@
       gap: 12px;
       text-align: left;
     }
-    .history-list::-webkit-scrollbar { width: 5px; }
-    .history-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+
+    .history-list::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .history-list::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+    }
+
     .history-item {
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
       border-radius: 8px;
       padding: 12px;
       font-size: 0.83rem;
@@ -557,24 +902,92 @@
     /* ─── 结算锁定（禁止交互）─────────────────────── */
     body.resolving .bottom-actions,
     body.resolving .commit-area,
-    body.resolving .hud-top { pointer-events: none !important; opacity: 0.6; }
+    body.resolving .hud-top {
+      pointer-events: none !important;
+      opacity: 0.6;
+    }
 
     /* ─── 响应式 ──────────────────────────────────── */
     @media (max-width: 640px) {
-      body { height: auto; min-height: 100svh; overflow-y: auto; overflow-x: hidden; }
-      .hud-top { flex-direction: column; padding: 10px 12px; gap: 8px; }
-      .status-card { padding: 8px 12px; gap: 10px; }
-      .timer-ring-wrap { width: 60px; height: 60px; }
-      .timer-ring-svg { width: 60px; height: 60px; }
-      .timer-sec { font-size: 1rem; }
-      .stat-label { width: 44px; font-size: 0.6rem; }
-      .hp-pip { width: 10px; height: 10px; }
-      .stamina-pip { width: 10px; height: 5px; }
-      .bottom-actions { padding: 12px 8px 28px; gap: 16px; }
-      .act-btn { width: 74px; height: 74px; font-size: 0.88rem; }
-      .act-btn.guard { width: 68px; height: 68px; }
-      .act-pt { font-size: 1.5rem; }
-      .commit-area { position: static; transform: none; padding: 12px 16px 0; }
+      body {
+        height: auto;
+        min-height: 100svh;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+
+      .hud-top {
+        flex-direction: column;
+        padding: 10px 12px;
+        gap: 8px;
+      }
+
+      .status-card {
+        padding: 8px 12px;
+        gap: 10px;
+      }
+
+      .avatar-frame {
+        width: 60px;
+        height: 60px;
+      }
+
+      .timer-ring-wrap {
+        width: 32px;
+        height: 32px;
+        top: 4px;
+        left: 4px;
+      }
+
+      .timer-ring-svg {
+        width: 32px;
+        height: 32px;
+      }
+
+      .timer-sec {
+        font-size: 0.6rem;
+      }
+
+      .stat-label {
+        width: 44px;
+        font-size: 0.6rem;
+      }
+
+      .hp-pip {
+        width: 10px;
+        height: 10px;
+      }
+
+      .stamina-pip {
+        width: 10px;
+        height: 5px;
+      }
+
+      .bottom-actions {
+        padding: 12px 8px 28px;
+        gap: 16px;
+      }
+
+      .act-btn {
+        width: 74px;
+        height: 74px;
+        font-size: 0.88rem;
+      }
+
+      .act-btn.guard {
+        width: 68px;
+        height: 68px;
+      }
+
+      .act-pt {
+        font-size: 1.5rem;
+      }
+
+      .commit-area {
+        position: static;
+        transform: none;
+        padding: 12px 16px 0;
+      }
     }
   </style>
 </head>
@@ -585,17 +998,23 @@
 
     <!-- P1 状态卡 -->
     <div class="status-card status-player" id="p1Card">
-      <!-- 倒计时环 -->
+
+      <!-- 倒计时环角标（绝对定位在卡片左上角） -->
       <div class="timer-ring-wrap" id="p1RingWrap">
         <svg class="timer-ring-svg" viewBox="0 0 84 84">
-          <circle class="ring-bg" cx="42" cy="42" r="36"/>
-          <circle class="ring-arc" id="p1Arc" cx="42" cy="42" r="36"/>
+          <circle class="ring-bg" cx="42" cy="42" r="36" />
+          <circle class="ring-arc" id="p1Arc" cx="42" cy="42" r="36" />
         </svg>
         <div class="timer-center">
           <span class="timer-sec" id="p1Sec">50</span>
           <span class="timer-phase-label" id="p1Phase">决策期</span>
         </div>
-        <div class="timer-ready-overlay">已<br>就绪</div>
+        <div class="timer-ready-overlay">✓</div>
+      </div>
+
+      <!-- 方形头像框 -->
+      <div class="avatar-frame" id="p1Avatar">
+        <img src="ui/sq-du/avatar/girl.jpg" alt="少女" style="width:100%;height:100%;object-fit:cover;">
       </div>
 
       <!-- 属性 -->
@@ -629,6 +1048,12 @@
 
     <!-- P2 状态卡（敌方） -->
     <div class="status-card status-enemy" id="p2Card">
+
+      <!-- 方形头像框（row-reverse 下自然出现在视觉右侧） -->
+      <div class="avatar-frame" id="p2Avatar">
+        <img src="ui/sq-du/avatar/man.jpg" alt="马厄斯" style="width:100%;height:100%;object-fit:cover;">
+      </div>
+
       <!-- 属性（方向翻转） -->
       <div class="stats-col">
         <div class="stat-row">
@@ -649,17 +1074,17 @@
         </div>
       </div>
 
-      <!-- 倒计时环（镜象） -->
-      <div class="timer-ring-wrap" id="p2RingWrap">
+      <!-- 对手倒计时环（完全隐藏，仅供 JS 引用） -->
+      <div class="timer-ring-wrap opponent-ring" id="p2RingWrap" aria-hidden="true">
         <svg class="timer-ring-svg" viewBox="0 0 84 84">
-          <circle class="ring-bg" cx="42" cy="42" r="36"/>
-          <circle class="ring-arc" id="p2Arc" cx="42" cy="42" r="36"/>
+          <circle class="ring-bg" cx="42" cy="42" r="36" />
+          <circle class="ring-arc" id="p2Arc" cx="42" cy="42" r="36" />
         </svg>
         <div class="timer-center">
-          <span class="timer-sec" id="p2Sec">50</span>
-          <span class="timer-phase-label" id="p2Phase">决策期</span>
+          <span class="timer-sec" id="p2Sec">0</span>
+          <span class="timer-phase-label" id="p2Phase"></span>
         </div>
-        <div class="timer-ready-overlay">已<br>就绪</div>
+        <div class="timer-ready-overlay"></div>
       </div>
     </div>
   </header>
@@ -679,12 +1104,36 @@
 
   <!-- ═══ 指令区 ═══ -->
   <div class="commit-area" id="commitArea">
-    <button class="commit-btn" id="readyBtn">就绪</button>
-    <button class="redecide-btn" id="redecideBtn">重新决策</button>
+    <div style="display: flex; gap: 12px; align-items: center;">
+      <button class="commit-btn" id="standbyBtn" title="跳过回合恢复1点精力">待命</button>
+      <button class="commit-btn" id="readyBtn">就绪</button>
+      <button class="redecide-btn" id="redecideBtn">重新决策</button>
+    </div>
     <span class="waiting-label" id="waitingLabel">等待对方就绪…</span>
 
     <!-- 主动洞察 -->
     <button class="insight-btn" id="insightBtn">👁 洞察对方（消耗 1 精力）</button>
+  </div>
+
+  <!-- ═══ 行动配置侧边栏（框架） ═══ -->
+  <div class="action-config-panel" id="actionConfigPanel">
+    <div class="config-header">
+      <span class="config-title">行动配置</span>
+      <button class="config-close" id="configCloseBtn">✕</button>
+    </div>
+
+    <!-- 强化栏 -->
+    <div class="config-enhance-row" id="enhanceRow">
+      <button class="enhance-btn" id="enhanceMinusBtn">−</button>
+      <div class="enhance-info" id="enhanceInfo">✦ 强化 +0 点数（消耗 0 精力）</div>
+      <button class="enhance-btn" id="enhancePlusBtn">+</button>
+    </div>
+
+    <!-- 效果注入区（框架，内容由递辑层填充） -->
+    <div class="effect-section-title">注入效果（最多 <span id="maxEffectSlots">0</span> 个）</div>
+    <div class="effect-list" id="effectList">
+      <!-- 效果项预留，由邂辑层动态注入 -->
+    </div>
   </div>
 
   <!-- ═══ 底部行动选择 ═══ -->
@@ -727,388 +1176,8 @@
     </div>
   </div>
 
-  <!-- ═══ 渲染层脚本 ═══ -->
-  <script type="module">
-    import { BattleEngine }  from './sq-du/base/engine.js';
-    import { EngineEvent, PlayerId, Action, ActionName, ClashName,
-             DefaultStats, TimerConfig, Phase, EngineMode }
-      from './sq-du/base/constants.js';
-
-    // ─── 常量 ─────────────────────────────────────
-    const RING_CIRC = 226.195; // 2π×36
-
-    // ─── 引擎初始化 ───────────────────────────────
-    const engine = new BattleEngine(EngineMode.PVE, {
-      p1Name: '少女',
-      p2Name: '马厄斯',
-    });
-
-    // ─── DOM 引用 ─────────────────────────────────
-    const $ = id => document.getElementById(id);
-
-    const ui = {
-      // 倒计时环
-      p1Arc:      $('p1Arc'),
-      p2Arc:      $('p2Arc'),
-      p1RingWrap: $('p1RingWrap'),
-      p2RingWrap: $('p2RingWrap'),
-      p1Sec:      $('p1Sec'),
-      p2Sec:      $('p2Sec'),
-      p1Phase:    $('p1Phase'),
-      p2Phase:    $('p2Phase'),
-      // 状态
-      p1SpeedVal: $('p1SpeedVal'),
-      p2SpeedVal: $('p2SpeedVal'),
-      // 按钮
-      btnDodge:   $('btn-dodge'),
-      btnGuard:   $('btn-guard'),
-      btnAttack:  $('btn-attack'),
-      ptDodge:    $('pt-dodge'),
-      ptGuard:    $('pt-guard'),
-      ptAttack:   $('pt-attack'),
-      p1SpeedUp:  $('p1SpeedUp'),
-      p1SpeedDown:$('p1SpeedDown'),
-      readyBtn:   $('readyBtn'),
-      redecideBtn:$('redecideBtn'),
-      waitingLabel:$('waitingLabel'),
-      insightBtn: $('insightBtn'),
-      // 日志
-      battleLog:  $('battleLog'),
-      clashName:  $('clashName'),
-      logDetail:  $('logDetail'),
-      insightNotice: $('insightNotice'),
-      // 历史
-      historyBtn: $('historyBtn'),
-      historyModal:$('historyModal'),
-      historyList: $('historyList'),
-      historyClose:$('historyClose'),
-      turnIndicator: $('turnIndicator'),
-    };
-
-    // ─── 本地 UI 状态 ─────────────────────────────
-    let selectedAction = null;  // 当前选中的行动类型
-    let localEnhance   = 0;     // P1 当前强化次数
-    let matchHistory   = [];    // 战事录
-    let isGameOver     = false;
-
-    // ─── 工具：更新倒计时环 SVG ───────────────────
-    function updateRing(arc, ringWrap, secEl, phaseEl, remaining, phase, ready) {
-      const ratio  = remaining / TimerConfig.TOTAL;       // 1→0
-      const offset = RING_CIRC * (1 - ratio);
-
-      arc.style.strokeDashoffset = offset;
-      arc.classList.toggle('insight-phase', phase === Phase.INSIGHT);
-
-      secEl.textContent   = remaining;
-      phaseEl.textContent = phase === Phase.INSIGHT ? '洞察期' : '决策期';
-
-      ringWrap.classList.toggle('is-ready', ready);
-    }
-
-    // ─── 工具：刷新 HP / 精力格 ───────────────────
-    function updatePips(prefix, current, max, type) {
-      for (let i = 1; i <= max; i++) {
-        const el = $(`${prefix}-${i}`);
-        if (!el) continue;
-        if (type === 'hp')     el.classList.toggle('lost', i > current);
-        if (type === 'stam')   el.classList.toggle('spent', i > current);
-      }
-    }
-
-    // ─── 工具：刷新点数显示 ────────────────────────
-    function refreshPoints(stamina, speed) {
-      const atkPt  = 1 + (selectedAction === 'attack' ? localEnhance : 0);
-      const grdPt  = 1 + (selectedAction === 'guard'  ? localEnhance : 0);
-
-      ui.ptAttack.textContent = atkPt;
-      ui.ptGuard.textContent  = grdPt;
-      ui.ptDodge.textContent  = speed;
-
-      // 精力不足时禁用按钮
-      const canAct = stamina >= 1;
-      ui.btnAttack.toggleAttribute('disabled', !canAct);
-      ui.btnGuard.toggleAttribute('disabled',  !canAct);
-      ui.btnDodge.toggleAttribute('disabled',  !canAct);
-
-      // 速度按钮
-      const snap = engine.getSnapshot();
-      const p1   = snap.players[PlayerId.P1];
-      ui.p1SpeedUp.disabled   = p1.stamina <= 1;
-      ui.p1SpeedDown.disabled = p1.speed   <= DefaultStats.BASE_SPEED;
-    }
-
-    // ─── 行动选择 ─────────────────────────────────
-    function selectAction(type, btn) {
-      if (isGameOver) return;
-
-      const snap = engine.getSnapshot();
-      const p1   = snap.players[PlayerId.P1];
-      if (p1.ready) return;
-
-      // 点击已选中的行动 → 取消
-      if (selectedAction === type) {
-        selectedAction = null;
-        localEnhance   = 0;
-        document.querySelectorAll('.act-btn').forEach(b => b.classList.remove('selected'));
-        engine.submitAction(PlayerId.P1, { action: Action.STANDBY, enhance: 0 });
-        refreshPoints(p1.stamina, p1.speed);
-        return;
-      }
-
-      document.querySelectorAll('.act-btn').forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      selectedAction = type;
-      localEnhance   = 0;
-
-      engine.submitAction(PlayerId.P1, { action: Action[type.toUpperCase()], enhance: 0 });
-      refreshPoints(p1.stamina, p1.speed);
-    }
-
-    ui.btnDodge.addEventListener('click',  () => selectAction('dodge',  ui.btnDodge));
-    ui.btnGuard.addEventListener('click',  () => selectAction('guard',  ui.btnGuard));
-    ui.btnAttack.addEventListener('click', () => selectAction('attack', ui.btnAttack));
-
-    // ─── 速度调节 ─────────────────────────────────
-    ui.p1SpeedUp.addEventListener('click', () => {
-      engine.adjustSpeed(PlayerId.P1, +1);
-    });
-    ui.p1SpeedDown.addEventListener('click', () => {
-      engine.adjustSpeed(PlayerId.P1, -1);
-    });
-
-    // ─── 就绪按钮 ─────────────────────────────────
-    ui.readyBtn.addEventListener('click', () => {
-      if (isGameOver) return;
-      engine.setReady(PlayerId.P1);
-    });
-
-    // ─── 重新决策 ─────────────────────────────────
-    ui.redecideBtn.addEventListener('click', () => {
-      engine.requestRedecide(PlayerId.P1);
-      ui.redecideBtn.classList.remove('show');
-    });
-
-    // ─── 主动洞察 ─────────────────────────────────
-    ui.insightBtn.addEventListener('click', () => {
-      if (isGameOver) return;
-      engine.useInsight(PlayerId.P1, PlayerId.P2);
-    });
-
-    // ─── 结算日志点击关闭并开始下一回合 ─────────────
-    ui.battleLog.addEventListener('click', () => {
-      if (!ui.battleLog.classList.contains('show')) return;
-      ui.battleLog.classList.remove('show');
-      document.body.classList.remove('resolving');
-      if (!isGameOver) {
-        engine.acknowledgeResolve();
-      }
-    });
-
-    // ─── 战事录 ───────────────────────────────────
-    ui.historyBtn.addEventListener('click', () => ui.historyModal.classList.add('show'));
-    ui.historyClose.addEventListener('click', () => ui.historyModal.classList.remove('show'));
-
-    // ─── 订阅引擎事件 ──────────────────────────────
-
-    // 倒计时 tick
-    engine.on(EngineEvent.TIMER_TICK, payload => {
-      const p1Data = payload[PlayerId.P1];
-      const p2Data = payload[PlayerId.P2];
-      const snap   = engine.getSnapshot();
-
-      updateRing(
-        ui.p1Arc, ui.p1RingWrap, ui.p1Sec, ui.p1Phase,
-        p1Data.remaining, p1Data.phase,
-        snap.players[PlayerId.P1].ready
-      );
-      updateRing(
-        ui.p2Arc, ui.p2RingWrap, ui.p2Sec, ui.p2Phase,
-        p2Data.remaining, p2Data.phase,
-        snap.players[PlayerId.P2].ready
-      );
-    });
-
-    // 行动配置更新（P1 自己的或 P2 的同步）
-    engine.on(EngineEvent.ACTION_UPDATED, ({ playerId, actionCtx }) => {
-      const snap = engine.getSnapshot();
-      const p1   = snap.players[PlayerId.P1];
-      if (playerId === PlayerId.P1) {
-        refreshPoints(p1.stamina, p1.speed);
-        ui.p1SpeedVal.textContent = p1.speed;
-      }
-      if (playerId === PlayerId.P2) {
-        ui.p2SpeedVal.textContent = snap.players[PlayerId.P2].speed;
-      }
-      updatePips('p1-hp',   p1.hp,      DefaultStats.MAX_HP,      'hp');
-      updatePips('p1-stam', p1.stamina, DefaultStats.MAX_STAMINA, 'stam');
-    });
-
-    // 玩家就绪
-    engine.on(EngineEvent.PLAYER_READY, ({ playerId, ready }) => {
-      const snap = engine.getSnapshot();
-      const p1   = snap.players[PlayerId.P1];
-      const p2   = snap.players[PlayerId.P2];
-
-      // 更新环
-      updateRing(ui.p1Arc, ui.p1RingWrap, ui.p1Sec, ui.p1Phase,
-        TimerConfig.TOTAL - 0, Phase.DECISION, p1.ready);
-      updateRing(ui.p2Arc, ui.p2RingWrap, ui.p2Sec, ui.p2Phase,
-        TimerConfig.TOTAL - 0, Phase.DECISION, p2.ready);
-
-      if (playerId === PlayerId.P1) {
-        // P1 就绪后锁定操作区
-        ui.readyBtn.disabled = ready;
-        ui.waitingLabel.classList.toggle('show', ready && !p2.ready);
-        if (ready) {
-          document.querySelectorAll('.act-btn').forEach(b => b.setAttribute('disabled', ''));
-          ui.p1SpeedUp.disabled   = true;
-          ui.p1SpeedDown.disabled = true;
-          ui.insightBtn.disabled  = true;
-        }
-      }
-    });
-
-    // 重新决策资格
-    engine.on(EngineEvent.REDECIDE_OFFER, ({ playerId }) => {
-      if (playerId === PlayerId.P1) {
-        ui.redecideBtn.classList.add('show');
-      }
-    });
-
-    // 玩家执行了重新决策
-    engine.on(EngineEvent.REDECIDED, ({ playerId }) => {
-      if (playerId === PlayerId.P1) {
-        selectedAction = null;
-        localEnhance   = 0;
-        document.querySelectorAll('.act-btn').forEach(b => {
-          b.classList.remove('selected');
-          b.removeAttribute('disabled');
-        });
-        ui.p1SpeedUp.disabled   = false;
-        ui.p1SpeedDown.disabled = false;
-        ui.insightBtn.disabled  = false;
-        ui.readyBtn.disabled    = false;
-        ui.waitingLabel.classList.remove('show');
-
-        const snap = engine.getSnapshot();
-        const p1   = snap.players[PlayerId.P1];
-        refreshPoints(p1.stamina, p1.speed);
-      }
-    });
-
-    // 被动洞察触发（目标方的计时器越过 30s）
-    engine.on(EngineEvent.PASSIVE_INSIGHT, ({ targetId, revealedAction }) => {
-      const isP1Target = targetId === PlayerId.P1;
-      const msg = isP1Target
-        ? '随着时间推移，你的行为已经被洞察。'
-        : `对方拖延太久——${ActionName[revealedAction?.action ?? 'standby']} 的意图已暴露。`;
-
-      showInsightNotice(msg);
-    });
-
-    // 主动洞察完成
-    engine.on(EngineEvent.ACTIVE_INSIGHT, ({ casterId, targetId, revealedAction }) => {
-      if (casterId === PlayerId.P1) {
-        const actName = ActionName[revealedAction?.action] ?? '未知';
-        showInsightNotice(`洞察成功：敌方意图为【${actName}】`);
-
-        // 刷新精力显示
-        const snap = engine.getSnapshot();
-        updatePips('p1-stam', snap.players[PlayerId.P1].stamina, DefaultStats.MAX_STAMINA, 'stam');
-        refreshPoints(snap.players[PlayerId.P1].stamina, snap.players[PlayerId.P1].speed);
-      }
-    });
-
-    // 回合结算
-    engine.on(EngineEvent.TURN_RESOLVED, result => {
-      document.body.classList.add('resolving');
-
-      const snap = engine.getSnapshot();
-      const p1   = snap.players[PlayerId.P1];
-      const p2   = snap.players[PlayerId.P2];
-
-      // 更新 HP / 精力
-      updatePips('p1-hp',   result.newState.p1.hp,      DefaultStats.MAX_HP,      'hp');
-      updatePips('p1-stam', result.newState.p1.stamina, DefaultStats.MAX_STAMINA, 'stam');
-      updatePips('p2-hp',   result.newState.p2.hp,      DefaultStats.MAX_HP,      'hp');
-      updatePips('p2-stam', result.newState.p2.stamina, DefaultStats.MAX_STAMINA, 'stam');
-
-      ui.p1SpeedVal.textContent = DefaultStats.BASE_SPEED;
-      ui.p2SpeedVal.textContent = DefaultStats.BASE_SPEED;
-
-      // 结算日志
-      ui.clashName.textContent = result.clashName;
-      ui.logDetail.innerHTML   = result.clashDesc;
-      ui.battleLog.classList.add('show');
-
-      // 写入战事录
-      const record = `
-        <div style="color:var(--text-main);font-weight:bold;margin-bottom:4px">[TURN ${result.turn}] ${result.clashName}</div>
-        <div style="color:var(--text-muted)">${result.clashDesc}</div>
-        ${result.damageToP1 > 0 ? `<div style="color:var(--color-hp)">你受到 ${result.damageToP1} 次伤害</div>` : ''}
-        ${result.damageToP2 > 0 ? `<div style="color:var(--color-atk)">敌方受到 ${result.damageToP2} 次伤害</div>` : ''}
-      `;
-      matchHistory.push(record);
-      updateHistoryUI();
-
-      // 更新回合数（若游戏未结束）
-      if (!isGameOver) {
-        ui.turnIndicator.textContent = `TURN ${result.turn + 1}`;
-      }
-    });
-
-    // 游戏结束
-    engine.on(EngineEvent.GAME_OVER, ({ winner, reason }) => {
-      isGameOver = true;
-      ui.logDetail.innerHTML += `<br><br><strong style="color:var(--color-atk)">${reason}</strong>`;
-      ui.logDetail.innerHTML += `<br><span style="color:var(--text-muted);font-size:0.78rem">刷新页面重新开始</span>`;
-      ui.readyBtn.disabled    = true;
-      ui.insightBtn.disabled  = true;
-    });
-
-    // ─── 历史记录渲染 ──────────────────────────────
-    function updateHistoryUI() {
-      if (!matchHistory.length) return;
-      ui.historyList.innerHTML = '';
-      matchHistory.forEach(rec => {
-        const div = document.createElement('div');
-        div.className   = 'history-item';
-        div.innerHTML   = rec;
-        ui.historyList.appendChild(div);
-      });
-      ui.historyList.scrollTop = ui.historyList.scrollHeight;
-    }
-
-    // ─── 洞察提示渲染 ──────────────────────────────
-    let insightTimer = null;
-    function showInsightNotice(msg) {
-      ui.insightNotice.textContent = msg;
-      ui.insightNotice.classList.add('show');
-      if (insightTimer) clearTimeout(insightTimer);
-      insightTimer = setTimeout(() => {
-        ui.insightNotice.classList.remove('show');
-      }, 3500);
-    }
-
-    // ─── 初始化 UI 状态 ────────────────────────────
-    function initUI() {
-      updatePips('p1-hp',   DefaultStats.MAX_HP,      DefaultStats.MAX_HP,      'hp');
-      updatePips('p1-stam', DefaultStats.MAX_STAMINA, DefaultStats.MAX_STAMINA, 'stam');
-      updatePips('p2-hp',   DefaultStats.MAX_HP,      DefaultStats.MAX_HP,      'hp');
-      updatePips('p2-stam', DefaultStats.MAX_STAMINA, DefaultStats.MAX_STAMINA, 'stam');
-      refreshPoints(DefaultStats.MAX_STAMINA, DefaultStats.BASE_SPEED);
-
-      // 初始化倒计时环为满
-      const initOffset = 0;
-      ui.p1Arc.style.strokeDashoffset = initOffset;
-      ui.p2Arc.style.strokeDashoffset = initOffset;
-      ui.p1Sec.textContent = TimerConfig.TOTAL;
-      ui.p2Sec.textContent = TimerConfig.TOTAL;
-    }
-
-    // ─── 启动 ──────────────────────────────────────
-    initUI();
-    engine.startGame();
-  </script>
+  <!-- ═══ 交互逻辑（由 sq-du/ui.js 负责） ═══ -->
+  <script type="module" src="./sq-du/ui.js"></script>
 </body>
+
 </html>

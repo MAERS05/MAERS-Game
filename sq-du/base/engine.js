@@ -97,11 +97,13 @@ function createPlayerState(id, overrides = {}) {
     stamina:      DefaultStats.MAX_STAMINA,
     speed:        DefaultStats.BASE_SPEED,
     ready:        false,
-    insightUsed:  false,  // 本回合是否已使用主动洞察
-    wasInsighted: false,  // 本回合是否经历了洞察（被动或主动）
-    canRedecide:  false,  // 本回合是否可以重新决策
-    didRedecide:  false,  // 本回合是否已经重新决策过（每回合只能一次）
-    actionCtx: null,      // 当前行动配置（选中但未必就绪）
+    insightUsed:  false,
+    wasInsighted: false,
+    pendingInsightTarget: null,
+    pendingPassiveReveal: false, // 进入洞察期但尚未就绪揭示行动
+    canRedecide:  false,
+    didRedecide:  false,
+    actionCtx: null,
     ...overrides,
   };
 }
@@ -257,14 +259,40 @@ export class BattleEngine {
 
     this._bus.emit(EngineEvent.PLAYER_READY, { playerId, ready: true });
 
-    // 若双方均已就绪，立即进入结算
-    if (this._players[PlayerId.P1].ready && this._players[PlayerId.P2].ready) {
-      this._triggerResolve();
+    const otherId = playerId === PlayerId.P1 ? PlayerId.P2 : PlayerId.P1;
+    const other   = this._players[otherId];
+
+    // 1. 此方就绪：揭示被动洞察（如果有）
+    if (p.pendingPassiveReveal) {
+      p.pendingPassiveReveal = false;
+      this._bus.emit(EngineEvent.PASSIVE_INSIGHT, {
+        targetId:       playerId,
+        revealedAction: { ...p.actionCtx },
+        revealed:       true,
+        type:           InsightType.PASSIVE,
+      });
+    }
+
+    // 2. 此方就绪：揭示对方对自己发起的主动洞察
+    if (other && other.pendingInsightTarget === playerId) {
+      this._resolveInsight(otherId, playerId);
+    }
+
+    // 只有一方就绪，暂时什么都不需要做
+    if (!this._players[PlayerId.P1].ready || !this._players[PlayerId.P2].ready) return;
+
+    // 3. 双方均就绪：检查识破
+    if (this._checkInsightClash()) {
+      this._triggerInsightClash();
       return;
     }
 
-    // 检查重新决策条件
-    this._checkRedecideOffer();
+    // 4. 双方均就绪：检查是否有重新决策资格——有则暂停结算
+    const offerMade = this._checkRedecideOffer();
+    if (offerMade) return;
+
+    // 5. 无重决策机会，进入结算
+    this._triggerResolve();
   }
 
   /**
@@ -281,20 +309,44 @@ export class BattleEngine {
     if (caster.ready) return;            // 已就绪则无需洞察
 
     caster.stamina--;
-    caster.insightUsed    = true;
-    caster.wasInsighted   = true; // 洞察者自身也"经历了洞察"用于识破判定
-    target.wasInsighted   = true;
+    caster.insightUsed        = true;
+    caster.pendingInsightTarget = targetId; // 标记目标，待其就绪时才揭示
+    target.wasInsighted       = true;
 
+    // 只通知 UI “洞察已发起”，不附带真实行动（尚未就绪）
+    this._bus.emit(EngineEvent.ACTIVE_INSIGHT, {
+      casterId,
+      targetId,
+      revealedAction: null,
+    });
+
+    // 如果对方已经就绪，立即揭示（对方已锁定）
+    if (target.ready) {
+      this._resolveInsight(casterId, targetId);
+    }
+
+    // 检查识破条件
+    if (this._checkInsightClash()) {
+      this._triggerInsightClash();
+    }
+  }
+
+  /**
+   * 将已就绪的对方行动揭示给洞察方
+   */
+  _resolveInsight(casterId, targetId) {
+    const caster = this._players[casterId];
+    const target = this._players[targetId];
+    if (!caster || !target) return;
+    if (!caster.pendingInsightTarget) return;
+
+    caster.pendingInsightTarget = null;
     this._bus.emit(EngineEvent.ACTIVE_INSIGHT, {
       casterId,
       targetId,
       revealedAction: target.actionCtx ? { ...target.actionCtx } : null,
+      revealed: true, // 标记为真正揭示
     });
-
-    // 检查识破条件：若被洞察方也已经历洞察
-    if (this._checkInsightClash()) {
-      this._triggerInsightClash();
-    }
   }
 
   /**
@@ -457,25 +509,16 @@ export class BattleEngine {
     const target  = this._players[playerId];
     const otherId = playerId === PlayerId.P1 ? PlayerId.P2 : PlayerId.P1;
 
+    // 只标记进入洞察期，行动就绪后才揭示
+    target.wasInsighted      = true;
+    target.pendingPassiveReveal = true;
+
     this._bus.emit(EngineEvent.PHASE_SHIFT, { playerId });
 
-    // 触发被动洞察
-    target.wasInsighted = true;
-
-    this._bus.emit(EngineEvent.PASSIVE_INSIGHT, {
-      targetId:       playerId,
-      revealedAction: target.actionCtx ? { ...target.actionCtx } : null,
-      type:           InsightType.PASSIVE,
-    });
-
-    // 若对方也已经历洞察，识破
-    if (this._players[otherId].wasInsighted) {
+    // 若对方也已经历洞察，立即触发识破（无论双方是否就绪，识破强制结算）
+    if (this._checkInsightClash()) {
       this._triggerInsightClash();
-      return;
     }
-
-    // 检查重新决策条件（对方如果已经提前就绪）
-    this._checkRedecideOffer();
   }
 
   /**
@@ -485,18 +528,8 @@ export class BattleEngine {
   _onTimeout(playerId) {
     const p = this._players[playerId];
     p.actionCtx = createActionCtx(Action.STANDBY);
-    p.ready     = true;
-
-    this._bus.emit(EngineEvent.PLAYER_READY, {
-      playerId,
-      ready:   true,
-      timeout: true,
-    });
-
-    // 若双方都已就绪（含超时就绪），进入结算
-    if (this._players[PlayerId.P1].ready && this._players[PlayerId.P2].ready) {
-      this._triggerResolve();
-    }
+    // 复用公共 setReady 流程，确保洞察揭示和重决策检查均在其中处理
+    this.setReady(playerId);
   }
 
   // ═══════════════════════════════════════════
@@ -504,18 +537,17 @@ export class BattleEngine {
   // ═══════════════════════════════════════════
 
   /**
-   * 检查是否应向某方推送重新决策资格：
-   * 条件：A 方已就绪（且在决策期内），B 方进入洞察期后就绪
-   * 当 B 最终就绪的那一刻，判断 A 是否满足条件
+   * 检查是否应向某方推送重新决策资格
+   * 条件：A 方已就绪，B 方经历洞察期并已就绪（即行动已被暴露）
+   * @returns {boolean} 是否发出了重决策邀请
    */
   _checkRedecideOffer() {
     const p1 = this._players[PlayerId.P1];
     const p2 = this._players[PlayerId.P2];
 
-    // 只有双方都已就绪时才能触发
-    if (!p1.ready || !p2.ready) return;
+    if (!p1.ready || !p2.ready) return false;
 
-    // 已经重新决策过的不再推送
+    let offered = false;
     const tryOffer = (earlyId, lateId) => {
       const early = this._players[earlyId];
       const late  = this._players[lateId];
@@ -523,15 +555,17 @@ export class BattleEngine {
         early.ready &&
         !early.didRedecide &&
         !early.canRedecide &&
-        late.wasInsighted // 晚方经历了洞察期
+        late.wasInsighted
       ) {
         early.canRedecide = true;
+        offered = true;
         this._bus.emit(EngineEvent.REDECIDE_OFFER, { playerId: earlyId });
       }
     };
 
     tryOffer(PlayerId.P1, PlayerId.P2);
     tryOffer(PlayerId.P2, PlayerId.P1);
+    return offered;
   }
 
   // ═══════════════════════════════════════════
@@ -607,15 +641,16 @@ export class BattleEngine {
   _scheduleAI() {
     if (this._aiReadyTimeout) clearTimeout(this._aiReadyTimeout);
 
-    // AI 在 5 ~ 25 秒内随机就绪（模拟决策用时）
-    const delay = (5 + Math.random() * 20) * 1000;
+    // 60% 概率 5-30s 内就绪，40% 概率 30-50s 内就绪
+    const earlyDecision = Math.random() < 0.6;
+    const delay = earlyDecision
+      ? (5  + Math.random() * 25) * 1000   // 5 ~ 30s
+      : (30 + Math.random() * 20) * 1000;  // 30 ~ 50s
 
     this._aiReadyTimeout = setTimeout(() => {
       if (this._state !== EngineState.TICKING) return;
 
       const aiDecision = this._buildAIDecision();
-
-      // 通过公共 API 提交行动（与玩家完全对称）
       this.submitAction(PlayerId.P2, aiDecision);
       this.setReady(PlayerId.P2);
     }, delay);

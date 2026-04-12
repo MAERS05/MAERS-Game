@@ -105,8 +105,8 @@ export function resolve(p1Ctx, p2Ctx, p1State, p2State, bothInsighted, turn) {
   // ── 3. 单方攻击，另一方待命 ────────────────────────
   if (p1Act === Action.ATTACK && p2Act === Action.STANDBY) {
     clash     = Clash.ONE_SIDE_ATTACK;
-    clashDesc = `你趁敌方松懈发动攻击，造成 ${p1Pts} 次命中！`;
-    damageToP2 = p1Pts;
+    clashDesc = `你趁敌方松懈发动攻击——命中！`;
+    damageToP2 = 1;
     return _buildResult(
       turn, p1Ctx, p2Ctx, p1Pts, p2Pts,
       clash, clashDesc, 0, damageToP2,
@@ -116,8 +116,8 @@ export function resolve(p1Ctx, p2Ctx, p1State, p2State, bothInsighted, turn) {
 
   if (p2Act === Action.ATTACK && p1Act === Action.STANDBY) {
     clash     = Clash.ONE_SIDE_ATTACK;
-    clashDesc = `敌方趁你松懈发动攻击，造成 ${p2Pts} 次命中！`;
-    damageToP1 = p2Pts;
+    clashDesc = `敌方趁你松懈发动攻击——命中！`;
+    damageToP1 = 1;
     return _buildResult(
       turn, p1Ctx, p2Ctx, p1Pts, p2Pts,
       clash, clashDesc, damageToP1, 0,
@@ -156,46 +156,45 @@ export function resolve(p1Ctx, p2Ctx, p1State, p2State, bothInsighted, turn) {
       clash     = Clash.EXECUTE;
       clashDesc = '敌方已精力耗尽——你的攻击将彻底终结这场战斗！【处决】';
       executeP2 = true;
-      damageToP2 = p2State.hp; // 清空气数
-      // P2 精力耗尽时若 P1 也在攻击：P2 能否反击取决于速度先后
-      if (!p1Exhausted) damageToP1 = (p2Speed > p1Speed) ? p2Pts : 0;
+      damageToP2 = p2State.hp;
+      if (!p1Exhausted) damageToP1 = (p2Speed > p1Speed) ? 1 : 0;
     } else if (p1Exhausted) {
       clash     = Clash.EXECUTE;
       clashDesc = '你已精力耗尽——敌方的攻击将彻底终结这场战斗！【处决】';
       executeP1 = true;
       damageToP1 = p1State.hp;
-      damageToP2 = (p1Speed > p2Speed) ? p1Pts : 0;
+      damageToP2 = (p1Speed > p2Speed) ? 1 : 0;
     }
     // 无处决：正常双攻判定
     else if (p1Speed > p2Speed) {
       // P1 抢攻
       clash      = Clash.PREEMPT;
-      damageToP2 = p1Pts;
-      damageToP1 = p2Pts;
-      clashDesc  = `你凭借速度（${p1Speed}）率先命中敌方（${p1Pts}次），随后敌方反击命中你（${p2Pts}次）。【抢攻】`;
+      damageToP2 = 1;
+      damageToP1 = 1;
+      clashDesc  = `你凭借速度（${p1Speed}）率先命中敌方，随后敌方反击命中你。【抢攻】`;
     } else if (p2Speed > p1Speed) {
       // P2 抢攻
       clash      = Clash.PREEMPT;
-      damageToP1 = p2Pts;
-      damageToP2 = p1Pts;
-      clashDesc  = `敌方凭借速度（${p2Speed}）率先命中你（${p2Pts}次），随后你反击命中敌方（${p1Pts}次）。【抢攻】`;
+      damageToP1 = 1;
+      damageToP2 = 1;
+      clashDesc  = `敌方凭借速度（${p2Speed}）率先命中你，随后你反击命中敌方。【抢攻】`;
     } else {
       // 速度相同
       if (p1Pts === p2Pts) {
-        // 对峙
+        // 对峙：势均力敌，双方均无法突破，安然无恙
         clash      = Clash.CONFRONT;
-        damageToP1 = p2Pts;
-        damageToP2 = p1Pts;
-        clashDesc  = `双方速度相同、实力相当，同时命中对方（各${p1Pts}次）！【对峙】`;
+        damageToP1 = 0;
+        damageToP2 = 0;
+        clashDesc  = `双方速度相同、实力相当，攻势彼此抵消——无人受伤，【对峙】僵持。`;
       } else if (p1Pts > p2Pts) {
         // P1 压制
         clash      = Clash.SUPPRESS;
-        damageToP2 = p1Pts;
+        damageToP2 = 1;
         clashDesc  = `双方速度相同，但你点数占优（${p1Pts} > ${p2Pts}），完全压制了敌方！【压制】`;
       } else {
         // P2 压制
         clash      = Clash.SUPPRESS;
-        damageToP1 = p2Pts;
+        damageToP1 = 1;
         clashDesc  = `双方速度相同，但敌方点数占优（${p2Pts} > ${p1Pts}），完全压制了你！【压制】`;
       }
     }
@@ -293,10 +292,10 @@ function _resolveAttackVsGuard(
     // 袭击：攻方速度更快，绕过防御
     clash     = Clash.RAID;
     clashDesc = attackerIsP1
-      ? `你的速度（${atkSpeed}）超过敌方守备（${defSpeed}），撕破防线造成 ${atkPts} 次伤害！【袭击】`
-      : `敌方速度（${atkSpeed}）超过你的守备（${defSpeed}），撕破防线造成 ${atkPts} 次伤害！【袭击】`;
-    if (attackerIsP1) damageToP2 = atkPts;
-    else              damageToP1 = atkPts;
+      ? `你的速度（${atkSpeed}）超过敌方守备（${defSpeed}），撕破防线——命中！【袭击】`
+      : `敌方速度（${atkSpeed}）超过你的守备（${defSpeed}），撕破防线——命中！【袭击】`;
+    if (attackerIsP1) damageToP2 = 1;
+    else              damageToP1 = 1;
   } else {
     // 守方速度 >= 攻方速度，守备生效
     if (defPts >= atkPts) {
@@ -309,10 +308,10 @@ function _resolveAttackVsGuard(
       // 破势：守备点数 < 攻击点数
       clash     = Clash.BREAK;
       clashDesc = attackerIsP1
-        ? `你的攻击（${atkPts}点）击穿了敌方薄弱的守备（${defPts}点）——【破势】，造成 ${atkPts} 次伤害！`
-        : `敌方攻击（${atkPts}点）击穿了你薄弱的守备（${defPts}点）——【破势】，造成 ${atkPts} 次伤害！`;
-      if (attackerIsP1) damageToP2 = atkPts;
-      else              damageToP1 = atkPts;
+        ? `你的攻击（${atkPts}点）击穿了敌方薄弱的守备（${defPts}点）——【破势】！`
+        : `敌方攻击（${atkPts}点）击穿了你薄弱的守备（${defPts}点）——【破势】！`;
+      if (attackerIsP1) damageToP2 = 1;
+      else              damageToP1 = 1;
     }
   }
 
@@ -342,10 +341,10 @@ function _resolveAttackVsDodge(
     // 迅攻：攻方速度 > 闪避速度
     clash     = Clash.SWIFT_STRIKE;
     clashDesc = attackerIsP1
-      ? `你的速度（${atkSpeed}）超过敌方闪避（${dodSpeed}），捕捉到动作空隙，命中 ${atkPts} 次！【迅攻】`
-      : `敌方速度（${atkSpeed}）超过你的闪避（${dodSpeed}），抢先一步命中你 ${atkPts} 次！【迅攻】`;
-    if (attackerIsP1) damageToP2 = atkPts;
-    else              damageToP1 = atkPts;
+      ? `你的速度（${atkSpeed}）超过敌方闪避（${dodSpeed}），捕捉到动作空隙——命中！【迅攻】`
+      : `敌方速度（${atkSpeed}）超过你的闪避（${dodSpeed}），抢先一步命中你！【迅攻】`;
+    if (attackerIsP1) damageToP2 = 1;
+    else              damageToP1 = 1;
   } else {
     // 规避：闪避速度 >= 攻击速度
     clash     = Clash.EVADE;
@@ -395,13 +394,13 @@ function _buildResult(
   const newP1Hp = Math.max(0, p1State.hp - finalDamageToP1);
   const newP2Hp = Math.max(0, p2State.hp - finalDamageToP2);
 
-  // 待命时恢复1精力
+  // 待命时恢复1精力；非待命时扣减行动消耗
   const newP1Stamina = p1Ctx.action === Action.STANDBY
     ? Math.min(DefaultStats.MAX_STAMINA, p1State.stamina + 1)
-    : p1State.stamina;
+    : Math.max(0, p1State.stamina - calcCost(p1Ctx));
   const newP2Stamina = p2Ctx.action === Action.STANDBY
     ? Math.min(DefaultStats.MAX_STAMINA, p2State.stamina + 1)
-    : p2State.stamina;
+    : Math.max(0, p2State.stamina - calcCost(p2Ctx));
 
   return {
     turn,
