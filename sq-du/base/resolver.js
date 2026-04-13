@@ -129,8 +129,8 @@ export function resolve(p1Ctx, p2Ctx, p1State, p2State, bothInsighted, turn) {
 
   // ── 2. 执行时间轴，产生不可变执行日志 ─────────────────────
   const bs = {
-    [PlayerId.P1]: { shields: [], evasions: [], dmgReceived: 0 },
-    [PlayerId.P2]: { shields: [], evasions: [], dmgReceived: 0 },
+    [PlayerId.P1]: { hp: p1State.hp, shields: [], evasions: [], dmgReceived: 0 },
+    [PlayerId.P2]: { hp: p2State.hp, shields: [], evasions: [], dmgReceived: 0 },
   };
   const log = _executeTimeline(timeline, bs, p1CtxEff, p2CtxEff, p1TriggeredEffects, p2TriggeredEffects);
 
@@ -236,7 +236,9 @@ function _executeTimeline(timeline, bs, p1Ctx, p2Ctx, p1TriggeredEffects, p2Trig
   const speeds = [...new Set(timeline.map(e => e.speed))].sort((a, b) => b - a);
 
   for (const speed of speeds) {
-    const slot = timeline.filter(e => e.speed === speed);
+    // 致命打断检查：如果在本 tick 之前，某方的剩余生命（hp - dmgReceived）已经 <= 0，
+    // 则说明他们在较快的攻击中被击杀了，后续动作中断，从本时序槽里剔除
+    const slot = timeline.filter(e => e.speed === speed && (bs[e.actorId].hp - bs[e.actorId].dmgReceived) > 0);
 
     // Step A：防御 buff 先挂载（守方先就位）
     for (const evt of slot) {
@@ -569,6 +571,13 @@ function _deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2)
       clashDesc = atkIsP1
         ? `你的攻击（最终速度 ${hit.atkSpeed}、最终点数 ${hit.atkPts}）抢在敌方准备闪躲（最终速度 ${targetCtx.speed}）前命中目标！【迅攻】`
         : `敌方的攻击（最终速度 ${hit.atkSpeed}、最终点数 ${hit.atkPts}）抢在你准备闪躲（最终速度 ${targetCtx.speed}）前命中目标！【迅攻】`;
+    } else if (targetCtx.action === Action.ATTACK) {
+      // 对方也是攻击，但只有一次 HIT，说明对方因为在这一击中倒下而动作被打断
+      clash = Clash.INTERRUPT;
+      const tSpeed = targetCtx.speed;
+      clashDesc = atkIsP1
+        ? `你最终速度（${hit.atkSpeed}）较快，抢在敌方（最终速度 ${tSpeed}）出手前便将其击倒！【截杀】`
+        : `敌方最终速度（${hit.atkSpeed}）较快，抢在你（最终速度 ${tSpeed}）出手前便将你击倒！【截杀】`;
     } else {
       // 兜底（理论上不应到达：攻击方主动命中非防御目标）
       clash = Clash.ONE_SIDE_ATTACK;

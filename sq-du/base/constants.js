@@ -80,6 +80,8 @@ export const Clash = Object.freeze({
   EXECUTE: 'EXECUTE',       // 处决
   /** 双方守备 */
   ACCUMULATE: 'ACCUMULATE',   // 蓄势
+  /** 进攻中途被打倒 */
+  INTERRUPT: 'INTERRUPT',     // 截杀
   /** 双方闪避 */
   RETREAT: 'RETREAT',      // 退让
   /** 一方闪避，一方守备 */
@@ -117,6 +119,7 @@ export const ClashName = Object.freeze({
   [Clash.SUPPRESS]: '压制',
   [Clash.EXECUTE]: '处决',
   [Clash.ACCUMULATE]: '蓄势',
+  [Clash.INTERRUPT]: '截杀',
   [Clash.RETREAT]: '退让',
   [Clash.PROBE]: '试探',
   [Clash.RAID]: '突袭',
