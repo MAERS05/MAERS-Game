@@ -26,10 +26,16 @@ export const AgilityEffect = Object.freeze({
   applicableTo: [Action.DODGE],
 
   /**
-   * 后置钩子：闪避成功（未受全额伤害）时调用，为闪避方标记下回合速度加成。
+   * 后置钩子：时间轴结算完毕后调用。
+   * @param {object} ctx       - 使用方的效果修正后 ActionCtx
+   * @param {object} selfState - 使用方 PlayerState（可写）
+   * @param {object} oppState  - 对手 PlayerState（可写）
+   * @param {number} dmgTaken  - 本回合使用方受到的总伤害次数
+   * @param {number} oppDmgTaken - 对方受到的伤害次数
+   * @param {object} oppCtx    - 对方的效果修正后 ActionCtx
    */
-  onPost(ctx, selfState, oppState, dmgTaken) {
-    if (ctx.action === Action.DODGE && dmgTaken === 0) {
+  onPost(ctx, selfState, oppState, dmgTaken, oppDmgTaken, oppCtx) {
+    if (ctx.action === Action.DODGE && dmgTaken === 0 && oppCtx && oppCtx.action === Action.ATTACK) {
       selfState.agilityBoost = (selfState.agilityBoost || 0) + 1;
     }
   },

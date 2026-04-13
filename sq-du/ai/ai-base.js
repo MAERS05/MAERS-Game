@@ -496,19 +496,30 @@ export function buildRedecideDecision(ai, player, revealedAction) {
 // ═══════════════════════════════════════════════════════════
 
 /**
- * AI 效果选取：从该行动的效果库中取出所有可用效果，
- * 按 pts = 1 + enhance 个槽位填满，其余补 null。
+ * 从 AI 的装配池中按顺序取得本回合生效的被动效果。
+ * pts = 1 + enhance 个槽位填满，其余为 null。
  *
- * @param {string}  action  - Action 枚举值
- * @param {number}  enhance - 本回合强化次数
+ * @param {string}  action  - Action 枚举。
+ * @param {number}  enhance - 本回合强化次数。
  * @param {import('../base/constants.js').PlayerState} ai
- * @returns {(string|null)[]} 长度为 EFFECT_SLOTS 的效果数组
+ * @returns {(string|null)[]} 长度为 EFFECT_SLOTS 的效果数组。
  */
 function _pickEffects(action, enhance, ai) {
   const EFFECT_SLOTS = 3;
   const slots = Math.min(1 + enhance, EFFECT_SLOTS);
+  
+  // 自残类效果 ID 列表
+  const selfHarmEffects = ['break_qi', 'break_limit', 'extreme', 'afterimage'];
+  
   const inventory = (ai.effectInventory?.[action] ?? [])
-    .filter(id => EffectDefs[id]?.applicableTo.includes(action));
+    .filter(id => EffectDefs[id]?.applicableTo.includes(action))
+    .filter(id => {
+      // 绝对生存底线：如果自己只剩 1 滴血，绝对不使用会消耗气数（HP）导致自杀的效果
+      if (ai.hp <= 1 && selfHarmEffects.includes(id)) {
+        return false;
+      }
+      return true;
+    });
 
   const result = Array(EFFECT_SLOTS).fill(null);
   for (let i = 0; i < slots && i < inventory.length; i++) {
