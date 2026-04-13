@@ -5,7 +5,7 @@ import { Action, EffectId } from '../../base/constants.js';
 export const InspireEffect = Object.freeze({
   id: EffectId.INSPIRE,
   name: '振奋',
-  desc: '守备成功且完全防挡来袭时，下回合精力消耗 -1',
+  desc: '守备成功下回合消耗精力 -1',
   staminaCost: 0,
   applicableTo: [Action.GUARD],
 

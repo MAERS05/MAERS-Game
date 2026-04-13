@@ -258,29 +258,29 @@ export const EngineEvent = Object.freeze({
  */
 export const EffectId = Object.freeze({
   // ── 攻击类效果 ──
-  WOUND:       'wound',       // 创伤：命中后为目标附加伤口（下回合行动额外消耗 1 精力）
-  BREAK_QI:    'break_qi',    // 破气：消耗自身 1 点气数，本回合攻击 +1 点数
+  WOUND: 'wound',       // 创伤：命中后为目标附加伤口（下回合行动额外消耗 1 精力）
+  BREAK_QI: 'break_qi',    // 破气：消耗自身 1 点气数，本回合攻击 +1 点数
   BREAK_LIMIT: 'break_limit', // 破限：消耗自身 1 点气数，本回合攻击 +1 速度
-  CHARGE:      'charge',      // 蓄力：本回合攻击不执行，下回合攻击 +1 点数
-  POUNCE:      'pounce',      // 猛扑：下回合最终闪避威力-1，本回合攻击威力+1
-  RECKLESS:    'reckless',    // 舍身：下回合最终守备威力-1，本回合攻击威力+1
-  ENERGIZE:    'energize',    // 蓄能：攻击成功下回合闪避最终点数+1
+  CHARGE: 'charge',      // 蓄力：本回合攻击不执行，下回合攻击 +1 点数
+  POUNCE: 'pounce',      // 猛扑：下回合最终闪避威力-1，本回合攻击威力+1
+  RECKLESS: 'reckless',    // 舍身：下回合最终守备威力-1，本回合攻击威力+1
+  ENERGIZE: 'energize',    // 蓄能：攻击成功下回合闪避最终点数+1
   // ── 守备类效果 ──
-  REBOUND:     'rebound',     // 反震：守备成功抵挡攻击时，对攻击方反弹一次攻击
+  REBOUND: 'rebound',     // 反震：守备成功抵挡攻击时，对攻击方反弹一次攻击
   AURA_SHIELD: 'aura_shield', // 御气：消耗自身 1 点气数，本回合守备 +1 点数
-  DEFLECT:     'deflect',     // 卸力：守备成功防挡时，对手下回合攻击 -1 点数
-  ENTRENCH:    'entrench',    // 固守：本回合未受到伤害，下回合守备 +1 点数
-  IRON_WALL:   'iron_wall',   // 铁壁：下回合最终攻击威力-1，本回合守备威力+1
-  PHALANX:     'phalanx',     // 步阵：下回合最终闪避威力-1，本回合守备威力+1
-  INSPIRE:     'inspire',     // 振奋：守备成功下回合消耗精力-1
+  DEFLECT: 'deflect',     // 卸力：守备成功防挡时，对手下回合攻击 -1 点数
+  ENTRENCH: 'entrench',    // 固守：本回合未受到伤害，下回合守备 +1 点数
+  IRON_WALL: 'iron_wall',   // 铁壁：下回合最终攻击威力-1，本回合守备威力+1
+  PHALANX: 'phalanx',     // 步阵：下回合最终闪避威力-1，本回合守备威力+1
+  INSPIRE: 'inspire',     // 振奋：守备成功下回合消耗精力-1
   // ── 闪避类效果 ──
-  AGILITY:     'agility',     // 灵巧：闪避成功后下回合速度 +1
-  AFTERIMAGE:  'afterimage',  // 残影：消耗自身 1 点气数，本回合闪避 +1 幅度
-  EXTREME:     'extreme',     // 极限：消耗自身 1 点气数，本回合闪避 +1 速度
-  MOMENTUM:    'momentum',    // 借势：闪避成功且未受伤，恢复 1 点精力
-  SIDE_STEP:   'side_step',   // 侧步：下回合最终攻击威力-1，本回合闪避威力+1
-  DISARM:      'disarm',      // 解甲：下回合最终守备威力-1，本回合闪避威力+1
-  DEPRESS:     'depress',     // 低落：闪避成功下回合对方精力消耗+1
+  AGILITY: 'agility',     // 灵巧：闪避成功后下回合速度 +1
+  AFTERIMAGE: 'afterimage',  // 残影：消耗自身 1 点气数，本回合闪避 +1 幅度
+  EXTREME: 'extreme',     // 极限：消耗自身 1 点气数，本回合闪避 +1 速度
+  MOMENTUM: 'momentum',    // 借势：闪避成功且未受伤，恢复 1 点精力
+  SIDE_STEP: 'side_step',   // 侧步：下回合最终攻击威力-1，本回合闪避威力+1
+  DISARM: 'disarm',      // 解甲：下回合最终守备威力-1，本回合闪避威力+1
+  DEPRESS: 'depress',     // 低落：闪避成功下回合对方精力消耗+1
 });
 
 
@@ -331,7 +331,7 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.ENERGIZE]: {
     id: EffectId.ENERGIZE, name: '蓄能',
-    desc: '攻击成功且造成伤害后，下回合闪避 +1 最终点数',
+    desc: '攻击成功下回合闪避最终点数 +1',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.REBOUND]: {
@@ -346,7 +346,7 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.DEFLECT]: {
     id: EffectId.DEFLECT, name: '卸力',
-    desc: '守备成功防挡来袭时，对手下回合攻击 -1 最终点数',
+    desc: '守备成功时，对手下回合攻击 -1 最终点数',
     applicableTo: [Action.GUARD],
   },
   [EffectId.ENTRENCH]: {
@@ -366,7 +366,7 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.INSPIRE]: {
     id: EffectId.INSPIRE, name: '振奋',
-    desc: '守备成功且完全防挡来袭时，下回合精力消耗 -1',
+    desc: '守备成功下回合消耗精力 -1',
     applicableTo: [Action.GUARD],
   },
   [EffectId.AGILITY]: {
@@ -401,7 +401,7 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.DEPRESS]: {
     id: EffectId.DEPRESS, name: '低落',
-    desc: '成功规避攻击或通过虚步闪躲后，下回合对方精力消耗 +1',
+    desc: '闪避成功下回合对方精力消耗 +1',
     applicableTo: [Action.DODGE],
   },
 });

@@ -5,7 +5,7 @@ import { Action, EffectId } from '../../base/constants.js';
 export const EnergizeEffect = Object.freeze({
   id: EffectId.ENERGIZE,
   name: '蓄能',
-  desc: '攻击成功且造成伤害后，下回合闪避 +1 最终点数',
+  desc: '攻击成功下回合闪避最终点数 +1',
   staminaCost: 0,
   applicableTo: [Action.ATTACK],
 
