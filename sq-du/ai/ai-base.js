@@ -68,8 +68,8 @@ export function scheduleAI(ctx) {
     }, insightDelay);
 
     // AI 发动手刹（洞察）后，等待对手锁定后依靠重决策逻辑进行响应
-    // 兜底时间 40~45s 防挂机
-    const fallbackDelay = (40 + Math.random() * 5) * 1000;
+    // 关键修复：不要挂机到识破（30s），应在 25s 左右打破僵局主动出招
+    const fallbackDelay = (22 + Math.random() * 6) * 1000;
     const fallbackHandle = setTimeout(() => {
       if (ctx.engineState() !== EngineState.TICKING) return;
       const currentAi = ctx.getState().ai;
