@@ -272,7 +272,7 @@ function _resolveSimultaneousAttacks([a, b], bs, log) {
   } else {
     const [W, L] = a.pts > b.pts ? [a, b] : [b, a];
     bs[W.targetId].dmgReceived += 1;
-    log.push({ kind: 'SUPPRESS', winnerId: W.actorId, loserId: L.actorId, winPts: W.pts, losePts: L.pts });
+    log.push({ kind: 'SUPPRESS', winnerId: W.actorId, loserId: L.actorId, winPts: W.pts, losePts: L.pts, speed: a.speed });
   }
 }
 
