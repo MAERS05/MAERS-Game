@@ -120,6 +120,16 @@ export class AIBaseLogic {
     const oppAggression = recent.length
       ? recent.filter(h => h.opponentAction === Action.ATTACK).length / recent.length
       : 0.33;
+    const lastAction = recent.length ? recent[recent.length - 1].opponentAction : null;
+    const sameActionStreak = (() => {
+      if (!lastAction) return 0;
+      let streak = 0;
+      for (let i = history.length - 1; i >= 0; i -= 1) {
+        if (history[i].opponentAction !== lastAction) break;
+        streak += 1;
+      }
+      return streak;
+    })();
 
     return {
       aiHpRatio: ai.hp / MAX_HP,
@@ -130,6 +140,8 @@ export class AIBaseLogic {
       oppEnhanceTrend,
       oppStaminaTrend,
       oppAggression,
+      oppLastAction: lastAction,
+      oppActionStreak: sameActionStreak,
     };
   }
 
@@ -196,6 +208,37 @@ export class AIBaseLogic {
       w.standby *= 0.35;
     }
 
+    // 对连续重复行为做针对性反制，降低“木桩”体验
+    if (snap.oppActionStreak >= 2) {
+      if (snap.oppLastAction === Action.ATTACK) {
+        w.guard += 1.8;
+        w.dodge += 1.0;
+      } else if (snap.oppLastAction === Action.GUARD) {
+        w.attack += 1.5;
+        w.standby -= 0.2;
+      } else if (snap.oppLastAction === Action.DODGE) {
+        w.guard += 0.8;
+        w.attack += 0.8;
+      } else if (snap.oppLastAction === Action.STANDBY) {
+        w.attack += 2.2;
+        w.standby *= 0.5;
+      }
+    }
+
+    // 斩杀窗口：对手血量/精力双低时主动出击
+    if (snap.playerHpRatio <= 0.18 && snap.playerStaminaRatio <= 0.34 && aiEffectiveStamina >= 2) {
+      w.attack += 2.8;
+      w.standby *= 0.4;
+      w.guard *= 0.8;
+    }
+
+    // 濒危保命：己方低血且对手攻击倾向明显时更谨慎
+    if (snap.aiHpRatio <= 0.25 && snap.oppAggression >= 0.5) {
+      w.guard += 1.6;
+      w.dodge += 1.2;
+      w.attack -= 0.8;
+    }
+
     return this.pickWeighted({
       [Action.ATTACK]: w.attack,
       [Action.GUARD]: w.guard,
@@ -226,6 +269,11 @@ export class AIBaseLogic {
     speedBoostWeight += playerWeakness * 2.0;
 
     if (action === Action.DODGE) speedBoostWeight += snap.oppAggression * 1.2;
+    if (snap.playerHpRatio <= 0.25 && action === Action.ATTACK) speedBoostWeight += 0.8;
+    if (snap.aiHpRatio <= 0.3 && action !== Action.ATTACK) speedBoostWeight += 0.4;
+    if (snap.oppActionStreak >= 2 && snap.oppLastAction === Action.ATTACK && action === Action.DODGE) {
+      speedBoostWeight += 0.7;
+    }
 
     const aiEffectiveStamina = ai.stamina + (ai.staminaDiscount || 0) - (ai.staminaPenalty || 0);
     const availableForBoost = aiEffectiveStamina - effectiveBaseCost;
@@ -267,6 +315,10 @@ export class AIBaseLogic {
     let enhWeight = snap.oppEnhanceTrend * 0.8;
     if (action === Action.GUARD) enhWeight += snap.oppAggression * 0.6;
     if (action === Action.ATTACK) enhWeight += (1 - snap.playerHpRatio) * 0.5;
+    if (action === Action.ATTACK && snap.playerHpRatio <= 0.25) enhWeight += 0.7;
+    if (action === Action.GUARD && snap.oppActionStreak >= 2 && snap.oppLastAction === Action.ATTACK) {
+      enhWeight += 0.4;
+    }
 
     const aiEffectiveStamina = ai.stamina + (ai.staminaDiscount || 0) - (ai.staminaPenalty || 0);
     const enhanceable = aiEffectiveStamina >= effectiveBaseCost + 1;
