@@ -616,6 +616,8 @@ function _buildResult(
     damageToP2,
     executeP1,
     executeP2,
+    p1ExposedEffects,
+    p2ExposedEffects,
     newState: {
       p1: { hp: newP1Hp, stamina: newP1Stamina,
              chargeBoost: p1State.chargeBoost || 0,

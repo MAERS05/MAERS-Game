@@ -536,8 +536,8 @@ engine.on(EngineEvent.TURN_RESOLVED, result => {
   ui.p1SpeedVal.textContent = DefaultStats.BASE_SPEED;
   ui.p2SpeedVal.textContent = DefaultStats.BASE_SPEED;
 
-  const p1Eff = formatEffects(result.p1Action);
-  const p2Eff = formatEffects(result.p2Action);
+  const p1Eff = formatEffects(result.p1ExposedEffects);
+  const p2Eff = formatEffects(result.p2ExposedEffects);
 
   let extDesc = result.clashDesc;
   if (p1Eff || p2Eff) {
@@ -587,9 +587,9 @@ engine.on(EngineEvent.GAME_OVER, ({ reason }) => {
 // 辅助渲染
 // ═══════════════════════════════════════════════════════
 
-function formatEffects(actionCtx) {
-  if (!actionCtx || !actionCtx.effects) return '';
-  const names = actionCtx.effects
+function formatEffects(effectIds) {
+  if (!effectIds || !effectIds.length) return '';
+  const names = effectIds
     .filter(id => id !== null)
     .map(id => EffectDefs[id]?.name)
     .filter(Boolean);
