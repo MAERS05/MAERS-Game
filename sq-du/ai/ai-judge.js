@@ -11,6 +11,7 @@
 import { Action, DefaultStats } from '../base/constants.js';
 import { AIExtraLayer } from './ai-extra.js';
 import { AIBaseLogic } from './ai-base.js';
+import { AIEnhaceLayer } from './ai-enhace.js';
 
 export class AIJudgeLayer {
   /**
@@ -46,8 +47,10 @@ export class AIJudgeLayer {
 
     // ── Axis 4：效果轴（交由扩展层接手配装）──
     const effects = AIExtraLayer.pickEffects(action, enhance, ai);
-
-    return { action, enhance, speed, effects };
+    return AIEnhaceLayer.constrainDecision(
+      { action, enhance, speed, effects },
+      { ai, player, history, revealedAction: null, isRedecide: false }
+    );
   }
 
   /**
@@ -162,8 +165,10 @@ export class AIJudgeLayer {
 
     const { speed, enhance } = this.validateBudget(ai, action, speedRaw, enhanceRaw);
     const effects = AIExtraLayer.pickEffects(action, enhance, ai);
-
-    return { action, enhance, speed, effects };
+    return AIEnhaceLayer.constrainDecision(
+      { action, enhance, speed, effects },
+      { ai, player, history: [], revealedAction: revealed, isRedecide: true }
+    );
   }
 
   /**

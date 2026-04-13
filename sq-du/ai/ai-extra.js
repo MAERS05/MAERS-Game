@@ -2,12 +2,14 @@
  * @file ai-extra.js
  * @description 博弈战斗系统 — AI 效果及扩展逻辑层
  *
- * 负责处理 AI 对挂载效果的选择与统筹计算（例如效果防自杀检测等）。
+ * 负责处理 AI 对挂载效果的随机选择与基础安全过滤。
  */
 
 'use strict';
 
-import { EffectDefs, EffectId } from '../base/constants.js';
+import { EffectDefs } from '../base/constants.js';
+
+const AI_EFFECT_LOW_HP_THRESHOLD = 2;
 
 export class AIExtraLayer {
   /**
@@ -30,32 +32,29 @@ export class AIExtraLayer {
     const inventory = (ai.effectInventory?.[action] ?? [])
       .filter(id => EffectDefs[id]?.applicableTo.includes(action));
 
-    // 洗牌，使得 AI 配效果具有随机性和不可预测性
-    for (let i = inventory.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [inventory[i], inventory[j]] = [inventory[j], inventory[i]];
-    }
-
     const result = Array(EFFECT_SLOTS).fill(null);
     // 追踪已选中的所有自伤效果累计气数消耗
     let selfHarmHpCost = 0;
     // 允许的最大自伤气数消耗（至少保留 1 点 HP）
     const maxSelfHarmHp = Math.max(0, ai.hp - 1);
-    const effectiveStamina = ai.stamina + (ai.staminaDiscount || 0) - (ai.staminaPenalty || 0);
-    const actionCost = Math.max(0, 1 + (enhance || 0) + (ai.staminaPenalty || 0) - (ai.staminaDiscount || 0));
+    const safePool = [];
+    const riskPool = [];
+
+    for (const id of inventory) {
+      const hpCost = EffectDefs[id]?.hpCost || 0;
+      if (hpCost > 0) {
+        riskPool.push(id);
+      } else {
+        safePool.push(id);
+      }
+    }
 
     let filled = 0;
-    for (let i = 0; filled < slots && i < inventory.length; i++) {
-      const id = inventory[i];
-
-      // 蓄力会把本回合攻击变成待命，但仍需支付本回合行动成本。
-      // 若支付后有效精力将归零，AI 下回合容易进入被动，故跳过该效果。
-      if (id === EffectId.CHARGE) {
-        const projectedEffectiveStamina = effectiveStamina - actionCost;
-        if (projectedEffectiveStamina <= 0 || (ai.chargeBoost || 0) > 0) {
-          continue;
-        }
-      }
+    while (filled < slots && (safePool.length > 0 || riskPool.length > 0)) {
+      const lowHp = ai.hp <= AI_EFFECT_LOW_HP_THRESHOLD;
+      const preferSafe = lowHp || safePool.length > 0;
+      const targetPool = (preferSafe && safePool.length > 0) ? safePool : riskPool;
+      const id = this._drawRandom(targetPool);
 
       // 通过 EffectDefs 内省气数代价，效果自行声明，无需维护硬编码列表
       const hpCost = EffectDefs[id]?.hpCost || 0;
@@ -69,5 +68,12 @@ export class AIExtraLayer {
       filled++;
     }
     return result;
+  }
+
+  static _drawRandom(pool) {
+    const idx = Math.floor(Math.random() * pool.length);
+    const id = pool[idx];
+    pool.splice(idx, 1);
+    return id;
   }
 }
