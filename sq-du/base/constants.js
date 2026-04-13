@@ -259,16 +259,22 @@ export const EffectId = Object.freeze({
   BREAK_QI:    'break_qi',    // 破气：消耗自身 1 点气数，本回合攻击 +1 点数
   BREAK_LIMIT: 'break_limit', // 破限：消耗自身 1 点气数，本回合攻击 +1 速度
   CHARGE:      'charge',      // 蓄力：本回合攻击不执行，下回合攻击 +1 点数
+  POUNCE:      'pounce',      // 猛扑：下回合最终闪避威力-1，本回合攻击威力+1
+  RECKLESS:    'reckless',    // 舍身：下回合最终守备威力-1，本回合攻击威力+1
   // ── 守备类效果 ──
   REBOUND:     'rebound',     // 反震：守备成功抵挡攻击时，对攻击方反弹一次攻击
   AURA_SHIELD: 'aura_shield', // 御气：消耗自身 1 点气数，本回合守备 +1 点数
   DEFLECT:     'deflect',     // 卸力：守备成功防挡时，对手下回合攻击 -1 点数
   ENTRENCH:    'entrench',    // 固守：本回合未受到伤害，下回合守备 +1 点数
+  IRON_WALL:   'iron_wall',   // 铁壁：下回合最终攻击威力-1，本回合守备威力+1
+  PHALANX:     'phalanx',     // 步阵：下回合最终闪避威力-1，本回合守备威力+1
   // ── 闪避类效果 ──
   AGILITY:     'agility',     // 灵巧：闪避成功后下回合速度 +1
   AFTERIMAGE:  'afterimage',  // 残影：消耗自身 1 点气数，本回合闪避 +1 幅度
   EXTREME:     'extreme',     // 极限：消耗自身 1 点气数，本回合闪避 +1 速度
   MOMENTUM:    'momentum',    // 借势：闪避成功且未受伤，恢复 1 点精力
+  SIDE_STEP:   'side_step',   // 侧步：下回合最终攻击威力-1，本回合闪避威力+1
+  DISARM:      'disarm',      // 解甲：下回合最终守备威力-1，本回合闪避威力+1
 });
 
 
@@ -307,6 +313,16 @@ export const EffectDefs = Object.freeze({
     desc: '本回合攻击不执行，下回合攻击 +1 点数',
     applicableTo: [Action.ATTACK],
   },
+  [EffectId.POUNCE]: {
+    id: EffectId.POUNCE, name: '猛扑',
+    desc: '下回合终点闪避点数-1，本回合攻击点数+1',
+    applicableTo: [Action.ATTACK],
+  },
+  [EffectId.RECKLESS]: {
+    id: EffectId.RECKLESS, name: '舍身',
+    desc: '下回合终点守备点数-1，本回合攻击点数+1',
+    applicableTo: [Action.ATTACK],
+  },
   [EffectId.REBOUND]: {
     id: EffectId.REBOUND, name: '反震',
     desc: '守备成功抵挡攻击时，对攻击方反弹 1 次伤害',
@@ -327,6 +343,16 @@ export const EffectDefs = Object.freeze({
     desc: '本回合未受到伤害，下回合守备 +1 点数',
     applicableTo: [Action.GUARD],
   },
+  [EffectId.IRON_WALL]: {
+    id: EffectId.IRON_WALL, name: '铁壁',
+    desc: '下回合终点攻击点数-1，本回合守备点数+1',
+    applicableTo: [Action.GUARD],
+  },
+  [EffectId.PHALANX]: {
+    id: EffectId.PHALANX, name: '步阵',
+    desc: '下回合终点闪避点数-1，本回合守备点数+1',
+    applicableTo: [Action.GUARD],
+  },
   [EffectId.AGILITY]: {
     id: EffectId.AGILITY, name: '灵巧',
     desc: '闪避成功后下回合速度 +1',
@@ -344,7 +370,17 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.MOMENTUM]: {
     id: EffectId.MOMENTUM, name: '借势',
-    desc: '闪避成功且未受到伤害时，恢复 1 点精力',
+    desc: '闪避成功且无伤时，恢复 1 点精力',
+    applicableTo: [Action.DODGE],
+  },
+  [EffectId.SIDE_STEP]: {
+    id: EffectId.SIDE_STEP, name: '侧步',
+    desc: '下回合终点攻击点数-1，本回合闪避点数+1',
+    applicableTo: [Action.DODGE],
+  },
+  [EffectId.DISARM]: {
+    id: EffectId.DISARM, name: '解甲',
+    desc: '下回合终点守备点数-1，本回合闪避点数+1',
     applicableTo: [Action.DODGE],
   },
 });

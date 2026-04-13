@@ -18,18 +18,24 @@ import { WoundEffect } from '../effect/attack/wound.js';
 import { BreakQiEffect } from '../effect/attack/break_qi.js';
 import { BreakLimitEffect } from '../effect/attack/break_limit.js';
 import { ChargeEffect } from '../effect/attack/charge.js';
+import { PounceEffect } from '../effect/attack/pounce.js';
+import { RecklessEffect } from '../effect/attack/reckless.js';
 
 // ── 守备类效果 ──
 import { ReboundEffect } from '../effect/guard/rebound.js';
 import { AuraShieldEffect } from '../effect/guard/aura_shield.js';
 import { DeflectEffect } from '../effect/guard/deflect.js';
 import { EntrenchEffect } from '../effect/guard/entrench.js';
+import { IronWallEffect } from '../effect/guard/iron_wall.js';
+import { PhalanxEffect } from '../effect/guard/phalanx.js';
 
 // ── 闪避类效果 ──
 import { AgilityEffect } from '../effect/dodge/agility.js';
 import { AfterimageEffect } from '../effect/dodge/afterimage.js';
 import { ExtremeEffect } from '../effect/dodge/extreme.js';
 import { MomentumEffect } from '../effect/dodge/momentum.js';
+import { SideStepEffect } from '../effect/dodge/side_step.js';
+import { DisarmEffect } from '../effect/dodge/disarm.js';
 
 /**
  * 效果处理器映射表（EffectId → handler）
@@ -51,4 +57,10 @@ export const EffectHandlers = Object.freeze({
   [EffectId.AFTERIMAGE]:  AfterimageEffect,
   [EffectId.EXTREME]:     ExtremeEffect,
   [EffectId.MOMENTUM]:    MomentumEffect,
+  [EffectId.SIDE_STEP]:   SideStepEffect,
+  [EffectId.DISARM]:      DisarmEffect,
+  [EffectId.IRON_WALL]:   IronWallEffect,
+  [EffectId.PHALANX]:     PhalanxEffect,
+  [EffectId.POUNCE]:      PounceEffect,
+  [EffectId.RECKLESS]:    RecklessEffect,
 });

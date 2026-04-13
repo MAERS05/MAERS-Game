@@ -85,26 +85,26 @@ export function resolve(p1Ctx, p2Ctx, p1State, p2State, bothInsighted, turn) {
 
   // ── 卸力跨回合补丁（ptsDebuff）─────────────────────────────
   if (p1Ctx.action === Action.ATTACK && p1State.ptsDebuff) {
-    p1Ctx = { ...p1Ctx, pts: Math.max(1, p1Ctx.pts - p1State.ptsDebuff) };
+    p1Ctx = { ...p1Ctx, pts: Math.max(0, p1Ctx.pts - p1State.ptsDebuff) };
   }
   if (p2Ctx.action === Action.ATTACK && p2State.ptsDebuff) {
-    p2Ctx = { ...p2Ctx, pts: Math.max(1, p2Ctx.pts - p2State.ptsDebuff) };
+    p2Ctx = { ...p2Ctx, pts: Math.max(0, p2Ctx.pts - p2State.ptsDebuff) };
   }
 
-  // ── 固守跨回合增益（guardBoost）────────────────────────────
-  if (p1Ctx.action === Action.GUARD && p1State.guardBoost) {
-    p1Ctx = { ...p1Ctx, pts: p1Ctx.pts + p1State.guardBoost };
+  // ── 固守跨回合增益/衰减（guardBoost / guardDebuff）──────────────
+  if (p1Ctx.action === Action.GUARD) {
+    p1Ctx = { ...p1Ctx, pts: Math.max(0, p1Ctx.pts + (p1State.guardBoost || 0) - (p1State.guardDebuff || 0)) };
   }
-  if (p2Ctx.action === Action.GUARD && p2State.guardBoost) {
-    p2Ctx = { ...p2Ctx, pts: p2Ctx.pts + p2State.guardBoost };
+  if (p2Ctx.action === Action.GUARD) {
+    p2Ctx = { ...p2Ctx, pts: Math.max(0, p2Ctx.pts + (p2State.guardBoost || 0) - (p2State.guardDebuff || 0)) };
   }
 
   // ── 闪避跨回合增幅 / 衰减 ───────────────────────────────
   if (p1Ctx.action === Action.DODGE) {
-    p1Ctx = { ...p1Ctx, pts: Math.max(1, p1Ctx.pts + (p1State.dodgeBoost || 0) - (p1State.dodgeDebuff || 0)) };
+    p1Ctx = { ...p1Ctx, pts: Math.max(0, p1Ctx.pts + (p1State.dodgeBoost || 0) - (p1State.dodgeDebuff || 0)) };
   }
   if (p2Ctx.action === Action.DODGE) {
-    p2Ctx = { ...p2Ctx, pts: Math.max(1, p2Ctx.pts + (p2State.dodgeBoost || 0) - (p2State.dodgeDebuff || 0)) };
+    p2Ctx = { ...p2Ctx, pts: Math.max(0, p2Ctx.pts + (p2State.dodgeBoost || 0) - (p2State.dodgeDebuff || 0)) };
   }
 
   // ==== 先消耗旧 hpDrain（上回合疯伤状态）====
