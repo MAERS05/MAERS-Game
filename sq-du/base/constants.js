@@ -386,7 +386,7 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.MOMENTUM]: {
     id: EffectId.MOMENTUM, name: '借势',
-    desc: '闪避成功且无伤时，恢复 1 点精力',
+    desc: '闪避成功时，恢复 1 点精力',
     applicableTo: [Action.DODGE],
   },
   [EffectId.SIDE_STEP]: {
