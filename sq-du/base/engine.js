@@ -32,6 +32,7 @@ import {
   EffectId,
   EffectDefs,
   EFFECT_SLOTS,
+  calcActionCost,
 } from './constants.js';
 
 import { DualTimer } from './timer.js';
@@ -274,9 +275,34 @@ export class BattleEngine {
       ...p.actionCtx,
       ...patch,
     };
+
+    // ── AI 速度消耗同步 ──────────────────────────────────
+    // AI 绕过了 adjustSpeed()，直接在 patch 中提交 speed 值。
+    // 此处将 speed 差值转化为精力扣除，与 adjustSpeed 行为一致。
+    if (patch.speed != null) {
+      const targetSpeed = patch.speed;
+      const currentSpeed = p.speed; // 当前速度（回合初始为 BASE_SPEED）
+      const delta = targetSpeed - currentSpeed;
+
+      if (delta > 0) {
+        // 加速：逐级扣精力（每级 1 精力）
+        const affordable = Math.min(delta, p.stamina - 1); // 至少留 1 精力给行动
+        const actualBoost = Math.max(0, affordable);
+        p.speed = currentSpeed + actualBoost;
+        p.stamina -= actualBoost;
+        p.actionCtx.speed = p.speed;
+      } else if (delta < 0) {
+        // 降速：归还精力（重决策时可能改用更低速度）
+        const refund = Math.abs(delta);
+        p.speed = Math.max(DefaultStats.BASE_SPEED, targetSpeed);
+        p.stamina = Math.min(DefaultStats.MAX_STAMINA, p.stamina + refund);
+        p.actionCtx.speed = p.speed;
+      }
+    }
+
     // 重新计算 pts 与 cost（以保证一致性）
     p.actionCtx.pts = this._calcPts(p.actionCtx, p);
-    p.actionCtx.cost = this._calcCost(p.actionCtx, p);
+    p.actionCtx.cost = calcActionCost(p.actionCtx, p);
 
     this._bus.emit(EngineEvent.ACTION_UPDATED, {
       playerId,
@@ -294,9 +320,13 @@ export class BattleEngine {
     if (!p || p.ready) return;
 
     if (delta > 0) {
-      // 提速：需要保证至少留 1 精力给基础行动
-      const minReserve = (p.actionCtx?.action && p.actionCtx.action !== Action.STANDBY) ? 1 : 0;
-      if (p.stamina - 1 < minReserve) return;
+      // 提速：消耗 1 精力
+      // 确保提速后仍能负担当前行动或可能选择的行动的精力代价
+      const effectiveActionCost = (p.actionCtx?.action && p.actionCtx.action !== Action.STANDBY)
+        ? calcActionCost(p.actionCtx, p)
+        : Math.max(0, 1 + (p.staminaPenalty || 0) - (p.staminaDiscount || 0));
+      // 提速后精力必须 >= 行动的有效代价
+      if (p.stamina - 1 < effectiveActionCost) return;
       p.stamina--;
       p.speed++;
     } else if (delta < 0) {
@@ -531,7 +561,7 @@ export class BattleEngine {
       p.pendingPassiveReveal = false;
       p.canRedecide = false;
       p.didRedecide = false;
-      p.speed = DefaultStats.BASE_SPEED;
+      p.speed = DefaultStats.BASE_SPEED; // resolver 会在结算时应用灵巧等速度加成
       p.actionCtx = createActionCtx(Action.STANDBY);
     });
 
@@ -790,9 +820,11 @@ export class BattleEngine {
     p2.staminaDiscount = result.newState.p2.staminaDiscount ?? 0;
     p2.hpDrain = result.newState.p2.hpDrain ?? 0;
 
-    // 回合末速度归1（加速为临时性的），但加上灵巧带来的速度提升
-    p1.speed = DefaultStats.BASE_SPEED + p1.agilityBoost;
-    p2.speed = DefaultStats.BASE_SPEED + p2.agilityBoost;
+    // 回合末速度归 BASE_SPEED（加速为临时性的）
+    // 注意：灵巧（agilityBoost）的速度加成已迁移到 resolver 内统一应用，
+    // 不在此处预设，避免与 _beginTurn 的重置产生双重计算。
+    p1.speed = DefaultStats.BASE_SPEED;
+    p2.speed = DefaultStats.BASE_SPEED;
 
     // 情报同步：将本回合对方生效的效果追加进己方的 effectIntel（去重）
     if (result.p2ExposedEffects?.length) {
@@ -883,26 +915,25 @@ export class BattleEngine {
     const p = this._players[playerId];
     if (!p.actionCtx || p.actionCtx.action === Action.STANDBY) return;
 
-    // TODO: 未来增加带耗能的 effectDefs 时，可在此纳入 effectCost 的累计
-    const effectCost = 0;
-
-    // 闪避基础消耗为 1（速度消耗已提前支付），其它基础消耗为 1
-    const baseCost = 1;
-    const pen = p.staminaPenalty || 0;
-    const dis = p.staminaDiscount || 0;
-    // 即使减抵免后也至少保证耗能>=0（计算在基础花费上）
-    const minCost = Math.max(0, baseCost + effectCost + pen - dis);
-    const currentCost = Math.max(0, baseCost + (p.actionCtx.enhance || 0) + effectCost + pen - dis);
+    // calcActionCost 已内置 penalty/discount 及 isCharge 逻辑
+    const currentCost = calcActionCost(p.actionCtx, p);
+    const minCost = calcActionCost(
+      { ...p.actionCtx, enhance: 0 },  // 最低档：enhance=0 的基础消耗
+      p
+    );
 
     if (p.stamina < currentCost) {
       if (p.stamina < minCost) {
-        // 连基础模型或必带效果的耗能都出不起，直接崩盘破防转待命
+        // 连基础行动都付不起，强制待命
         p.actionCtx = createActionCtx(Action.STANDBY);
       } else {
-        // 付得起基础模型，但多挂的强化付不起，强行剥离超额强化
-        p.actionCtx.enhance = Math.max(0, p.stamina - baseCost - effectCost - pen + dis);
-        p.actionCtx.cost = Math.max(0, baseCost + p.actionCtx.enhance + effectCost + pen - dis);
-        p.actionCtx.pts = 1 + p.actionCtx.enhance; // 闪避点数也是 1+enhance
+        // 付得起基础，但强化超额：向下收紧 enhance
+        // 解出最大可负担的 enhance: stamina >= 1 + enhance + pen - dis
+        const pen = p.staminaPenalty || 0;
+        const dis = p.staminaDiscount || 0;
+        p.actionCtx.enhance = Math.max(0, p.stamina - 1 - pen + dis);
+        p.actionCtx.cost = calcActionCost(p.actionCtx, p);
+        p.actionCtx.pts = 1 + p.actionCtx.enhance;
       }
     }
   }
@@ -921,15 +952,7 @@ export class BattleEngine {
     if (ctx.action === Action.STANDBY) return 0;
     return 1 + (ctx.enhance || 0);
   }
-
-  /** 计算行动精力消耗 */
-  _calcCost(ctx, playerState) {
-    if (ctx.action === Action.STANDBY) return 0;
-    const base = 1 + (ctx.enhance || 0);
-    const pen = playerState?.staminaPenalty || 0;
-    const dis = playerState?.staminaDiscount || 0;
-    return Math.max(0, base + pen - dis);
-  }
+  // _calcCost 已移至 constants.js 的 calcActionCost 导出函数，engine 直接 import 使用
 }
 
 

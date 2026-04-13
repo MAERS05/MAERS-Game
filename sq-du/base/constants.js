@@ -291,6 +291,8 @@ export const EffectId = Object.freeze({
  * @property {string}   name         - 中文名
  * @property {string}   desc         - 简短描述
  * @property {string[]} applicableTo - 可装配到哪些行为（Action 枚举值数组）
+ * @property {number}  [hpCost=0]   - 触发时消耗使用方的气数（自伤类效果，如破气=1）。
+ *                                     AI 及规则层通过此字段内省效果代价，无需硬编码 ID 列表。
  */
 
 /**
@@ -308,11 +310,13 @@ export const EffectDefs = Object.freeze({
     id: EffectId.BREAK_QI, name: '破气',
     desc: '消耗自身 1 点气数，本回合攻击 +1 最终点数',
     applicableTo: [Action.ATTACK],
+    hpCost: 1,
   },
   [EffectId.BREAK_LIMIT]: {
     id: EffectId.BREAK_LIMIT, name: '破限',
     desc: '消耗自身 1 点气数，本回合攻击 +1 最终速度',
     applicableTo: [Action.ATTACK],
+    hpCost: 1,
   },
   [EffectId.CHARGE]: {
     id: EffectId.CHARGE, name: '蓄力',
@@ -343,6 +347,7 @@ export const EffectDefs = Object.freeze({
     id: EffectId.AURA_SHIELD, name: '御气',
     desc: '消耗自身 1 点气数，本回合守备 +1 最终点数',
     applicableTo: [Action.GUARD],
+    hpCost: 1,
   },
   [EffectId.DEFLECT]: {
     id: EffectId.DEFLECT, name: '卸力',
@@ -378,11 +383,13 @@ export const EffectDefs = Object.freeze({
     id: EffectId.AFTERIMAGE, name: '残影',
     desc: '消耗自身 1 点气数，本回合闪避 +1 最终点数',
     applicableTo: [Action.DODGE],
+    hpCost: 1,
   },
   [EffectId.EXTREME]: {
     id: EffectId.EXTREME, name: '极限',
     desc: '消耗自身 1 点气数，本回合闪避 +1 最终速度',
     applicableTo: [Action.DODGE],
+    hpCost: 1,
   },
   [EffectId.MOMENTUM]: {
     id: EffectId.MOMENTUM, name: '借势',
@@ -408,6 +415,33 @@ export const EffectDefs = Object.freeze({
 
 /** 效果槽位数量（每个行动最多配置 N 个效果） */
 export const EFFECT_SLOTS = 3;
+
+// ─────────────────────────────────────────────
+// 共享精力消耗计算（唯一来源，engine 与 resolver 共用）
+// ─────────────────────────────────────────────
+
+/**
+ * 计算一个行动的精力消耗（唯一权威实现）。
+ *
+ * 规则：
+ *  - 真正的待命（action=STANDBY 且没有 isCharge 标记）消耗为 0。
+ *  - 蓄力（isCharge=true）将本回合行动转为 STANDBY，但依然按原攻击行动的
+ *    基础消耗结算，防止蓄力变成「免费待命+1」的漏洞。
+ *  - 振奋（staminaDiscount）/ 低落（staminaPenalty）在此处统一修正。
+ *
+ * @param {{ action: string, enhance?: number, isCharge?: boolean }} ctx
+ * @param {{ staminaPenalty?: number, staminaDiscount?: number } | null} [playerState]
+ * @returns {number} 0 或正整数
+ */
+export function calcActionCost(ctx, playerState) {
+  // 真正的待命：不消耗精力
+  if (ctx.action === Action.STANDBY && !ctx.isCharge) return 0;
+  // 蓄力 / 普通行动：按 1 + enhance 基础计算，再加 penalty 减 discount
+  const base = 1 + (ctx.enhance || 0);
+  const pen  = playerState?.staminaPenalty  || 0;
+  const dis  = playerState?.staminaDiscount || 0;
+  return Math.max(0, base + pen - dis);
+}
 
 
 // ─────────────────────────────────────────────

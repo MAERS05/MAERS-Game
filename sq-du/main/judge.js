@@ -1,0 +1,390 @@
+import {
+  Action,
+  Clash,
+  ClashName,
+  PlayerId,
+  DefaultStats,
+  calcActionCost
+} from '../base/constants.js';
+
+// 内部常量：时间轴事件类型
+export const EvtType = Object.freeze({
+  MOUNT_SHIELD: 'MOUNT_SHIELD',   
+  MOUNT_EVASION: 'MOUNT_EVASION',  
+  ATTACK: 'ATTACK',         
+});
+
+export class JudgeLayer {
+  /**
+   * 计算基础博弈推演结果（时间轴引擎）
+   */
+  static evaluateTimeline(p1CtxEff, p2CtxEff, p1State, p2State) {
+    const timeline = [];
+    this._addEvents(timeline, PlayerId.P1, p1CtxEff);
+    this._addEvents(timeline, PlayerId.P2, p2CtxEff);
+
+    const bs = {
+      [PlayerId.P1]: { hp: p1State.hp, shields: [], evasions: [], dmgReceived: 0 },
+      [PlayerId.P2]: { hp: p2State.hp, shields: [], evasions: [], dmgReceived: 0 },
+    };
+    
+    // 返回 log 和 bs 战场状态对象
+    const log = this._executeTimeline(timeline, bs);
+
+    // 从日志推演胜负局势
+    const derived = this._deriveClash(
+      log, p1CtxEff, p2CtxEff, p1State, p2State,
+      bs[PlayerId.P1].dmgReceived,
+      bs[PlayerId.P2].dmgReceived
+    );
+
+    return { log, bs, derived };
+  }
+
+  /**
+   * 构造最终回合结算包裹对象
+   */
+  static buildFinalResult(
+    turn, p1CtxEff, p2CtxEff, p1State, p2State, 
+    derived, bothInsighted, p1TriggeredEffects, p2TriggeredEffects
+  ) {
+    if (bothInsighted) {
+      return this._buildResultObj(
+        turn, p1CtxEff, p2CtxEff, p1State, p2State,
+        Clash.INSIGHT_CLASH, '双方心思彼此透明——任何行动在此刻都失去意义。【识破】',
+        0, 0, false, false, [], []
+      );
+    }
+
+    const finalDmgP1 = derived.finalDmgP1 + (p1State.directDamage || 0);
+    const finalDmgP2 = derived.finalDmgP2 + (p2State.directDamage || 0);
+
+    return this._buildResultObj(
+      turn, p1CtxEff, p2CtxEff, p1State, p2State,
+      derived.clash, derived.clashDesc,
+      finalDmgP1, finalDmgP2,
+      derived.executeP1, derived.executeP2,
+      p1TriggeredEffects, p2TriggeredEffects
+    );
+  }
+
+  static _addEvents(timeline, playerId, ctx) {
+    const opponentId = playerId === PlayerId.P1 ? PlayerId.P2 : PlayerId.P1;
+    switch (ctx.action) {
+      case Action.ATTACK:
+        timeline.push({ type: EvtType.ATTACK, actorId: playerId, targetId: opponentId, speed: ctx.speed, pts: ctx.pts });
+        break;
+      case Action.GUARD:
+        timeline.push({ type: EvtType.MOUNT_SHIELD, actorId: playerId, speed: ctx.speed, pts: ctx.pts });
+        break;
+      case Action.DODGE:
+        timeline.push({ type: EvtType.MOUNT_EVASION, actorId: playerId, speed: ctx.speed, pts: ctx.pts });
+        break;
+      case Action.STANDBY:
+        break;
+    }
+  }
+
+  static _executeTimeline(timeline, bs) {
+    const log = [];
+    const speeds = [...new Set(timeline.map(e => e.speed))].sort((a, b) => b - a);
+
+    for (const speed of speeds) {
+      const slot = timeline.filter(e => e.speed === speed && (bs[e.actorId].hp - bs[e.actorId].dmgReceived) > 0);
+
+      // Step A：防御 buff 先挂载
+      for (const evt of slot) {
+        if (evt.type === EvtType.MOUNT_SHIELD) {
+          bs[evt.actorId].shields.push({ pts: evt.pts, speed: evt.speed });
+          log.push({ kind: 'SHIELD_MOUNTED', actorId: evt.actorId, pts: evt.pts, speed: evt.speed });
+        } else if (evt.type === EvtType.MOUNT_EVASION) {
+          bs[evt.actorId].evasions.push({ pts: evt.pts, speed: evt.speed });
+          log.push({ kind: 'EVASION_MOUNTED', actorId: evt.actorId, pts: evt.pts, speed: evt.speed });
+        }
+      }
+
+      // Step B：攻击解算
+      const attacks = slot.filter(e => e.type === EvtType.ATTACK);
+      if (attacks.length === 2) this._resolveSimultaneousAttacks(attacks, bs, log);
+      else if (attacks.length === 1) this._resolveSingleAttack(attacks[0], bs, log);
+    }
+    return log;
+  }
+
+  static _resolveSimultaneousAttacks([a, b], bs, log) {
+    if (a.pts === b.pts) {
+      log.push({ kind: 'CONFRONT', actors: [a.actorId, b.actorId], speed: a.speed, pts: a.pts });
+    } else {
+      const [W, L] = a.pts > b.pts ? [a, b] : [b, a];
+      bs[W.targetId].dmgReceived += 1;
+      log.push({ kind: 'SUPPRESS', winnerId: W.actorId, loserId: L.actorId, winPts: W.pts, losePts: L.pts, speed: a.speed });
+    }
+  }
+
+  static _resolveSingleAttack(attack, bs, log) {
+    const target = bs[attack.targetId];
+
+    if (target.evasions.length > 0) {
+      const best = target.evasions.reduce((b, e) => e.speed > b.speed ? e : b);
+
+      if (best.speed > attack.speed) {
+        log.push({ kind: 'EVADE', attackerId: attack.actorId, dodgerId: attack.targetId, atkSpeed: attack.speed, dodgeSpeed: best.speed, dodgePts: best.pts, atkPts: attack.pts });
+      } else if (best.speed < attack.speed) {
+        bs[attack.targetId].dmgReceived += 1;
+        log.push({ kind: 'SWIFT_STRIKE', attackerId: attack.actorId, dodgerId: attack.targetId, atkSpeed: attack.speed, dodgeSpeed: best.speed, dodgePts: best.pts, atkPts: attack.pts });
+      } else {
+        if (best.pts > attack.pts) {
+          log.push({ kind: 'DODGE_OUTMANEUVERED', attackerId: attack.actorId, dodgerId: attack.targetId, speed: best.speed, dodgePts: best.pts, atkPts: attack.pts });
+        } else if (best.pts < attack.pts) {
+          bs[attack.targetId].dmgReceived += 1;
+          log.push({ kind: 'ATTACK_OVERPOWERS', attackerId: attack.actorId, dodgerId: attack.targetId, speed: best.speed, dodgePts: best.pts, atkPts: attack.pts });
+        } else {
+          log.push({ kind: 'MUTUAL_HIT', attackerId: attack.actorId, dodgerId: attack.targetId, speed: best.speed, dodgePts: best.pts, atkPts: attack.pts });
+        }
+      }
+      return;
+    }
+
+    if (target.shields.length > 0) {
+      const best = target.shields.reduce((b, s) => s.pts > b.pts ? s : b);
+      if (best.pts >= attack.pts) {
+        log.push({ kind: 'FORTIFY', attackerId: attack.actorId, defenderId: attack.targetId, shieldPts: best.pts, shieldSpeed: best.speed, atkPts: attack.pts, atkSpeed: attack.speed });
+      } else {
+        bs[attack.targetId].dmgReceived += 1;
+        log.push({ kind: 'BREAK', attackerId: attack.actorId, defenderId: attack.targetId, shieldPts: best.pts, shieldSpeed: best.speed, atkPts: attack.pts, atkSpeed: attack.speed });
+      }
+      return;
+    }
+
+    bs[attack.targetId].dmgReceived += 1;
+    log.push({ kind: 'HIT', attackerId: attack.actorId, targetId: attack.targetId, atkSpeed: attack.speed, atkPts: attack.pts });
+  }
+
+  static _deriveClash(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2) {
+    const p1Act = p1Ctx.action;
+    const p2Act = p2Ctx.action;
+
+    if (p1Act === Action.STANDBY && p2Act === Action.STANDBY)
+      return this._zero(Clash.MUTUAL_STANDBY, '双方都在蓄积力量，小心观察着对方——什么也没有发生。');
+
+    if (p1Act === Action.GUARD && p2Act === Action.GUARD)
+      return this._zero(Clash.ACCUMULATE, `双方同时举起防御（你的最终速度 ${p1Ctx.speed}、最终点数 ${p1Ctx.pts}，敌方最终速度 ${p2Ctx.speed}、最终点数 ${p2Ctx.pts}），战场陷入僵持——【蓄势】。`);
+
+    if (p1Act === Action.DODGE && p2Act === Action.DODGE)
+      return this._zero(Clash.RETREAT, `双方同时撤招，你最终速度 ${p1Ctx.speed}、最终点数 ${p1Ctx.pts}，敌方最终速度 ${p2Ctx.speed}、最终点数 ${p2Ctx.pts}——点数相同，互相后撤。`);
+
+    if ((p1Act === Action.DODGE && p2Act === Action.GUARD) || (p1Act === Action.GUARD && p2Act === Action.DODGE)) {
+      const isP1Dodge = p1Act === Action.DODGE;
+      const dodgePts = isP1Dodge ? p1Ctx.pts : p2Ctx.pts;
+      const guardPts = isP1Dodge ? p2Ctx.pts : p1Ctx.pts;
+      const dodgerName = isP1Dodge ? '你' : '敌方';
+      const guarderName = isP1Dodge ? '敌方' : '你';
+      const dodgeSpeed = isP1Dodge ? p1Ctx.speed : p2Ctx.speed;
+      const guardSpeed = isP1Dodge ? p2Ctx.speed : p1Ctx.speed;
+      return this._zero(Clash.PROBE, `${dodgerName}试图以最终速度 ${dodgeSpeed}、最终点数 ${dodgePts} 闪躲，但${guarderName}守备最终速度 ${guardSpeed}、最终点数 ${guardPts} 点的空档下，双方仅是一次无果的试探。【试探】`);
+    }
+
+    if (p1Act === Action.ATTACK && p2Act === Action.STANDBY)
+      return this._withExecute(Clash.ONE_SIDE_ATTACK, `你趁敌方待命，以 ${p1Ctx.speed} 的最终速度发动攻击（最终点数 ${p1Ctx.pts}）——命中！`, rawDmgP1, rawDmgP2, p1State, p2State);
+
+    if (p2Act === Action.ATTACK && p1Act === Action.STANDBY)
+      return this._withExecute(Clash.ONE_SIDE_ATTACK, `敌方趁你待命，以 ${p2Ctx.speed} 的最终速度发动攻击（最终点数 ${p2Ctx.pts}）——命中！`, rawDmgP1, rawDmgP2, p1State, p2State);
+
+    if (p1Act !== Action.ATTACK && p2Act === Action.STANDBY) {
+      const actName = p1Act === Action.GUARD ? '守备' : '闪避';
+      return this._zero(Clash.WASTED_ACTION, `你发动了${actName}（最终速度 ${p1Ctx.speed}、最终点数 ${p1Ctx.pts}），而敌方处于待命状态——行动毫无意义。`);
+    }
+
+    if (p2Act !== Action.ATTACK && p1Act === Action.STANDBY) {
+      const actName = p2Act === Action.GUARD ? '守备' : '闪避';
+      return this._zero(Clash.WASTED_ACTION, `敌方发动了${actName}（最终速度 ${p2Ctx.speed}、最终点数 ${p2Ctx.pts}），而你处于待命状态——行动毫无意义。`);
+    }
+
+    return this._deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2);
+  }
+
+  static _zero(clash, clashDesc) {
+    return { clash, clashDesc, executeP1: false, executeP2: false, finalDmgP1: 0, finalDmgP2: 0 };
+  }
+
+  static _withExecute(clash, clashDesc, rawDmgP1, rawDmgP2, p1State, p2State) {
+    let executeP1 = false, executeP2 = false;
+    let finalDmgP1 = rawDmgP1, finalDmgP2 = rawDmgP2;
+
+    if (rawDmgP1 > 0 && p1State.stamina <= 0) {
+      executeP1 = true;
+      finalDmgP1 = p1State.hp;
+      clash = Clash.EXECUTE;
+      clashDesc = '你已精力耗尽——敌方的攻击将彻底终结这场战斗！【处决】';
+    }
+    if (rawDmgP2 > 0 && p2State.stamina <= 0) {
+      executeP2 = true;
+      finalDmgP2 = p2State.hp;
+      clash = Clash.EXECUTE;
+      clashDesc = '敌方已精力耗尽——你的攻击将彻底终结这场战斗！【处决】';
+    }
+
+    return { clash, clashDesc, executeP1, executeP2, finalDmgP1, finalDmgP2 };
+  }
+
+  static _deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2) {
+    const confront = log.find(e => e.kind === 'CONFRONT');
+    const suppress = log.find(e => e.kind === 'SUPPRESS');
+    const hits = log.filter(e => e.kind === 'HIT');
+    const fortify = log.find(e => e.kind === 'FORTIFY');
+    const breakEvt = log.find(e => e.kind === 'BREAK');
+    const evade = log.find(e => e.kind === 'EVADE');
+    const dodgeOutmaneuvered = log.find(e => e.kind === 'DODGE_OUTMANEUVERED');
+    const attackOverpowers = log.find(e => e.kind === 'ATTACK_OVERPOWERS');
+    const mutualHit = log.find(e => e.kind === 'MUTUAL_HIT');
+
+    let clash, clashDesc;
+
+    if (confront) {
+      clash = Clash.CONFRONT;
+      clashDesc = `双方最终速度相同（${confront.speed}）且最终点数相当（${confront.pts}），攻势彼此抵消——无人受伤。【对峙】`;
+    } else if (suppress) {
+      const winIsP1 = suppress.winnerId === PlayerId.P1;
+      clash = Clash.SUPPRESS;
+      clashDesc = winIsP1
+        ? `双方最终速度相同（${suppress.speed}），但你的攻击最终点数（${suppress.winPts}）压制了敌方的攻击最终点数（${suppress.losePts}）——单方命中！【压制】`
+        : `双方最终速度相同（${suppress.speed}），但敌方的攻击最终点数（${suppress.winPts}）压制了你的攻击最终点数（${suppress.losePts}）——单方命中！【压制】`;
+    } else if (hits.length >= 2) {
+      const firstIsP1 = hits[0].attackerId === PlayerId.P1;
+      const fastSpeed = firstIsP1 ? p1Ctx.speed : p2Ctx.speed;
+      const slowSpeed = firstIsP1 ? p2Ctx.speed : p1Ctx.speed;
+      clash = Clash.PREEMPT;
+      clashDesc = firstIsP1
+        ? `你最终速度（${fastSpeed}）较快，攻击（最终点数 ${p1Ctx.pts}）率先命中；随后敌方以最终速度（${slowSpeed}）反击（最终点数 ${p2Ctx.pts}）也命中了你。【抢攻】`
+        : `敌方最终速度（${fastSpeed}）较快，攻击（最终点数 ${p2Ctx.pts}）率先命中；随后你以最终速度（${slowSpeed}）反击（最终点数 ${p1Ctx.pts}）也命中了敌方。【抢攻】`;
+    } else if (evade) {
+      const atkIsP1 = evade.attackerId === PlayerId.P1;
+      clash = Clash.EVADE;
+      clashDesc = atkIsP1
+        ? `敌方的闪避最终速度（${evade.dodgeSpeed}）比你的攻击最终速度（${evade.atkSpeed}）更快，轻易躲开了你的攻击（最终点数 ${evade.atkPts}）。【规避】`
+        : `你的闪避最终速度（${evade.dodgeSpeed}）比敌方的攻击最终速度（${evade.atkSpeed}）更快，轻易躲开了敌方的攻击（最终点数 ${evade.atkPts}）。【规避】`;
+    } else if (dodgeOutmaneuvered) {
+      const atkIsP1 = dodgeOutmaneuvered.attackerId === PlayerId.P1;
+      clash = Clash.DODGE_OUTMANEUVERED;
+      clashDesc = atkIsP1
+        ? `双方最终速度相同（${dodgeOutmaneuvered.speed}），敌方闪避最终点数（${dodgeOutmaneuvered.dodgePts}）超过你的攻击最终点数（${dodgeOutmaneuvered.atkPts}），闪身躲开。【虚步】`
+        : `双方最终速度相同（${dodgeOutmaneuvered.speed}），你闪避最终点数（${dodgeOutmaneuvered.dodgePts}）超过敌方的攻击最终点数（${dodgeOutmaneuvered.atkPts}），闪身躲开。【虚步】`;
+    } else if (attackOverpowers) {
+      const atkIsP1 = attackOverpowers.attackerId === PlayerId.P1;
+      clash = Clash.ATTACK_OVERPOWERS;
+      clashDesc = atkIsP1
+        ? `双方最终速度相同（${attackOverpowers.speed}），你的攻击最终点数（${attackOverpowers.atkPts}）压过了敌方的闪避最终点数（${attackOverpowers.dodgePts}）——强行命中！【强突】`
+        : `双方最终速度相同（${attackOverpowers.speed}），敌方的攻击最终点数（${attackOverpowers.atkPts}）压过了你的闪避最终点数（${attackOverpowers.dodgePts}）——强行命中！【强突】`;
+    } else if (mutualHit) {
+      clash = Clash.MUTUAL_HIT;
+      clashDesc = `双方最终速度相同（${mutualHit.speed}）且最终点数相当（攻击 ${mutualHit.atkPts} vs 闪避 ${mutualHit.dodgePts}）——擦肩而过，互生侥幸。【侥幸】`;
+    } else if (fortify) {
+      const atkIsP1 = fortify.attackerId === PlayerId.P1;
+      clash = Clash.FORTIFY;
+      const isFaster = fortify.shieldSpeed > fortify.atkSpeed;
+      if (atkIsP1) {
+        clashDesc = isFaster
+          ? `敌方抢先（最终速度 ${fortify.shieldSpeed}，你的攻击速度 ${fortify.atkSpeed}）举起守备（最终点数 ${fortify.shieldPts}），稳稳挡下了你的攻击（最终点数 ${fortify.atkPts}）。【坚固】`
+          : `敌方同时（双方最终速度 ${fortify.shieldSpeed}）举起守备（最终点数 ${fortify.shieldPts}），稳稳挡下了你的攻击（最终点数 ${fortify.atkPts}）。【坚固】`;
+      } else {
+        clashDesc = isFaster
+          ? `你抢先（最终速度 ${fortify.shieldSpeed}，敌方的攻击速度 ${fortify.atkSpeed}）举起守备（最终点数 ${fortify.shieldPts}），稳稳挡下了敌方的攻击（最终点数 ${fortify.atkPts}）。【坚固】`
+          : `你同时（双方最终速度 ${fortify.shieldSpeed}）举起守备（最终点数 ${fortify.shieldPts}），稳稳挡下了敌方的攻击（最终点数 ${fortify.atkPts}）。【坚固】`;
+      }
+    } else if (breakEvt) {
+      const atkIsP1 = breakEvt.attackerId === PlayerId.P1;
+      clash = Clash.BREAK;
+      const isFaster = breakEvt.shieldSpeed > breakEvt.atkSpeed;
+      if (atkIsP1) {
+        clashDesc = isFaster
+          ? `敌方虽抢先（最终速度 ${breakEvt.shieldSpeed}，你的攻击速度 ${breakEvt.atkSpeed}）举起守备（最终点数 ${breakEvt.shieldPts}），但仍被你的攻击（最终点数 ${breakEvt.atkPts}）无情击穿！【破势】`
+          : `敌方同时（双方最终速度 ${breakEvt.shieldSpeed}）举起守备（最终点数 ${breakEvt.shieldPts}），但仍被你的攻击（最终点数 ${breakEvt.atkPts}）无情击穿！【破势】`;
+      } else {
+        clashDesc = isFaster
+          ? `你虽抢先（最终速度 ${breakEvt.shieldSpeed}，敌方的攻击速度 ${breakEvt.atkSpeed}）举起守备（最终点数 ${breakEvt.shieldPts}），但仍被敌方的攻击（最终点数 ${breakEvt.atkPts}）无情击穿！【破势】`
+          : `你同时（双方最终速度 ${breakEvt.shieldSpeed}）举起守备（最终点数 ${breakEvt.shieldPts}），但仍被敌方的攻击（最终点数 ${breakEvt.atkPts}）无情击穿！【破势】`;
+      }
+    } else if (hits.length === 1) {
+      const hit = hits[0];
+      const atkIsP1 = hit.attackerId === PlayerId.P1;
+      const targetCtx = atkIsP1 ? p2Ctx : p1Ctx;
+      if (targetCtx.action === Action.GUARD) {
+        clash = Clash.RAID;
+        clashDesc = atkIsP1
+          ? `你的攻击（最终速度 ${hit.atkSpeed}、最终点数 ${hit.atkPts}）抢在敌方拉起防御（最终速度 ${targetCtx.speed}）前命中目标！【袭击】`
+          : `敌方的攻击（最终速度 ${hit.atkSpeed}、最终点数 ${hit.atkPts}）抢在你拉起防御（最终速度 ${targetCtx.speed}）前命中目标！【袭击】`;
+      } else if (targetCtx.action === Action.DODGE) {
+        clash = Clash.SWIFT_STRIKE;
+        clashDesc = atkIsP1
+          ? `你的攻击（最终速度 ${hit.atkSpeed}、最终点数 ${hit.atkPts}）抢在敌方准备闪躲（最终速度 ${targetCtx.speed}）前命中目标！【迅攻】`
+          : `敌方的攻击（最终速度 ${hit.atkSpeed}、最终点数 ${hit.atkPts}）抢在你准备闪躲（最终速度 ${targetCtx.speed}）前命中目标！【迅攻】`;
+      } else if (targetCtx.action === Action.ATTACK) {
+        clash = Clash.INTERRUPT;
+        const tSpeed = targetCtx.speed;
+        clashDesc = atkIsP1
+          ? `你最终速度（${hit.atkSpeed}）较快，抢在敌方（最终速度 ${tSpeed}）出手前便将其击倒！【截杀】`
+          : `敌方最终速度（${hit.atkSpeed}）较快，抢在你（最终速度 ${tSpeed}）出手前便将你击倒！【截杀】`;
+      } else {
+        clash = Clash.ONE_SIDE_ATTACK;
+        clashDesc = atkIsP1
+          ? `你的攻击（最终速度 ${hit.atkSpeed}、最终点数 ${hit.atkPts}）直接命中了未作防备的敌方。【命中】`
+          : `敌方攻击（最终速度 ${hit.atkSpeed}、最终点数 ${hit.atkPts}）直接命中了未作防备的你。【命中】`;
+      }
+    } else {
+      clash = Clash.WASTED_ACTION;
+      clashDesc = '发生了不在预期内的交锋结果。';
+    }
+
+    return this._withExecute(clash, clashDesc, rawDmgP1, rawDmgP2, p1State, p2State);
+  }
+
+  static _buildResultObj(
+    turn, p1Ctx, p2Ctx, p1State, p2State,
+    clash, clashDesc, damageToP1, damageToP2, executeP1, executeP2,
+    p1ExposedEffects, p2ExposedEffects
+  ) {
+    const newP1Hp = Math.max(0, p1State.hp - damageToP1);
+    const newP2Hp = Math.max(0, p2State.hp - damageToP2);
+
+    const p1Bonus = p1State.staminaBonus || 0;
+    const p2Bonus = p2State.staminaBonus || 0;
+    let newP1Stamina = p1State.stamina;
+    let newP2Stamina = p2State.stamina;
+
+    if (clash !== Clash.INSIGHT_CLASH) {
+      const p1IsRealStandby = p1Ctx.action === Action.STANDBY && !p1Ctx.isCharge;
+      const p2IsRealStandby = p2Ctx.action === Action.STANDBY && !p2Ctx.isCharge;
+      newP1Stamina = Math.min(DefaultStats.MAX_STAMINA,
+        (p1IsRealStandby ? p1State.stamina + 1 : Math.max(0, p1State.stamina - calcActionCost(p1Ctx, p1State))) + p1Bonus
+      );
+      newP2Stamina = Math.min(DefaultStats.MAX_STAMINA,
+        (p2IsRealStandby ? p2State.stamina + 1 : Math.max(0, p2State.stamina - calcActionCost(p2Ctx, p2State))) + p2Bonus
+      );
+    }
+
+    return {
+      turn, p1Action: { ...p1Ctx }, p2Action: { ...p2Ctx },
+      clash, clashName: ClashName[clash] ?? clash, clashDesc,
+      damageToP1, damageToP2, executeP1, executeP2,
+      p1ExposedEffects, p2ExposedEffects,
+      newState: {
+        p1: {
+          hp: newP1Hp, stamina: newP1Stamina,
+          chargeBoost: p1State.chargeBoost || 0, ptsDebuff: p1State.ptsDebuff || 0,
+          guardBoost: p1State.guardBoost || 0, guardDebuff: p1State.guardDebuff || 0,
+          dodgeBoost: p1State.dodgeBoost || 0, dodgeDebuff: p1State.dodgeDebuff || 0,
+          agilityBoost: p1State.agilityBoost || 0, staminaPenalty: p1State.staminaPenalty || 0,
+          staminaDiscount: p1State.staminaDiscount || 0, hpDrain: p1State.hpDrain || 0
+        },
+        p2: {
+          hp: newP2Hp, stamina: newP2Stamina,
+          chargeBoost: p2State.chargeBoost || 0, ptsDebuff: p2State.ptsDebuff || 0,
+          guardBoost: p2State.guardBoost || 0, guardDebuff: p2State.guardDebuff || 0,
+          dodgeBoost: p2State.dodgeBoost || 0, dodgeDebuff: p2State.dodgeDebuff || 0,
+          agilityBoost: p2State.agilityBoost || 0, staminaPenalty: p2State.staminaPenalty || 0,
+          staminaDiscount: p2State.staminaDiscount || 0, hpDrain: p2State.hpDrain || 0
+        },
+      }
+    };
+  }
+}

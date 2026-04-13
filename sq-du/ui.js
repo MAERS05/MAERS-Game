@@ -144,9 +144,12 @@ function updatePips(prefix, current, max, type) {
 /** 实时计算包含了当前行动消耗在内的预期精力 */
 function getProjectedStamina(player) {
   let s = player.stamina;
-  if (player.actionCtx && player.actionCtx.action !== Action.STANDBY) {
-    // 闪避、攻击、守备的消耗统一为 1 + enhance
-    s -= (1 + (player.actionCtx.enhance || 0));
+  const ctx = player.actionCtx;
+  if (ctx && ctx.action !== Action.STANDBY) {
+    // 与 calcActionCost 保持相同公式，含振奋/低落修正
+    const pen = player.staminaPenalty || 0;
+    const dis = player.staminaDiscount || 0;
+    s -= Math.max(0, 1 + (ctx.enhance || 0) + pen - dis);
   }
   return Math.max(0, Math.min(DefaultStats.MAX_STAMINA, s));
 }
