@@ -211,6 +211,12 @@ export class BattleEngine {
     this._beginTurn();
   }
 
+  /** 随时暂停/恢复游戏倒计时 */
+  togglePause() {
+    if (this._state !== EngineState.TICKING && this._state !== EngineState.EQUIPPING) return false;
+    return this._timer.togglePauseGlobal();
+  }
+
   /**
    * 装备期：玩家将某个效果放置到某行为的某个槽位（或清空，传 null）
    * 效果更改持久跨回合，直到玩家主动替换。

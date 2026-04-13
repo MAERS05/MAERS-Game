@@ -93,6 +93,22 @@ export class DualTimer {
     this._running = false;
   }
 
+  /** 切换全局暂停状态 */
+  togglePauseGlobal() {
+    if (this._running) {
+      if (this._intervalId !== null) {
+        clearInterval(this._intervalId);
+        this._intervalId = null;
+      }
+    } else {
+      if (this._intervalId === null) {
+        this._intervalId = setInterval(() => this._tick(), TimerConfig.TICK_MS);
+      }
+    }
+    this._running = !this._running;
+    return !this._running;
+  }
+
   /**
    * 暂停某方的决策期倒计时（该方已就绪）
    * @param {string} playerId - PlayerId

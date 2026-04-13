@@ -97,6 +97,8 @@ const ui = {
   effectPicker: $('effectPicker'),
   effectPickerClose: $('effectPickerClose'),
   effectPickerList: $('effectPickerList'),
+  // 全局控制
+  globalPauseBtn: $('globalPauseBtn'),
 };
 
 // ─── 本地 UI 状态 ─────────────────────────────────────
@@ -338,22 +340,21 @@ ui.insightBtn.addEventListener('click', () => {
 
 ui.battleLog.addEventListener('click', () => {
   if (!ui.battleLog.classList.contains('show')) return;
+  // 仅在游戏结束时，才允许点击强制重置
+  if (!isGameOver) return;
+
   ui.battleLog.classList.remove('show');
   document.body.classList.remove('resolving');
-  if (!isGameOver) {
-    engine.acknowledgeResolve();
-  } else {
-    // 重新开局
-    isGameOver = false;
-    matchHistory = [];
-    updateHistoryUI();
-    ui.turnIndicator.textContent = "TURN 1";
-    ui.battleLog.querySelector('.log-hint').textContent = "点击关闭，开始下一回合";
+  // 重新开局
+  isGameOver = false;
+  matchHistory = [];
+  updateHistoryUI();
+  ui.turnIndicator.textContent = "TURN 1";
+  ui.battleLog.querySelector('.log-hint').textContent = "";
 
-    engine.restartGame();
-    initUI();
-    resetForNewTurn();
-  }
+  engine.restartGame();
+  initUI();
+  resetForNewTurn();
 });
 
 ui.historyBtn.addEventListener('click', () => ui.historyModal.classList.add('show'));
@@ -563,6 +564,15 @@ engine.on(EngineEvent.TURN_RESOLVED, result => {
   updateHistoryUI();
 
   if (!isGameOver) {
+    ui.battleLog.querySelector('.log-hint').textContent = "3 秒后自动关闭";
+    setTimeout(() => {
+      if (ui.battleLog.classList.contains('show') && !isGameOver) {
+        ui.battleLog.classList.remove('show');
+        document.body.classList.remove('resolving');
+        engine.acknowledgeResolve();
+      }
+    }, 3000);
+
     ui.turnIndicator.textContent = `TURN ${result.turn + 1}`;
     resetForNewTurn();
   }
@@ -976,7 +986,7 @@ function showTemporaryIntelBox() {
   if (ui.intelBox._timeoutId) clearTimeout(ui.intelBox._timeoutId);
   ui.intelBox._timeoutId = setTimeout(() => {
     ui.intelBox.classList.remove('show');
-  }, 2000);
+  }, 3000);
 }
 
 // 绑定 P2 人物框的情报图标点击事件
@@ -985,6 +995,14 @@ if (ui.p2IntelBtn) {
     e.stopPropagation();
     ui.intelBox.classList.toggle('show');
     if (ui.intelBox._timeoutId) clearTimeout(ui.intelBox._timeoutId);
+  });
+}
+
+if (ui.globalPauseBtn) {
+  ui.globalPauseBtn.addEventListener('click', () => {
+    const isPaused = engine.togglePause();
+    ui.globalPauseBtn.textContent = isPaused ? '▶︎' : '⏸︎';
+    ui.globalPauseBtn.classList.toggle('is-paused', isPaused);
   });
 }
 
