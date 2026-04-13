@@ -73,15 +73,25 @@ export class AIJudgeLayer {
       action: Action.STANDBY, speed: DefaultStats.BASE_SPEED, enhance: 0, pts: 0,
     };
 
-    const w = { attack: 1.0, guard: 1.0, dodge: 1.0 };
+    const w = { attack: 1.0, guard: 1.0, dodge: 1.0, standby: 0.2 };
 
-    if (player.stamina <= 0) { w.attack += 8; w.guard *= 0.1; w.dodge *= 0.1; }
+    if (player.stamina <= 0) { w.attack += 8; w.guard *= 0.1; w.dodge *= 0.1; w.standby *= 0.05; }
     const aiHpPressure = 1 - snap.aiHpRatio;
     w.guard += aiHpPressure * 2.0;
     w.dodge += aiHpPressure * 1.2;
-    if (ai.stamina >= 2) w.attack += (1 - snap.playerHpRatio) * 2.5;
+    if (rdEffectiveStamina >= 2) w.attack += (1 - snap.playerHpRatio) * 2.5;
+    const rdEffectiveStamina = ai.stamina + (ai.staminaDiscount || 0) - (ai.staminaPenalty || 0);
+    if (rdEffectiveStamina <= 1 && player.hp > 1 && player.stamina > 0) {
+      w.standby += 3.0;
+      w.attack -= 0.6;
+      w.dodge -= 0.3;
+    }
+    if (rdEffectiveStamina <= 2 && snap.playerHpRatio > 0.35) {
+      w.standby += 1.2;
+      w.attack -= 0.3;
+    }
 
-    const REVEAL_W = 5.0;
+    const REVEAL_W = 3.8;
 
     const attackNature = {
       [Action.ATTACK]: 1.0,
@@ -109,6 +119,7 @@ export class AIJudgeLayer {
       [Action.ATTACK]: Math.max(0, w.attack),
       [Action.GUARD]: Math.max(0, w.guard),
       [Action.DODGE]: Math.max(0, w.dodge),
+      [Action.STANDBY]: Math.max(0, w.standby),
     });
 
     const revealedSpeed = revealed.speed ?? DefaultStats.BASE_SPEED;
@@ -120,8 +131,12 @@ export class AIJudgeLayer {
     const playerWeakness = 1 - Math.max(snap.playerHpRatio, snap.playerStaminaRatio);
     speedBoostWeight += playerWeakness * 2.0;
 
-    const availableForBoost = ai.stamina - 1;
-    const boostProb = Math.max(0, Math.min(0.9, 0.25 + speedBoostWeight * 0.35));
+    const availableForBoost = rdEffectiveStamina - 1;
+    if (availableForBoost <= 1 && snap.playerHpRatio > 0.4) {
+      speedBoostWeight -= 0.5;
+    }
+    const staminaConserve = Math.max(0.45, Math.min(1.0, snap.aiStaminaRatio + 0.15));
+    const boostProb = Math.max(0, Math.min(0.75, (0.16 + speedBoostWeight * 0.22) * staminaConserve));
     const speedBoostRaw = (availableForBoost > 0 && Math.random() < boostProb) ? 1 : 0;
     const speedRaw = DefaultStats.BASE_SPEED + speedBoostRaw;
 
@@ -134,10 +149,14 @@ export class AIJudgeLayer {
       enhWeight += playerWeakness * 2.5;
 
       const rdBaseCost = Math.max(0, 1 + rdPenalty - rdDiscount);
-      const canEnhance = ai.stamina >= rdBaseCost + 1;
+      const canEnhance = rdEffectiveStamina >= rdBaseCost + 1;
       if (canEnhance) {
-        const enhProb = Math.max(0, Math.min(0.85, 0.15 + enhWeight * 0.3));
-        enhanceRaw = Math.random() < enhProb ? 1 : 0;
+        if (snap.aiStaminaRatio < 0.45 && snap.playerHpRatio > 0.35) {
+          enhanceRaw = 0;
+        } else {
+          const enhProb = Math.max(0, Math.min(0.75, (0.12 + enhWeight * 0.24) * staminaConserve));
+          enhanceRaw = Math.random() < enhProb ? 1 : 0;
+        }
       }
     }
 

@@ -114,6 +114,9 @@ export class AIBaseLogic {
     const oppEnhanceTrend = recent.length
       ? recent.reduce((s, h) => s + (h.opponentEnhance ?? 0), 0) / recent.length
       : 0;
+    const oppStaminaTrend = recent.length
+      ? recent.reduce((s, h) => s + (h.opponentStamina ?? DefaultStats.MAX_STAMINA), 0) / recent.length
+      : DefaultStats.MAX_STAMINA;
     const oppAggression = recent.length
       ? recent.filter(h => h.opponentAction === Action.ATTACK).length / recent.length
       : 0.33;
@@ -125,6 +128,7 @@ export class AIBaseLogic {
       playerStaminaRatio: player.stamina / MAX_STAMINA,
       oppSpeedTrend,
       oppEnhanceTrend,
+      oppStaminaTrend,
       oppAggression,
     };
   }
@@ -134,12 +138,13 @@ export class AIBaseLogic {
   // ═══════════════════════════════════════════════════════════
 
   static pickAction(snap, ai) {
-    const w = { attack: 1.0, guard: 1.0, dodge: 1.0 };
+    const w = { attack: 1.0, guard: 1.0, dodge: 1.0, standby: 0.2 };
 
     if (snap.playerStaminaRatio <= 0) {
       w.attack += 8;
       w.guard *= 0.1;
       w.dodge *= 0.1;
+      w.standby *= 0.05;
     }
 
     const aiHpPressure = 1 - snap.aiHpRatio;
@@ -147,8 +152,9 @@ export class AIBaseLogic {
     w.dodge += aiHpPressure * 1.5;
     w.attack -= aiHpPressure * 0.5;
 
+    const aiEffectiveStamina = ai.stamina + (ai.staminaDiscount || 0) - (ai.staminaPenalty || 0);
     const playerHpPressure = 1 - snap.playerHpRatio;
-    if (ai.stamina >= 2) {
+    if (aiEffectiveStamina >= 2) {
       w.attack += playerHpPressure * 3.0;
     }
 
@@ -156,17 +162,46 @@ export class AIBaseLogic {
     w.dodge += snap.oppAggression * 1.0;
     w.attack -= snap.oppAggression * 0.5;
 
-    const aiEffectiveStamina = ai.stamina + (ai.staminaDiscount || 0) - (ai.staminaPenalty || 0);
     // 这里不再减去 penalty/discount，因为在 validBudget 里会统一基于 effectiveStamina 裁剪
     const aiCostEstimate = 1; 
     const aiRemainingStamina = aiEffectiveStamina - aiCostEstimate;
     
     if (aiRemainingStamina <= 0) {
-      w.guard += 1.0;
-      w.attack -= 0.5;
+      w.guard += 1.6;
+      w.attack -= 0.8;
+      w.dodge -= 0.3;
+      w.standby += 3.2;
     }
 
-    return this.pickWeighted({ [Action.ATTACK]: w.attack, [Action.GUARD]: w.guard, [Action.DODGE]: w.dodge });
+    // 低精力时更倾向待命回血，避免连续空转到被处决线
+    if (aiEffectiveStamina <= 1 && snap.playerStaminaRatio > 0) {
+      w.standby += 2.8;
+      w.attack -= 0.6;
+    }
+    if (aiEffectiveStamina <= 2 && snap.playerHpRatio > 0.35) {
+      w.standby += 1.4;
+      w.attack -= 0.4;
+      w.dodge -= 0.2;
+    }
+    if (snap.aiHpRatio <= 0.4 && aiEffectiveStamina <= 2) {
+      w.standby += 1.2;
+    }
+    // 对手也低精力时，适度降低待命倾向，避免双方空转
+    if (snap.oppStaminaTrend <= 1.0 && aiEffectiveStamina >= 1) {
+      w.attack += 0.8;
+      w.standby -= 0.5;
+    }
+    // 对手濒危时减少保守倾向，避免错失斩杀窗口
+    if (snap.playerHpRatio <= 0.25 && aiEffectiveStamina >= 2) {
+      w.standby *= 0.35;
+    }
+
+    return this.pickWeighted({
+      [Action.ATTACK]: w.attack,
+      [Action.GUARD]: w.guard,
+      [Action.DODGE]: w.dodge,
+      [Action.STANDBY]: w.standby,
+    });
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -192,10 +227,13 @@ export class AIBaseLogic {
 
     if (action === Action.DODGE) speedBoostWeight += snap.oppAggression * 1.2;
 
-    const availableForBoost = ai.stamina - effectiveBaseCost;
+    const aiEffectiveStamina = ai.stamina + (ai.staminaDiscount || 0) - (ai.staminaPenalty || 0);
+    const availableForBoost = aiEffectiveStamina - effectiveBaseCost;
     if (availableForBoost <= 0) return BASE;
 
-    const boostProb = Math.max(0, Math.min(0.9, 0.3 + speedBoostWeight * 0.3));
+    if (availableForBoost <= 1 && snap.playerHpRatio > 0.4) return BASE;
+    const staminaConserve = Math.max(0.45, Math.min(1.0, snap.aiStaminaRatio + 0.15));
+    const boostProb = Math.max(0, Math.min(0.75, (0.16 + speedBoostWeight * 0.22) * staminaConserve));
     const boost = Math.random() < boostProb ? 1 : 0;
 
     return BASE + boost;
@@ -216,10 +254,13 @@ export class AIBaseLogic {
       let dodgeEnhWeight = snap.oppEnhanceTrend * 0.9;
       dodgeEnhWeight += snap.oppAggression * 0.7;
 
-      const dodgeEnhanceable = ai.stamina >= effectiveBaseCost + 1;
+      const aiEffectiveStamina = ai.stamina + (ai.staminaDiscount || 0) - (ai.staminaPenalty || 0);
+      const dodgeEnhanceable = aiEffectiveStamina >= effectiveBaseCost + 1;
       if (!dodgeEnhanceable) return 0;
 
-      const dodgeEnhProb = Math.max(0, Math.min(0.85, 0.15 + dodgeEnhWeight * 0.4));
+      if (snap.aiStaminaRatio < 0.45 && snap.playerHpRatio > 0.4) return 0;
+      const staminaConserve = Math.max(0.45, Math.min(1.0, snap.aiStaminaRatio + 0.15));
+      const dodgeEnhProb = Math.max(0, Math.min(0.75, (0.10 + dodgeEnhWeight * 0.28) * staminaConserve));
       return Math.random() < dodgeEnhProb ? 1 : 0;
     }
 
@@ -227,10 +268,13 @@ export class AIBaseLogic {
     if (action === Action.GUARD) enhWeight += snap.oppAggression * 0.6;
     if (action === Action.ATTACK) enhWeight += (1 - snap.playerHpRatio) * 0.5;
 
-    const enhanceable = ai.stamina >= effectiveBaseCost + 1;
+    const aiEffectiveStamina = ai.stamina + (ai.staminaDiscount || 0) - (ai.staminaPenalty || 0);
+    const enhanceable = aiEffectiveStamina >= effectiveBaseCost + 1;
     if (!enhanceable) return 0;
 
-    const enhProb = Math.max(0, Math.min(0.85, 0.2 + enhWeight * 0.35));
+    if (snap.aiStaminaRatio < 0.45 && snap.playerHpRatio > 0.35) return 0;
+    const staminaConserve = Math.max(0.45, Math.min(1.0, snap.aiStaminaRatio + 0.15));
+    const enhProb = Math.max(0, Math.min(0.75, (0.14 + enhWeight * 0.26) * staminaConserve));
     return Math.random() < enhProb ? 1 : 0;
   }
 
