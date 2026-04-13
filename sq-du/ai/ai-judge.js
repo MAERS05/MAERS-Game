@@ -74,13 +74,13 @@ export class AIJudgeLayer {
     };
 
     const w = { attack: 1.0, guard: 1.0, dodge: 1.0, standby: 0.2 };
+    const rdEffectiveStamina = ai.stamina + (ai.staminaDiscount || 0) - (ai.staminaPenalty || 0);
 
-    if (player.stamina <= 0) { w.attack += 8; w.guard *= 0.1; w.dodge *= 0.1; w.standby *= 0.05; }
+    if (player.stamina <= 0) { w.attack += 9; w.guard *= 0.1; w.dodge *= 0.1; w.standby *= 0.05; }
     const aiHpPressure = 1 - snap.aiHpRatio;
     w.guard += aiHpPressure * 2.0;
     w.dodge += aiHpPressure * 1.2;
     if (rdEffectiveStamina >= 2) w.attack += (1 - snap.playerHpRatio) * 2.5;
-    const rdEffectiveStamina = ai.stamina + (ai.staminaDiscount || 0) - (ai.staminaPenalty || 0);
     if (rdEffectiveStamina <= 1 && player.hp > 1 && player.stamina > 0) {
       w.standby += 3.0;
       w.attack -= 0.6;

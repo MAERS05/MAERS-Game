@@ -141,7 +141,7 @@ export class AIBaseLogic {
     const w = { attack: 1.0, guard: 1.0, dodge: 1.0, standby: 0.2 };
 
     if (snap.playerStaminaRatio <= 0) {
-      w.attack += 8;
+      w.attack += 9;
       w.guard *= 0.1;
       w.dodge *= 0.1;
       w.standby *= 0.05;
@@ -179,7 +179,7 @@ export class AIBaseLogic {
       w.attack -= 0.6;
     }
     if (aiEffectiveStamina <= 2 && snap.playerHpRatio > 0.35) {
-      w.standby += 1.4;
+      w.standby += 1.6;
       w.attack -= 0.4;
       w.dodge -= 0.2;
     }
