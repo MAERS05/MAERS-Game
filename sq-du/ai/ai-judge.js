@@ -121,28 +121,32 @@ export class AIJudgeLayer {
 
     // 对手出守备时反制
     if (revealedAct === Action.GUARD) {
+      // 守备是防御姿态：AI 有尝试打穿的价值
       if (effectiveStamina >= 2) {
-        // 足够精力且能打穿守备（需要 pts 比对手守备点数高）则强化攻击
-        // 否则待命回气，等更好时机
-        if (revealedPts >= 3 && snap.aiHpRatio > 0.3) {
-          // 对手守备点数高，硬攻不值，等待
-          return effectiveStamina >= 2 ? Action.STANDBY : Action.STANDBY;
+        // 对手守备点数极高（≥3）而自身精力有限，无法强化打穿，下一回合伺机再攻
+        if (revealedPts >= 3 && effectiveStamina < 4) {
+          return Action.STANDBY;
         }
+        // 否则强化后攻击打穿（ai-judge._pickCounterEnhance 会配合强化到 revealedPts+1）
         return Action.ATTACK;
       }
+      // 精力不足：无法强化攻击，也不能站在守备面前浪费攻击，待命
       return Action.STANDBY;
     }
 
-    // 对手出闪避时：攻击无效（会被闪开），选择待命或强化以做下回合准备
+    // 对手出闪避时：闪避克制攻击（攻击可能被提前命中也可能被闪开）
+    // 关键取决于速度——如果 AI 攻击速度 > 对手闪避速度，攻击优先命中
+    // 此处仅决定行动类型；具体速度由 _pickCounterSpeed 保证超过对手闪避速
     if (revealedAct === Action.DODGE) {
-      // 对手闪避中 → 尝试用速度压制（比闪避速度快则命中），否则待命
       if (effectiveStamina >= 2) {
-        return Action.ATTACK; // 靠速度尝试在闪避前命中
+        // 有足够精力加速超越对手闪避速度：攻击有成功可能
+        return Action.ATTACK;
       }
+      // 精力不足无法加速超越，正面攻击大概率被闪开，待命更好
       return Action.STANDBY;
     }
 
-    // 对手待命 → 进攻
+    // 对手待命 → 进攻（待命无法防御）
     if (revealedAct === Action.STANDBY) {
       if (effectiveStamina >= 1) return Action.ATTACK;
       return Action.STANDBY;
@@ -154,8 +158,8 @@ export class AIJudgeLayer {
 
   /**
    * 完美信息下的速度选择。
-   * 对手出攻击：守备/闪避速度应超过对手攻击速度。
-   * 对手出守备/待命：加速没什么意义，保守为主。
+   * 对手攻击时：守备/闪避速度超过对手攻击速度方能提前就位。
+   * 对手闪避时：攻击速度必须严格超过闪避速度，否则攻击被闪开。
    */
   static _pickCounterSpeed(revealed, snap, action, ai, effectiveStamina) {
     const BASE = DefaultStats.BASE_SPEED;
@@ -165,15 +169,24 @@ export class AIJudgeLayer {
     const revealedSpd = revealed.speed ?? BASE;
     const revealedAct = revealed.action;
 
-    // 对手出攻击时：守备/闪避需要速度 > 对手速度才能提前就位
+    // 对手攻击时：守备/闪避需要速度 > 对手攻击速度才能提前就位
     if (revealedAct === Action.ATTACK && (action === Action.GUARD || action === Action.DODGE)) {
-      // 如果对手速度超过 BASE，且有余量，一定加速
       if (revealedSpd > BASE && availableForBoost >= 1) return BASE + 1;
-      // 对手 BASE 速时：随机50%加速（防止被预测）
-      if (revealedSpd <= BASE) return Math.random() < 0.40 ? BASE + 1 : BASE;
+      // 对手 BASE 速时：不需要强行加速，随机化防止被读
+      return Math.random() < 0.35 ? BASE + 1 : BASE;
     }
 
-    // 自身出攻击时对手出待命/守备：不需要特别快，节省精力
+    // 对手闪避时 AI 出攻击：必须速度严格超过对手闪避速度才能命中
+    if (revealedAct === Action.DODGE && action === Action.ATTACK) {
+      if (revealedSpd >= BASE + 1 && availableForBoost >= 1) {
+        // 对手已经加速闪避，必须跟着加速
+        return BASE + 1;
+      }
+      // 对手基础速度闪避：加速可以确保命中，有余量时加速
+      if (availableForBoost >= 1) return BASE + 1;
+    }
+
+    // 其他行动组合：按情势判断
     if (action === Action.ATTACK) {
       const playerWeakness = 1 - Math.max(snap.playerHpRatio, snap.playerStaminaRatio);
       const prob = Math.min(0.6, playerWeakness * 0.8 + (snap.aiStaminaRatio - 0.5) * 0.4);
