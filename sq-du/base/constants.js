@@ -260,9 +260,15 @@ export const EffectId = Object.freeze({
   BREAK_LIMIT: 'break_limit', // 破限：消耗自身 1 点气数，本回合攻击 +1 速度
   CHARGE:      'charge',      // 蓄力：本回合攻击不执行，下回合攻击 +1 点数
   // ── 守备类效果 ──
-  REBOUND: 'rebound',  // 反震：守备成功抵挡攻击时，对攻击方反弹一次攻击
+  REBOUND:     'rebound',     // 反震：守备成功抵挡攻击时，对攻击方反弹一次攻击
+  AURA_SHIELD: 'aura_shield', // 御气：消耗自身 1 点气数，本回合守备 +1 点数
+  DEFLECT:     'deflect',     // 卸力：守备成功防挡时，对手下回合攻击 -1 点数
+  ENTRENCH:    'entrench',    // 固守：本回合未受到伤害，下回合守备 +1 点数
   // ── 闪避类效果 ──
-  AGILITY: 'agility',  // 灵巧：闪避成功后下回合速度 +1
+  AGILITY:     'agility',     // 灵巧：闪避成功后下回合速度 +1
+  AFTERIMAGE:  'afterimage',  // 残影：消耗自身 1 点气数，本回合闪避 +1 幅度
+  EXTREME:     'extreme',     // 极限：消耗自身 1 点气数，本回合闪避 +1 速度
+  MOMENTUM:    'momentum',    // 借势：闪避成功且未受伤，恢复 1 点精力
 });
 
 
@@ -296,9 +302,29 @@ export const EffectDefs = Object.freeze({
     desc: '消耗自身 1 点气数，本回合攻击 +1 速度',
     applicableTo: [Action.ATTACK],
   },
+  [EffectId.CHARGE]: {
+    id: EffectId.CHARGE, name: '蓄力',
+    desc: '本回合攻击不执行，下回合攻击 +1 点数',
+    applicableTo: [Action.ATTACK],
+  },
   [EffectId.REBOUND]: {
     id: EffectId.REBOUND, name: '反震',
     desc: '守备成功抵挡攻击时，对攻击方反弹 1 次伤害',
+    applicableTo: [Action.GUARD],
+  },
+  [EffectId.AURA_SHIELD]: {
+    id: EffectId.AURA_SHIELD, name: '御气',
+    desc: '消耗自身 1 点气数，本回合守备 +1 点数',
+    applicableTo: [Action.GUARD],
+  },
+  [EffectId.DEFLECT]: {
+    id: EffectId.DEFLECT, name: '卸力',
+    desc: '守备成功防挡来袭时，对手下回合攻击 -1 点数',
+    applicableTo: [Action.GUARD],
+  },
+  [EffectId.ENTRENCH]: {
+    id: EffectId.ENTRENCH, name: '固守',
+    desc: '本回合未受到伤害，下回合守备 +1 点数',
     applicableTo: [Action.GUARD],
   },
   [EffectId.AGILITY]: {
@@ -306,10 +332,20 @@ export const EffectDefs = Object.freeze({
     desc: '闪避成功后下回合速度 +1',
     applicableTo: [Action.DODGE],
   },
-  [EffectId.CHARGE]: {
-    id: EffectId.CHARGE, name: '蓄力',
-    desc: '本回合攻击不执行，下回合攻击 +1 点数',
-    applicableTo: [Action.ATTACK],
+  [EffectId.AFTERIMAGE]: {
+    id: EffectId.AFTERIMAGE, name: '残影',
+    desc: '消耗自身 1 点气数，本回合闪避 +1 幅度',
+    applicableTo: [Action.DODGE],
+  },
+  [EffectId.EXTREME]: {
+    id: EffectId.EXTREME, name: '极限',
+    desc: '消耗自身 1 点气数，本回合闪避 +1 速度',
+    applicableTo: [Action.DODGE],
+  },
+  [EffectId.MOMENTUM]: {
+    id: EffectId.MOMENTUM, name: '借势',
+    desc: '闪避成功且未受到伤害时，恢复 1 点精力',
+    applicableTo: [Action.DODGE],
   },
 });
 

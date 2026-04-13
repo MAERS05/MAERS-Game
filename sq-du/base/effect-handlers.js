@@ -11,8 +11,6 @@
  *   3. 在此文件 import 并加入 EffectHandlers
  */
 
-'use strict';
-
 import { EffectId } from './constants.js';
 
 // ── 攻击类效果 ──
@@ -23,16 +21,22 @@ import { ChargeEffect } from '../effect/attack/charge.js';
 
 // ── 守备类效果 ──
 import { ReboundEffect } from '../effect/guard/rebound.js';
+import { AuraShieldEffect } from '../effect/guard/aura_shield.js';
+import { DeflectEffect } from '../effect/guard/deflect.js';
+import { EntrenchEffect } from '../effect/guard/entrench.js';
 
 // ── 闪避类效果 ──
 import { AgilityEffect } from '../effect/dodge/agility.js';
+import { AfterimageEffect } from '../effect/dodge/afterimage.js';
+import { ExtremeEffect } from '../effect/dodge/extreme.js';
+import { MomentumEffect } from '../effect/dodge/momentum.js';
 
 /**
  * 效果处理器映射表（EffectId → handler）
  *
  * 每个 handler 可实现以下可选钩子：
- *   onPre(ctx, state)  → 返回修改后的 ctx 副本（前置效果，在时间轴执行前触发）
- *   onHit(ctx)         → void（后置命中效果，在时间轴命中结算后触发）
+ *   onPre(ctx, state)                          → 返回修改后的 ctx 副本（前置效果）
+ *   onPost(ctx, selfState, oppState, dmgTaken) → void（后置效果，时间轴结算后触发）
  */
 export const EffectHandlers = Object.freeze({
   [EffectId.WOUND]:       WoundEffect,
@@ -40,5 +44,11 @@ export const EffectHandlers = Object.freeze({
   [EffectId.BREAK_LIMIT]: BreakLimitEffect,
   [EffectId.CHARGE]:      ChargeEffect,
   [EffectId.REBOUND]:     ReboundEffect,
+  [EffectId.AURA_SHIELD]: AuraShieldEffect,
+  [EffectId.DEFLECT]:     DeflectEffect,
+  [EffectId.ENTRENCH]:    EntrenchEffect,
   [EffectId.AGILITY]:     AgilityEffect,
+  [EffectId.AFTERIMAGE]:  AfterimageEffect,
+  [EffectId.EXTREME]:     ExtremeEffect,
+  [EffectId.MOMENTUM]:    MomentumEffect,
 });

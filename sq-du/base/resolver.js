@@ -85,6 +85,26 @@ export function resolve(p1Ctx, p2Ctx, p1State, p2State, bothInsighted, turn) {
     p2State.chargeBoost = 0;
   }
 
+  // ── 卸力跨回合补丁（ptsDebuff）─────────────────────────────
+  if (p1Ctx.action === Action.ATTACK && p1State.ptsDebuff) {
+    p1Ctx = { ...p1Ctx, pts: Math.max(1, p1Ctx.pts - p1State.ptsDebuff) };
+    p1State.ptsDebuff = 0;
+  }
+  if (p2Ctx.action === Action.ATTACK && p2State.ptsDebuff) {
+    p2Ctx = { ...p2Ctx, pts: Math.max(1, p2Ctx.pts - p2State.ptsDebuff) };
+    p2State.ptsDebuff = 0;
+  }
+
+  // ── 固守跨回合增益（guardBoost）────────────────────────────
+  if (p1Ctx.action === Action.GUARD && p1State.guardBoost) {
+    p1Ctx = { ...p1Ctx, pts: p1Ctx.pts + p1State.guardBoost };
+    p1State.guardBoost = 0;
+  }
+  if (p2Ctx.action === Action.GUARD && p2State.guardBoost) {
+    p2Ctx = { ...p2Ctx, pts: p2Ctx.pts + p2State.guardBoost };
+    p2State.guardBoost = 0;
+  }
+
   // ── 效果层：顺位失效 + 前置修正（如铁壁、破甲）────────────
   const { ctx: p1CtxEff, triggered: p1TriggeredEffects } = _applyEffects(p1Ctx, p1State, p2Ctx);
   const { ctx: p2CtxEff, triggered: p2TriggeredEffects } = _applyEffects(p2Ctx, p2State, p1CtxEff);
@@ -100,6 +120,10 @@ export function resolve(p1Ctx, p2Ctx, p1State, p2State, bothInsighted, turn) {
     [PlayerId.P2]: { shields: [], evasions: [], dmgReceived: 0 },
   };
   const log = _executeTimeline(timeline, bs, p1CtxEff, p2CtxEff, p1TriggeredEffects, p2TriggeredEffects);
+
+  // ── 后置效果钩子（时间轴结算后，知晓实际受伤数）──────────
+  _applyPostEffects(p1CtxEff, p1State, p2State, p1TriggeredEffects, bs[PlayerId.P1].dmgReceived);
+  _applyPostEffects(p2CtxEff, p2State, p1State, p2TriggeredEffects, bs[PlayerId.P2].dmgReceived);
 
   // ── 3. 从日志涌现推断情形，含处决覆盖 ────────────────────
   const derived = _deriveClash(
@@ -549,13 +573,21 @@ function _buildResult(
   const newP1Hp = Math.max(0, p1State.hp - damageToP1);
   const newP2Hp = Math.max(0, p2State.hp - damageToP2);
 
-  // 精力结算：待命 +1，行动消耗 cost（速度加速已在 engine 层提前支付）
-  const newP1Stamina = p1Ctx.action === Action.STANDBY
-    ? Math.min(DefaultStats.MAX_STAMINA, p1State.stamina + 1)
-    : Math.max(0, p1State.stamina - _calcCost(p1Ctx));
-  const newP2Stamina = p2Ctx.action === Action.STANDBY
-    ? Math.min(DefaultStats.MAX_STAMINA, p2State.stamina + 1)
-    : Math.max(0, p2State.stamina - _calcCost(p2Ctx));
+  // 精力结算：待命 +1，行动消耗 cost；借势 staminaBonus 在成功出赵后加回
+  const p1Bonus = p1State.staminaBonus || 0;
+  const p2Bonus = p2State.staminaBonus || 0;
+  const newP1Stamina = Math.min(
+    DefaultStats.MAX_STAMINA,
+    (p1Ctx.action === Action.STANDBY
+      ? p1State.stamina + 1
+      : Math.max(0, p1State.stamina - _calcCost(p1Ctx))) + p1Bonus
+  );
+  const newP2Stamina = Math.min(
+    DefaultStats.MAX_STAMINA,
+    (p2Ctx.action === Action.STANDBY
+      ? p2State.stamina + 1
+      : Math.max(0, p2State.stamina - _calcCost(p2Ctx))) + p2Bonus
+  );
 
   return {
     turn,
@@ -569,8 +601,14 @@ function _buildResult(
     executeP1,
     executeP2,
     newState: {
-      p1: { hp: newP1Hp, stamina: newP1Stamina },
-      p2: { hp: newP2Hp, stamina: newP2Stamina },
+      p1: { hp: newP1Hp, stamina: newP1Stamina,
+             chargeBoost: p1State.chargeBoost || 0,
+             ptsDebuff:   p1State.ptsDebuff   || 0,
+             guardBoost:  p1State.guardBoost  || 0 },
+      p2: { hp: newP2Hp, stamina: newP2Stamina,
+             chargeBoost: p2State.chargeBoost || 0,
+             ptsDebuff:   p2State.ptsDebuff   || 0,
+             guardBoost:  p2State.guardBoost  || 0 },
     },
     // 情报暴露：本回合已生效的效果列表
     p1ExposedEffects,
@@ -632,4 +670,22 @@ function _applyEffects(ctx, state, oppCtxEff = null) {
   }
 
   return { ctx: patchedCtx, triggered };
+}
+
+/**
+ * 后置效果分派：时间轴结算后调用各效果的 onPost 钩子。
+ *
+ * @param {object}   ctx           - 使用方效果修正后的 ActionCtx
+ * @param {object}   selfState     - 使用方 PlayerState（可直接写入跨回合字段）
+ * @param {object}   oppState      - 对手 PlayerState（如 ptsDebuff 写入对手）
+ * @param {string[]} triggeredEffects - 本回合已触发的效果 ID 列表
+ * @param {number}   dmgTaken      - 本回合使用方受到的总伤害次数
+ */
+function _applyPostEffects(ctx, selfState, oppState, triggeredEffects, dmgTaken) {
+  for (const effectId of triggeredEffects) {
+    const handler = EffectHandlers[effectId];
+    if (handler?.onPost) {
+      handler.onPost(ctx, selfState, oppState, dmgTaken);
+    }
+  }
 }
