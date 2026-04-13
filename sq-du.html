@@ -609,7 +609,7 @@
       backdrop-filter: blur(8px);
       opacity: 0;
       transform: translateY(20px);
-      transition: all 0.5s;
+      transition: opacity 0.3s, transform 0.3s;
       max-width: 620px;
       line-height: 1.65;
       cursor: pointer;
@@ -620,6 +620,12 @@
       opacity: 1;
       transform: translateY(0);
       pointer-events: auto;
+    }
+
+    .battle-log.fade-out {
+      opacity: 0 !important;
+      pointer-events: none !important;
+      transition: opacity 1s ease !important;
     }
 
     .clash-name {
@@ -1067,6 +1073,12 @@
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.3s;
+    }
+
+    .intel-box.fade-out {
+      opacity: 0 !important;
+      pointer-events: none !important;
+      transition: opacity 1s ease !important;
     }
 
     .intel-box.show {

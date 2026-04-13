@@ -564,14 +564,22 @@ engine.on(EngineEvent.TURN_RESOLVED, result => {
   updateHistoryUI();
 
   if (!isGameOver) {
-    ui.battleLog.querySelector('.log-hint').textContent = "3 秒后自动关闭";
+    ui.battleLog.querySelector('.log-hint').textContent = "4s后自动关闭";
+
+    setTimeout(() => {
+      if (ui.battleLog.classList.contains('show') && !isGameOver) {
+        ui.battleLog.classList.add('fade-out');
+      }
+    }, 3000);
+
     setTimeout(() => {
       if (ui.battleLog.classList.contains('show') && !isGameOver) {
         ui.battleLog.classList.remove('show');
+        ui.battleLog.classList.remove('fade-out');
         document.body.classList.remove('resolving');
         engine.acknowledgeResolve();
       }
-    }, 3000);
+    }, 4000);
 
     ui.turnIndicator.textContent = `TURN ${result.turn + 1}`;
     resetForNewTurn();
@@ -983,18 +991,29 @@ function updateIntelBox() {
 
 function showTemporaryIntelBox() {
   ui.intelBox.classList.add('show');
-  if (ui.intelBox._timeoutId) clearTimeout(ui.intelBox._timeoutId);
-  ui.intelBox._timeoutId = setTimeout(() => {
-    ui.intelBox.classList.remove('show');
+  ui.intelBox.classList.remove('fade-out');
+
+  if (ui.intelBox._timeoutIdFade) clearTimeout(ui.intelBox._timeoutIdFade);
+  if (ui.intelBox._timeoutIdClose) clearTimeout(ui.intelBox._timeoutIdClose);
+
+  ui.intelBox._timeoutIdFade = setTimeout(() => {
+    ui.intelBox.classList.add('fade-out');
   }, 3000);
+
+  ui.intelBox._timeoutIdClose = setTimeout(() => {
+    ui.intelBox.classList.remove('show');
+    ui.intelBox.classList.remove('fade-out');
+  }, 4000);
 }
 
 // 绑定 P2 人物框的情报图标点击事件
 if (ui.p2IntelBtn) {
   ui.p2IntelBtn.addEventListener('click', (e) => {
     e.stopPropagation();
+    ui.intelBox.classList.remove('fade-out');
     ui.intelBox.classList.toggle('show');
-    if (ui.intelBox._timeoutId) clearTimeout(ui.intelBox._timeoutId);
+    if (ui.intelBox._timeoutIdFade) clearTimeout(ui.intelBox._timeoutIdFade);
+    if (ui.intelBox._timeoutIdClose) clearTimeout(ui.intelBox._timeoutIdClose);
   });
 }
 
@@ -1003,7 +1022,9 @@ if (intelClose) {
   intelClose.addEventListener('click', (e) => {
     e.stopPropagation();
     ui.intelBox.classList.remove('show');
-    if (ui.intelBox._timeoutId) clearTimeout(ui.intelBox._timeoutId);
+    ui.intelBox.classList.remove('fade-out');
+    if (ui.intelBox._timeoutIdFade) clearTimeout(ui.intelBox._timeoutIdFade);
+    if (ui.intelBox._timeoutIdClose) clearTimeout(ui.intelBox._timeoutIdClose);
   });
 }
 

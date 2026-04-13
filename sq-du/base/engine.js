@@ -97,8 +97,8 @@ class EventBus {
 function createPlayerState(id, overrides = {}) {
   // 每个行动独立维护自己的效果库
   const allAttackEffects = Object.values(EffectId).filter(id => EffectDefs[id]?.applicableTo.includes(Action.ATTACK));
-  const allGuardEffects  = Object.values(EffectId).filter(id => EffectDefs[id]?.applicableTo.includes(Action.GUARD));
-  const allDodgeEffects  = Object.values(EffectId).filter(id => EffectDefs[id]?.applicableTo.includes(Action.DODGE));
+  const allGuardEffects = Object.values(EffectId).filter(id => EffectDefs[id]?.applicableTo.includes(Action.GUARD));
+  const allDodgeEffects = Object.values(EffectId).filter(id => EffectDefs[id]?.applicableTo.includes(Action.DODGE));
   // 创建每个行为的空槽位（长度固定为 EFFECT_SLOTS）
   const emptySlots = () => Array(EFFECT_SLOTS).fill(null);
 
@@ -118,8 +118,8 @@ function createPlayerState(id, overrides = {}) {
     // 效果相关状态：每个行动独立维护自己的效果库
     effectInventory: {
       [Action.ATTACK]: [...allAttackEffects],
-      [Action.GUARD]:  [...allGuardEffects],
-      [Action.DODGE]:  [...allDodgeEffects],
+      [Action.GUARD]: [...allGuardEffects],
+      [Action.DODGE]: [...allDodgeEffects],
     },
     equippedEffects: {                            // 跨回合缓存的快捷槽担
       [Action.ATTACK]: emptySlots(),
@@ -542,8 +542,13 @@ export class BattleEngine {
     });
 
     this._timer.reset();
-    this._timer.start();
-    // 注：AI 调度呈在 _onEquipEnd 里发起，装备期结束名同时进入决策期
+    // 延迟 1s 开始倒计时，以配合 UI 的 1s 淡入效果
+    setTimeout(() => {
+      if (this._state === EngineState.EQUIPPING) {
+        this._timer.start();
+      }
+    }, 1000);
+    // 注：AI 调度呈在 _onEquipEnd 里发起，装备期结束同时进入决策期
   }
 
   _triggerResolve() {
@@ -759,28 +764,28 @@ export class BattleEngine {
     p1.hp = result.newState.p1.hp;
     p1.stamina = result.newState.p1.stamina;
     p1.chargeBoost = result.newState.p1.chargeBoost ?? 0;
-    p1.ptsDebuff   = result.newState.p1.ptsDebuff   ?? 0;
-    p1.guardBoost  = result.newState.p1.guardBoost  ?? 0;
+    p1.ptsDebuff = result.newState.p1.ptsDebuff ?? 0;
+    p1.guardBoost = result.newState.p1.guardBoost ?? 0;
     p1.guardDebuff = result.newState.p1.guardDebuff ?? 0;
-    p1.dodgeBoost  = result.newState.p1.dodgeBoost  ?? 0;
+    p1.dodgeBoost = result.newState.p1.dodgeBoost ?? 0;
     p1.dodgeDebuff = result.newState.p1.dodgeDebuff ?? 0;
     p1.agilityBoost = result.newState.p1.agilityBoost ?? 0;
-    p1.staminaPenalty  = result.newState.p1.staminaPenalty  ?? 0;
+    p1.staminaPenalty = result.newState.p1.staminaPenalty ?? 0;
     p1.staminaDiscount = result.newState.p1.staminaDiscount ?? 0;
-    p1.hpDrain     = result.newState.p1.hpDrain     ?? 0;
+    p1.hpDrain = result.newState.p1.hpDrain ?? 0;
 
     p2.hp = result.newState.p2.hp;
     p2.stamina = result.newState.p2.stamina;
     p2.chargeBoost = result.newState.p2.chargeBoost ?? 0;
-    p2.ptsDebuff   = result.newState.p2.ptsDebuff   ?? 0;
-    p2.guardBoost  = result.newState.p2.guardBoost  ?? 0;
+    p2.ptsDebuff = result.newState.p2.ptsDebuff ?? 0;
+    p2.guardBoost = result.newState.p2.guardBoost ?? 0;
     p2.guardDebuff = result.newState.p2.guardDebuff ?? 0;
-    p2.dodgeBoost  = result.newState.p2.dodgeBoost  ?? 0;
+    p2.dodgeBoost = result.newState.p2.dodgeBoost ?? 0;
     p2.dodgeDebuff = result.newState.p2.dodgeDebuff ?? 0;
     p2.agilityBoost = result.newState.p2.agilityBoost ?? 0;
-    p2.staminaPenalty  = result.newState.p2.staminaPenalty  ?? 0;
+    p2.staminaPenalty = result.newState.p2.staminaPenalty ?? 0;
     p2.staminaDiscount = result.newState.p2.staminaDiscount ?? 0;
-    p2.hpDrain     = result.newState.p2.hpDrain     ?? 0;
+    p2.hpDrain = result.newState.p2.hpDrain ?? 0;
 
     // 回合末速度归1（加速为临时性的），但加上灵巧带来的速度提升
     p1.speed = DefaultStats.BASE_SPEED + p1.agilityBoost;
