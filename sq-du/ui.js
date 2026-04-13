@@ -999,10 +999,14 @@ if (ui.p2IntelBtn) {
 }
 
 if (ui.globalPauseBtn) {
+  const pauseOverlay = $('pauseOverlay');
   ui.globalPauseBtn.addEventListener('click', () => {
     const isPaused = engine.togglePause();
     ui.globalPauseBtn.textContent = isPaused ? '▶︎' : '⏸︎';
     ui.globalPauseBtn.classList.toggle('is-paused', isPaused);
+    if (pauseOverlay) {
+      pauseOverlay.classList.toggle('active', isPaused);
+    }
   });
 }
 

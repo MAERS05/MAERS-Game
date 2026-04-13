@@ -1782,7 +1782,40 @@
       background: rgba(40, 40, 40, 0.6);
       color: #fff;
     }
+    #pauseOverlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 9998;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+    #pauseOverlay.active {
+      opacity: 1;
+      pointer-events: auto; /* 阻挡下方所有点击 */
+    }
+    #pauseOverlay .pause-text {
+      color: #fff;
+      font-size: 48px;
+      font-weight: bold;
+      letter-spacing: 12px;
+      margin-left: 12px; /* 补偿 spacing 导致的视觉偏移 */
+      text-shadow: 0 4px 12px rgba(0,0,0,0.8);
+      font-family: var(--font-number);
+    }
   </style>
+  
+  <div id="pauseOverlay">
+    <div class="pause-text">已暂停</div>
+  </div>
+  
   <!-- 全局暂停按钮 -->
   <button id="globalPauseBtn">⏸︎</button>
 
