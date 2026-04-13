@@ -7,7 +7,7 @@
 
 'use strict';
 
-import { EffectDefs } from '../base/constants.js';
+import { EffectDefs, EffectId } from '../base/constants.js';
 
 export class AIExtraLayer {
   /**
@@ -41,10 +41,21 @@ export class AIExtraLayer {
     let selfHarmHpCost = 0;
     // 允许的最大自伤气数消耗（至少保留 1 点 HP）
     const maxSelfHarmHp = Math.max(0, ai.hp - 1);
+    const effectiveStamina = ai.stamina + (ai.staminaDiscount || 0) - (ai.staminaPenalty || 0);
+    const actionCost = Math.max(0, 1 + (enhance || 0) + (ai.staminaPenalty || 0) - (ai.staminaDiscount || 0));
 
     let filled = 0;
     for (let i = 0; filled < slots && i < inventory.length; i++) {
       const id = inventory[i];
+
+      // 蓄力会把本回合攻击变成待命，但仍需支付本回合行动成本。
+      // 若支付后有效精力将归零，AI 下回合容易进入被动，故跳过该效果。
+      if (id === EffectId.CHARGE) {
+        const projectedEffectiveStamina = effectiveStamina - actionCost;
+        if (projectedEffectiveStamina <= 0 || (ai.chargeBoost || 0) > 0) {
+          continue;
+        }
+      }
 
       // 通过 EffectDefs 内省气数代价，效果自行声明，无需维护硬编码列表
       const hpCost = EffectDefs[id]?.hpCost || 0;
