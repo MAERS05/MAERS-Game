@@ -3,7 +3,7 @@
  * @description 【残影】闪避效果
  *
  * 触发条件：前置（闪避发动前）
- * 效果：消耗自身 1 点气数，本回合闪避幅度（pts）+1。
+ * 效果：消耗自身 1 点气数，本回合闪避 +1 最终点数。
  * 在同速对决时，用气数强行拉高幅度拿到虚步判定，以此躲开高点数攻击。
  */
 
@@ -14,7 +14,7 @@ import { Action, EffectId } from '../../base/constants.js';
 export const AfterimageEffect = Object.freeze({
   id: EffectId.AFTERIMAGE,
   name: '残影',
-  desc: '消耗自身 1 点气数，本回合闪避 +1 幅度',
+  desc: '消耗自身 1 点气数，本回合闪避 +1 最终点数',
   applicableTo: [Action.DODGE],
 
   /**

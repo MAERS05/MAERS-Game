@@ -368,10 +368,10 @@ function _deriveClash(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2) {
     return _zero(Clash.MUTUAL_STANDBY, '双方都在蓄积力量，小心观察着对方——什么也没有发生。');
 
   if (p1Act === Action.GUARD && p2Act === Action.GUARD)
-    return _zero(Clash.ACCUMULATE, `双方同时举起防御（你的抗伤 ${p1Ctx.pts}，敌方抗伤 ${p2Ctx.pts}），战场陷入僵持——【蓄势】。`);
+    return _zero(Clash.ACCUMULATE, `双方同时举起防御（你最终点数 ${p1Ctx.pts}，敌方最终点数 ${p2Ctx.pts}），战场陷入僵持——【蓄势】。`);
 
   if (p1Act === Action.DODGE && p2Act === Action.DODGE)
-    return _zero(Clash.RETREAT, `双方同时展开闪避（你的幅度 ${p1Ctx.pts}，敌方幅度 ${p2Ctx.pts}），错身而过——【退让】。`);
+    return _zero(Clash.RETREAT, `双方同时撤招，你最终点数 ${p1Ctx.pts}，敌方最终点数 ${p2Ctx.pts}——点数相同，互相后撤。`);
 
   if ((p1Act === Action.DODGE && p2Act === Action.GUARD) ||
     (p1Act === Action.GUARD && p2Act === Action.DODGE)) {
@@ -380,33 +380,31 @@ function _deriveClash(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2) {
     const guardPts = isP1Dodge ? p2Ctx.pts : p1Ctx.pts;
     const dodgerName = isP1Dodge ? '你' : '敌方';
     const guarderName = isP1Dodge ? '敌方' : '你';
-    return _zero(Clash.PROBE, `${dodgerName}试图以 ${dodgePts} 的幅度闪开，${guarderName}以 ${guardPts} 的抗伤缩于防御——双方试探，无功而返。【试探】`);
+    return _zero(Clash.PROBE, `${dodgerName}试图以最终点数 ${dodgePts} 闪躲，但${guarderName}守备最终点数 ${guardPts} 点的空档下，双方仅是一次无果的试探。【试探】`);
   }
 
   // ── 单方攻击 vs 待命 ────────────────────────────────────
   if (p1Act === Action.ATTACK && p2Act === Action.STANDBY)
     return _withExecute(Clash.ONE_SIDE_ATTACK,
-      `你趁敌方松懈，以 ${p1Ctx.speed} 的速度发动攻击（力度 ${p1Ctx.pts}点）——命中！`,
+      `你趁敌方松懈，以 ${p1Ctx.speed} 的速度发动攻击（最终 ${p1Ctx.pts}点）——命中！`,
       rawDmgP1, rawDmgP2, p1State, p2State);
 
   if (p2Act === Action.ATTACK && p1Act === Action.STANDBY)
     return _withExecute(Clash.ONE_SIDE_ATTACK,
-      `敌方趁你松懈，以 ${p2Ctx.speed} 的速度发动攻击（力度 ${p2Ctx.pts}点）——命中！`,
+      `敌方趁你松懈，以 ${p2Ctx.speed} 的速度发动攻击（最终 ${p2Ctx.pts}点）——命中！`,
       rawDmgP1, rawDmgP2, p1State, p2State);
 
   // ── 非攻击 vs 待命（行动落空）──────────────────────────
   if (p1Act !== Action.ATTACK && p2Act === Action.STANDBY) {
     const actName = p1Act === Action.GUARD ? '守备' : '闪避';
-    const numName = p1Act === Action.GUARD ? '抗伤' : '幅度';
     return _zero(Clash.WASTED_ACTION,
-      `你发动了${actName}（${numName} ${p1Ctx.pts}），而敌方处于待命——行动毫无意义。`);
+      `你发动了${actName}（最终点数 ${p1Ctx.pts}），而敌方处于待命——行动毫无意义。`);
   }
 
   if (p2Act !== Action.ATTACK && p1Act === Action.STANDBY) {
     const actName = p2Act === Action.GUARD ? '守备' : '闪避';
-    const numName = p2Act === Action.GUARD ? '抗伤' : '幅度';
     return _zero(Clash.WASTED_ACTION,
-      `敌方发动了${actName}（${numName} ${p2Ctx.pts}），而你处于待命——行动毫无意义。`);
+      `敌方发动了${actName}（最终点数 ${p2Ctx.pts}），而你处于待命——行动毫无意义。`);
   }
 
   // ── 从执行日志涌现推断（含攻击 vs 防御/攻击的所有情形）──
@@ -472,15 +470,15 @@ function _deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2)
   if (confront) {
     // 双攻同速同点：相互抵消
     clash = Clash.CONFRONT;
-    clashDesc = `双方速度（${confront.speed}）与点数（${confront.pts}）完全相当，攻势彼此抵消——无人受伤。【对峙】`;
+    clashDesc = `双方速度（${confront.speed}）与最终点数（${confront.pts}）完全相当，攻势彼此抵消——无人受伤。【对峙】`;
 
   } else if (suppress) {
     // 双攻同速不同点：强者单方命中
     const winIsP1 = suppress.winnerId === PlayerId.P1;
     clash = Clash.SUPPRESS;
     clashDesc = winIsP1
-      ? `双方速度相同，但你点数占优（${suppress.winPts} > ${suppress.losePts}），完全压制了敌方！【压制】`
-      : `双方速度相同，但敌方点数占优（${suppress.winPts} > ${suppress.losePts}），完全压制了你！【压制】`;
+      ? `双方速度相同，但你最终点数占优（${suppress.winPts} > ${suppress.losePts}），完全压制了敌方！【压制】`
+      : `双方速度相同，但敌方最终点数占优（${suppress.winPts} > ${suppress.losePts}），完全压制了你！【压制】`;
 
   } else if (hits.length >= 2) {
     // 两次命中，发生在不同速度 tick → 较快者先打，较慢者后打（互相命中）
@@ -504,21 +502,21 @@ function _deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2)
     const atkIsP1 = dodgeOutmaneuvered.attackerId === PlayerId.P1;
     clash = Clash.DODGE_OUTMANEUVERED;
     clashDesc = atkIsP1
-      ? `同等速度（${dodgeOutmaneuvered.speed}）下，敌方的闪避幅度（${dodgeOutmaneuvered.dodgePts}）超过你的攻击（${dodgeOutmaneuvered.atkPts}），轻巧躲开！【虚步】`
-      : `同等速度（${dodgeOutmaneuvered.speed}）下，你的闪避幅度（${dodgeOutmaneuvered.dodgePts}）超过敌方攻击（${dodgeOutmaneuvered.atkPts}），轻巧躲开！【虚步】`;
+      ? `同等速度（${dodgeOutmaneuvered.speed}）下，敌方的闪避最终点数（${dodgeOutmaneuvered.dodgePts}）超过你的攻击最终点数（${dodgeOutmaneuvered.atkPts}），轻巧躲开！【虚步】`
+      : `同等速度（${dodgeOutmaneuvered.speed}）下，你的闪避最终点数（${dodgeOutmaneuvered.dodgePts}）超过敌方攻击最终点数（${dodgeOutmaneuvered.atkPts}），轻巧躲开！【虚步】`;
 
   } else if (attackOverpowers) {
     // 同速，攻击点数 > 闪避幅度 → 强突
     const atkIsP1 = attackOverpowers.attackerId === PlayerId.P1;
     clash = Clash.ATTACK_OVERPOWERS;
     clashDesc = atkIsP1
-      ? `同等速度（${attackOverpowers.speed}）下，你的攻击（${attackOverpowers.atkPts}）压过敌方闪避幅度（${attackOverpowers.dodgePts}），强行命中！【强突】`
-      : `同等速度（${attackOverpowers.speed}）下，敌方攻击（${attackOverpowers.atkPts}）压过你的闪避幅度（${attackOverpowers.dodgePts}），强行命中！【强突】`;
+      ? `同等速度（${attackOverpowers.speed}）下，你的攻击最终点数（${attackOverpowers.atkPts}）压过敌方闪避最终点数（${attackOverpowers.dodgePts}），强行命中！【强突】`
+      : `同等速度（${attackOverpowers.speed}）下，敌方攻击最终点数（${attackOverpowers.atkPts}）压过你的闪避最终点数（${attackOverpowers.dodgePts}），强行命中！【强突】`;
 
   } else if (mutualHit) {
     // 同速且幅度相等 → 侥幸，双方互中，无效果触发
     clash = Clash.MUTUAL_HIT;
-    clashDesc = `速度（${mutualHit.speed}）与幅度（${mutualHit.dodgePts}）完全相当——双方擦肩而过，互相毫发无损。【侥幸】`;
+    clashDesc = `速度（${mutualHit.speed}）与最终点数（${mutualHit.dodgePts}）完全相当——双方擦肩而过，互相毫发无损。【侥幸】`;
 
   } else if (fortify) {
     // 盾牌就位，且硬度 >= 攻击点数：完全格挡
@@ -526,8 +524,8 @@ function _deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2)
     clash = Clash.FORTIFY;
     let timingWord = fortify.shieldSpeed > fortify.atkSpeed ? "抢先" : "同速";
     clashDesc = atkIsP1
-      ? `敌方凭借${timingWord}（速度${fortify.shieldSpeed}）拉起守备（${fortify.shieldPts}点），稳稳承接了你的攻击（${fortify.atkPts}点）——【坚固】，毫无损伤。`
-      : `你凭借${timingWord}（速度${fortify.shieldSpeed}）拉起守备（${fortify.shieldPts}点），稳稳承接了敌方的攻击（${fortify.atkPts}点）——【坚固】，毫无损伤。`;
+      ? `敌方凭借${timingWord}（速度${fortify.shieldSpeed}）拉起守备（最终点数${fortify.shieldPts}），稳稳承接了你的攻击（最终点数${fortify.atkPts}）——【坚固】，毫无损伤。`
+      : `你凭借${timingWord}（速度${fortify.shieldSpeed}）拉起守备（最终点数${fortify.shieldPts}），稳稳承接了敌方的攻击（最终点数${fortify.atkPts}）——【坚固】，毫无损伤。`;
 
   } else if (breakEvt) {
     // 盾牌就位，但硬度 < 攻击点数：攻击击穿
@@ -535,8 +533,8 @@ function _deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2)
     clash = Clash.BREAK;
     let timingWord = breakEvt.shieldSpeed > breakEvt.atkSpeed ? "抢先" : "同速";
     clashDesc = atkIsP1
-      ? `敌方虽凭借${timingWord}（速度${breakEvt.shieldSpeed}）完成设防（${breakEvt.shieldPts}点），但仍被你的攻击（${breakEvt.atkPts}点）无情击穿——【破势】！`
-      : `你虽凭借${timingWord}（速度${breakEvt.shieldSpeed}）完成设防（${breakEvt.shieldPts}点），但仍被敌方攻击（${breakEvt.atkPts}点）无情击穿——【破势】！`;
+      ? `敌方虽凭借${timingWord}（速度${breakEvt.shieldSpeed}）完成设防（最终点数 ${breakEvt.shieldPts}），但仍被你的攻击最终点数（${breakEvt.atkPts}）无情击穿——【破势】！`
+      : `你虽凭借${timingWord}（速度${breakEvt.shieldSpeed}）完成设防（最终点数 ${breakEvt.shieldPts}），但仍被敌方攻击最终点数（${breakEvt.atkPts}）无情击穿——【破势】！`;
 
   } else if (hits.length === 1) {
     // 唯一一次 HIT：目标无防御 buff（守备/闪避未能在攻击前挂上）
@@ -560,8 +558,8 @@ function _deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2)
       // 兜底（理论上不应到达：攻击方主动命中非防御目标）
       clash = Clash.ONE_SIDE_ATTACK;
       clashDesc = atkIsP1
-        ? `你的攻击（速度 ${hit.atkSpeed}，力度 ${hit.atkPts}）命中敌方。`
-        : `敌方攻击（速度 ${hit.atkSpeed}，力度 ${hit.atkPts}）命中你。`;
+        ? `你的攻击（速度 ${hit.atkSpeed}，最终点数 ${hit.atkPts}）命中敌方。`
+        : `敌方攻击（速度 ${hit.atkSpeed}，最终点数 ${hit.atkPts}）命中你。`;
     }
 
   } else {

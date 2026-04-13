@@ -3,7 +3,7 @@
  * @description 【固守】守备效果
  *
  * 触发条件：后置（结算后）
- * 效果：本回合未受到伤害，下回合守备 +1 点数。
+ * 效果：本回合未受到伤害，下回合守备 +1 最终点数。
  *
  * 实现要点：
  *   - onPost(ctx, selfState, oppState, dmgTaken) 被 resolver 在时间轴结算后调用
@@ -18,7 +18,7 @@ import { Action, EffectId } from '../../base/constants.js';
 export const EntrenchEffect = Object.freeze({
   id: EffectId.ENTRENCH,
   name: '固守',
-  desc: '本回合未受到伤害，下回合守备 +1 点数',
+  desc: '本回合未受到伤害，下回合守备 +1 最终点数',
   applicableTo: [Action.GUARD],
 
   /**

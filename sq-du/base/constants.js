@@ -300,7 +300,7 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.BREAK_QI]: {
     id: EffectId.BREAK_QI, name: '破气',
-    desc: '消耗自身 1 点气数，本回合攻击 +1 点数',
+    desc: '消耗自身 1 点气数，本回合攻击 +1 最终点数',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.BREAK_LIMIT]: {
@@ -310,17 +310,17 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.CHARGE]: {
     id: EffectId.CHARGE, name: '蓄力',
-    desc: '本回合攻击不执行，下回合攻击 +1 点数',
+    desc: '本回合攻击不执行，下回合攻击 +1 最终点数',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.POUNCE]: {
     id: EffectId.POUNCE, name: '猛扑',
-    desc: '下回合终点闪避点数-1，本回合攻击点数+1',
+    desc: '本回合攻击 +1 最终点数，下回合闪避 -1 最终点数',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.RECKLESS]: {
     id: EffectId.RECKLESS, name: '舍身',
-    desc: '下回合终点守备点数-1，本回合攻击点数+1',
+    desc: '本回合攻击 +1 最终点数，下回合守备 -1 最终点数',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.REBOUND]: {
@@ -330,27 +330,27 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.AURA_SHIELD]: {
     id: EffectId.AURA_SHIELD, name: '御气',
-    desc: '消耗自身 1 点气数，本回合守备 +1 点数',
+    desc: '消耗自身 1 点气数，本回合守备 +1 最终点数',
     applicableTo: [Action.GUARD],
   },
   [EffectId.DEFLECT]: {
     id: EffectId.DEFLECT, name: '卸力',
-    desc: '守备成功防挡来袭时，对手下回合攻击 -1 点数',
+    desc: '守备成功防挡来袭时，对手下回合攻击 -1 最终点数',
     applicableTo: [Action.GUARD],
   },
   [EffectId.ENTRENCH]: {
     id: EffectId.ENTRENCH, name: '固守',
-    desc: '本回合未受到伤害，下回合守备 +1 点数',
+    desc: '本回合未受到伤害，下回合守备 +1 最终点数',
     applicableTo: [Action.GUARD],
   },
   [EffectId.IRON_WALL]: {
     id: EffectId.IRON_WALL, name: '铁壁',
-    desc: '下回合终点攻击点数-1，本回合守备点数+1',
+    desc: '本回合守备 +1 最终点数，下回合攻击 -1 最终点数',
     applicableTo: [Action.GUARD],
   },
   [EffectId.PHALANX]: {
     id: EffectId.PHALANX, name: '步阵',
-    desc: '下回合终点闪避点数-1，本回合守备点数+1',
+    desc: '本回合守备 +1 最终点数，下回合闪避 -1 最终点数',
     applicableTo: [Action.GUARD],
   },
   [EffectId.AGILITY]: {
@@ -360,7 +360,7 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.AFTERIMAGE]: {
     id: EffectId.AFTERIMAGE, name: '残影',
-    desc: '消耗自身 1 点气数，本回合闪避 +1 幅度',
+    desc: '消耗自身 1 点气数，本回合闪避 +1 最终点数',
     applicableTo: [Action.DODGE],
   },
   [EffectId.EXTREME]: {
@@ -375,12 +375,12 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.SIDE_STEP]: {
     id: EffectId.SIDE_STEP, name: '侧步',
-    desc: '下回合终点攻击点数-1，本回合闪避点数+1',
+    desc: '本回合闪避 +1 最终点数，下回合攻击 -1 最终点数',
     applicableTo: [Action.DODGE],
   },
   [EffectId.DISARM]: {
     id: EffectId.DISARM, name: '解甲',
-    desc: '下回合终点守备点数-1，本回合闪避点数+1',
+    desc: '本回合闪避 +1 最终点数，下回合守备 -1 最终点数',
     applicableTo: [Action.DODGE],
   },
 });

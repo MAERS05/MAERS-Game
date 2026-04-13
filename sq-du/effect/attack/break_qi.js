@@ -3,7 +3,7 @@
  * @description 【破气】攻击效果
  *
  * 触发条件：攻击前（前置效果）
- * 效果：消耗自身 1 点气数，本回合攻击 pts +1。
+ * 效果：消耗自身 1 点气数，本回合攻击 +1 最终点数。
  *
  * 实现要点：
  *   - onPre：修改 ctx.pts +1，扣除 state.hp -1
@@ -17,7 +17,7 @@ import { Action, EffectId } from '../../base/constants.js';
 export const BreakQiEffect = Object.freeze({
   id: EffectId.BREAK_QI,
   name: '破气',
-  desc: '消耗自身 1 点气数，本回合攻击 +1 点数',
+  desc: '消耗自身 1 点气数，本回合攻击 +1 最终点数',
   applicableTo: [Action.ATTACK],
 
   /**

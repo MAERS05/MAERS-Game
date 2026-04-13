@@ -3,7 +3,7 @@
  * @description 【猛扑】攻击效果
  *
  * 触发条件：前置（攻击发动前）
- * 效果：本回合攻击威力+1，下回合最终闪避威力-1（dodgeDebuff）。
+ * 效果：本回合攻击 +1 最终点数，下回合最终闪避点数-1（dodgeDebuff）。
  */
 
 'use strict';
@@ -13,7 +13,7 @@ import { Action, EffectId } from '../../base/constants.js';
 export const PounceEffect = Object.freeze({
   id: EffectId.POUNCE,
   name: '猛扑',
-  desc: '本回合攻击 +1 点数，下回合闪避 -1 幅度',
+  desc: '本回合攻击 +1 最终点数，下回合闪避 -1 最终点数',
   staminaCost: 0,
   applicableTo: [Action.ATTACK],
 

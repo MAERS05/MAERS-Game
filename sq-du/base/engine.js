@@ -883,7 +883,7 @@ export class BattleEngine {
         // 付得起基础模型，但多挂的强化付不起，强行剥离超额强化
         p.actionCtx.enhance = Math.max(0, p.stamina - baseCost - effectCost);
         p.actionCtx.cost = baseCost + p.actionCtx.enhance + effectCost;
-        p.actionCtx.pts = 1 + p.actionCtx.enhance; // 闪避幅度也是 1+enhance
+        p.actionCtx.pts = 1 + p.actionCtx.enhance; // 闪避点数也是 1+enhance
       }
     }
   }
@@ -896,7 +896,7 @@ export class BattleEngine {
 
   /** 计算行动最终点数
    * 攻击/守备/闪避均为 1 + enhance
-   * 闪避幅度已与速度解耦，速度仅影响时序
+   * 闪避点数已与速度解耦，速度仅影响时序
    */
   _calcPts(ctx, _playerState) {
     if (ctx.action === Action.STANDBY) return 0;

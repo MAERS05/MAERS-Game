@@ -3,7 +3,7 @@
  * @description 【御气】守备效果
  *
  * 触发条件：前置（守备发动前）
- * 效果：消耗自身 1 点气数，本回合守备 pts +1。
+ * 效果：消耗自身 1 点气数，本回合守备 +1 最终点数。
  * 对标攻击的【破气】，以牺牲气数换取更高的防御厚度。
  */
 
@@ -14,7 +14,7 @@ import { Action, EffectId } from '../../base/constants.js';
 export const AuraShieldEffect = Object.freeze({
   id: EffectId.AURA_SHIELD,
   name: '御气',
-  desc: '消耗自身 1 点气数，本回合守备 +1 点数',
+  desc: '消耗自身 1 点气数，本回合守备 +1 最终点数',
   applicableTo: [Action.GUARD],
 
   /**

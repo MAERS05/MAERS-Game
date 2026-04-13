@@ -3,7 +3,7 @@
  * @description 【卸力】守备效果
  *
  * 触发条件：后置（结算后）
- * 效果：守备成功防挡攻击（本回合受到 0 伤害）时，对手下回合攻击 -1 点数。
+ * 效果：守备成功防挡攻击（本回合受到 0 伤害）时，对手下回合攻击 -1 最终点数。
  *
  * 实现要点：
  *   - onPost(ctx, selfState, oppState, dmgTaken) 被 resolver 在时间轴结算后调用
@@ -19,7 +19,7 @@ import { Action, EffectId } from '../../base/constants.js';
 export const DeflectEffect = Object.freeze({
   id: EffectId.DEFLECT,
   name: '卸力',
-  desc: '守备成功防挡来袭时，对手下回合攻击 -1 点数',
+  desc: '守备成功防挡来袭时，对手下回合攻击 -1 最终点数',
   applicableTo: [Action.GUARD],
 
   /**
