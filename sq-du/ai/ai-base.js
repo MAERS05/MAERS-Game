@@ -480,7 +480,6 @@ export function buildRedecideDecision(ai, player, revealedAction) {
   enhWeight += (snap.aiStaminaRatio - 0.9) * 4.0;
 
   // 杀机对冲：对手越弱，这股保守防御的恐惧就越能被抵消，越敢于强化输出/防御
-  const playerWeakness = 1 - Math.max(snap.playerHpRatio, snap.playerStaminaRatio);
   enhWeight += playerWeakness * 2.5;
 
   const canEnhance = ai.stamina >= (1 + boost + 1);
