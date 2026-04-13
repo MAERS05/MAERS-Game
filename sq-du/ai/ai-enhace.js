@@ -35,6 +35,7 @@ export class AIEnhaceLayer {
     };
 
     const { ai, player } = scene;
+    const killWindow = player.hp <= 1 || (player.hp <= 2 && player.stamina <= 1);
     const effectiveStamina = ai.stamina + (ai.staminaDiscount || 0) - (ai.staminaPenalty || 0);
     const actionCost = Math.max(0, 1 + (normalized.enhance || 0) + (ai.staminaPenalty || 0) - (ai.staminaDiscount || 0));
 
@@ -54,6 +55,7 @@ export class AIEnhaceLayer {
       normalized.action !== Action.STANDBY &&
       normalized.speed > DefaultStats.BASE_SPEED &&
       effectiveStamina <= 1 &&
+      !killWindow &&
       player.hp > 1 &&
       player.stamina > 0
     ) {
@@ -65,6 +67,7 @@ export class AIEnhaceLayer {
       normalized.action !== Action.STANDBY &&
       normalized.enhance > 0 &&
       effectiveStamina <= 2 &&
+      !killWindow &&
       player.hp > 1
     ) {
       normalized.enhance = 0;
@@ -74,6 +77,7 @@ export class AIEnhaceLayer {
     if (
       normalized.action !== Action.STANDBY &&
       effectiveStamina <= 1 &&
+      !killWindow &&
       player.hp > 1 &&
       player.stamina > 0
     ) {

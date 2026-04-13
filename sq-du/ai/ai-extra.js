@@ -7,7 +7,7 @@
 
 'use strict';
 
-import { EffectDefs } from '../base/constants.js';
+import { Action, EffectDefs, EffectId } from '../base/constants.js';
 
 const AI_EFFECT_LOW_HP_THRESHOLD = 2;
 
@@ -23,9 +23,14 @@ export class AIExtraLayer {
    * @param {string}  action  - Action 枚举。
    * @param {number}  enhance - 本回合强化次数。
    * @param {import('../base/constants.js').PlayerState} ai
+   * @param {{
+   *   player?: import('../base/constants.js').PlayerState,
+   *   revealedAction?: import('../base/constants.js').ActionCtx | null,
+   *   isRedecide?: boolean
+   * }} [scene]
    * @returns {(string|null)[]} 长度为 EFFECT_SLOTS 的效果数组。
    */
-  static pickEffects(action, enhance, ai) {
+  static pickEffects(action, enhance, ai, scene = {}) {
     const EFFECT_SLOTS = 3;
     const slots = Math.min(1 + enhance, EFFECT_SLOTS);
 
@@ -37,30 +42,24 @@ export class AIExtraLayer {
     let selfHarmHpCost = 0;
     // 允许的最大自伤气数消耗（至少保留 1 点 HP）
     const maxSelfHarmHp = Math.max(0, ai.hp - 1);
-    const safePool = [];
-    const riskPool = [];
-
-    for (const id of inventory) {
-      const hpCost = EffectDefs[id]?.hpCost || 0;
-      if (hpCost > 0) {
-        riskPool.push(id);
-      } else {
-        safePool.push(id);
-      }
-    }
+    const remainingPool = [...inventory];
 
     let filled = 0;
-    while (filled < slots && (safePool.length > 0 || riskPool.length > 0)) {
+    while (filled < slots && remainingPool.length > 0) {
       const lowHp = ai.hp <= AI_EFFECT_LOW_HP_THRESHOLD;
-      const preferSafe = lowHp || safePool.length > 0;
-      const targetPool = (preferSafe && safePool.length > 0) ? safePool : riskPool;
-      const id = this._drawRandom(targetPool);
+      const id = this._pickBestEffect(remainingPool, action, ai, scene);
+      if (!id) break;
 
       // 通过 EffectDefs 内省气数代价，效果自行声明，无需维护硬编码列表
       const hpCost = EffectDefs[id]?.hpCost || 0;
       if (hpCost > 0 && selfHarmHpCost + hpCost > maxSelfHarmHp) {
         // 再选这个效果会导致 HP 归零甚至自杀，跳过
         continue;
+      }
+      if (hpCost > 0 && lowHp) {
+        // 低血量时尽量避免自伤效果，除非没有其他可选项
+        const hasSafeAlternative = remainingPool.some(candidate => (EffectDefs[candidate]?.hpCost || 0) <= 0);
+        if (hasSafeAlternative) continue;
       }
       selfHarmHpCost += hpCost;
 
@@ -70,10 +69,55 @@ export class AIExtraLayer {
     return result;
   }
 
-  static _drawRandom(pool) {
-    const idx = Math.floor(Math.random() * pool.length);
-    const id = pool[idx];
-    pool.splice(idx, 1);
+  static _pickBestEffect(pool, action, ai, scene) {
+    if (!Array.isArray(pool) || pool.length === 0) return null;
+    const scored = pool.map(id => ({ id, score: this._scoreEffect(id, action, ai, scene) }));
+    scored.sort((a, b) => b.score - a.score);
+    const id = scored[0].id;
+    const idx = pool.indexOf(id);
+    if (idx >= 0) pool.splice(idx, 1);
     return id;
+  }
+
+  static _scoreEffect(id, action, ai, scene) {
+    const player = scene?.player ?? null;
+    const revealed = scene?.revealedAction ?? null;
+    const aiLowHp = ai.hp <= AI_EFFECT_LOW_HP_THRESHOLD;
+    const playerLowHp = player ? player.hp <= 2 : false;
+    const playerLowStamina = player ? player.stamina <= 1 : false;
+    const score = 1;
+
+    const byId = {
+      [EffectId.BREAK_QI]: action === Action.ATTACK ? (playerLowHp ? 3.2 : 1.2) : -5,
+      [EffectId.CHARGE]: action === Action.ATTACK
+        ? ((ai.chargeBoost || 0) > 0 || aiLowHp ? -4 : 1.0)
+        : -5,
+      [EffectId.POUNCE]: action === Action.ATTACK ? (playerLowHp ? 2.4 : 1.5) : -5,
+      [EffectId.RECKLESS]: action === Action.ATTACK ? (playerLowHp ? 2.0 : 1.0) : -5,
+      [EffectId.ENERGIZE]: action === Action.ATTACK ? (playerLowStamina ? 0.6 : 1.4) : -5,
+      [EffectId.WOUND]: action === Action.ATTACK ? (playerLowStamina ? 0.8 : 1.8) : -5,
+
+      [EffectId.AURA_SHIELD]: action === Action.GUARD ? (aiLowHp ? 2.2 : 0.8) : -5,
+      [EffectId.DEFLECT]: action === Action.GUARD ? 1.8 : -5,
+      [EffectId.ENTRENCH]: action === Action.GUARD ? 1.2 : -5,
+      [EffectId.IRON_WALL]: action === Action.GUARD ? 1.4 : -5,
+      [EffectId.PHALANX]: action === Action.GUARD ? 1.3 : -5,
+      [EffectId.INSPIRE]: action === Action.GUARD ? (ai.stamina <= 2 ? 2.5 : 1.1) : -5,
+
+      [EffectId.AGILITY]: action === Action.DODGE ? 1.4 : -5,
+      [EffectId.AFTERIMAGE]: action === Action.DODGE ? (aiLowHp ? 0.4 : 1.5) : -5,
+      [EffectId.MOMENTUM]: action === Action.DODGE ? (ai.stamina <= 2 ? 2.6 : 1.3) : -5,
+      [EffectId.SIDE_STEP]: action === Action.DODGE ? 1.1 : -5,
+      [EffectId.DISARM]: action === Action.DODGE ? 1.3 : -5,
+      [EffectId.DEPRESS]: action === Action.DODGE ? (playerLowStamina ? 0.5 : 1.9) : -5,
+    };
+
+    let total = score + (byId[id] ?? 0);
+    const hpCost = EffectDefs[id]?.hpCost || 0;
+    if (hpCost > 0 && aiLowHp) total -= 2.0;
+    if (scene?.isRedecide && revealed?.action === Action.ATTACK && action === Action.GUARD) total += 0.5;
+    if (scene?.isRedecide && revealed?.action === Action.STANDBY && action === Action.ATTACK) total += 0.5;
+    total += Math.random() * 0.15;
+    return total;
   }
 }

@@ -20,8 +20,8 @@ import { AIJudgeLayer } from './ai-judge.js';
  */
 export function scheduleAI(ctx) {
   const { ai, player } = ctx.getState();
-  const history = ctx.getHistory ? ctx.getHistory() : [];
-  const snap = AIBaseLogic.snapshot(ai, player, history);
+  const getHistoryNow = () => (ctx.getHistory ? ctx.getHistory() : []);
+  const snap = AIBaseLogic.snapshot(ai, player, getHistoryNow());
 
     const wantInsight = ctx.useInsight && !ai.insightUsed && ai.stamina >= 1 && (
       (ai.stamina >= 2 && snap.playerHpRatio > 0.5 && Math.random() < 0.20) ||
@@ -64,7 +64,7 @@ export function scheduleAI(ctx) {
       if (ctx.engineState() !== EngineState.TICKING) return;
 
       const currentAi = ctx.getState().ai;
-      const decision = AIJudgeLayer.buildDecision(currentAi, ctx.getState().player, history);
+      const decision = AIJudgeLayer.buildDecision(currentAi, ctx.getState().player, getHistoryNow());
       ctx.submitAction(PlayerId.P2, decision);
       ctx.setReady(PlayerId.P2);
     }, delay);
@@ -89,7 +89,12 @@ export function scheduleAIRedecide(ctx) {
         return;
       }
 
-      const decision = AIJudgeLayer.buildRedecideDecision(ai, player, revealedAction);
+      const decision = AIJudgeLayer.buildRedecideDecision(
+        ai,
+        player,
+        revealedAction,
+        ctx.getHistory ? ctx.getHistory() : [],
+      );
       ctx.requestRedecide(PlayerId.P2);
       ctx.submitAction(PlayerId.P2, decision);
       ctx.setReady(PlayerId.P2);

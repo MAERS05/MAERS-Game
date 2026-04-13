@@ -46,7 +46,7 @@ export class AIJudgeLayer {
     const { speed, enhance } = this.validateBudget(ai, action, speedRaw, enhanceRaw);
 
     // ── Axis 4：效果轴（交由扩展层接手配装）──
-    const effects = AIExtraLayer.pickEffects(action, enhance, ai);
+    const effects = AIExtraLayer.pickEffects(action, enhance, ai, { player, isRedecide: false });
     return AIEnhaceLayer.constrainDecision(
       { action, enhance, speed, effects },
       { ai, player, history, revealedAction: null, isRedecide: false }
@@ -62,7 +62,7 @@ export class AIJudgeLayer {
    * @param {import('../base/constants.js').ActionCtx}   revealedAction
    * @returns {Partial<import('../base/constants.js').ActionCtx>}
    */
-  static buildRedecideDecision(ai, player, revealedAction) {
+  static buildRedecideDecision(ai, player, revealedAction, history = []) {
     const rdPenalty = ai.staminaPenalty || 0;
     const rdDiscount = ai.staminaDiscount || 0;
     const rdEffectiveMinCost = Math.max(0, 1 + rdPenalty - rdDiscount);
@@ -71,13 +71,14 @@ export class AIJudgeLayer {
       return { action: Action.STANDBY, enhance: 0, speed: DefaultStats.BASE_SPEED };
     }
 
-    const snap = AIBaseLogic.snapshot(ai, player, []);
+    const snap = AIBaseLogic.snapshot(ai, player, history);
     const revealed = revealedAction ?? {
       action: Action.STANDBY, speed: DefaultStats.BASE_SPEED, enhance: 0, pts: 0,
     };
 
     const w = { attack: 1.0, guard: 1.0, dodge: 1.0, standby: 0.2 };
     const rdEffectiveStamina = ai.stamina + (ai.staminaDiscount || 0) - (ai.staminaPenalty || 0);
+    const indicators = AIBaseLogic.buildIndicators(snap, rdEffectiveStamina);
 
     if (player.stamina <= 0) { w.attack += 9; w.guard *= 0.1; w.dodge *= 0.1; w.standby *= 0.05; }
     const aiHpPressure = 1 - snap.aiHpRatio;
@@ -118,12 +119,12 @@ export class AIJudgeLayer {
     w.guard -= passiveNature * REVEAL_W * 0.3;
     w.dodge -= passiveNature * REVEAL_W * 0.3;
 
-    const action = AIBaseLogic.pickWeighted({
+    const action = AIBaseLogic.pickSmartAction({
       [Action.ATTACK]: Math.max(0, w.attack),
       [Action.GUARD]: Math.max(0, w.guard),
       [Action.DODGE]: Math.max(0, w.dodge),
       [Action.STANDBY]: Math.max(0, w.standby),
-    });
+    }, indicators);
 
     const revealedSpeed = revealed.speed ?? DefaultStats.BASE_SPEED;
     let speedBoostWeight = 0;
@@ -164,10 +165,10 @@ export class AIJudgeLayer {
     }
 
     const { speed, enhance } = this.validateBudget(ai, action, speedRaw, enhanceRaw);
-    const effects = AIExtraLayer.pickEffects(action, enhance, ai);
+    const effects = AIExtraLayer.pickEffects(action, enhance, ai, { player, revealedAction: revealed, isRedecide: true });
     return AIEnhaceLayer.constrainDecision(
       { action, enhance, speed, effects },
-      { ai, player, history: [], revealedAction: revealed, isRedecide: true }
+      { ai, player, history, revealedAction: revealed, isRedecide: true }
     );
   }
 
