@@ -301,7 +301,7 @@ export const EffectId = Object.freeze({
 export const EffectDefs = Object.freeze({
   [EffectId.WOUND]: {
     id: EffectId.WOUND, name: '创伤',
-    desc: '攻击成功，对方下回合结束时损失 1 点气数',
+    desc: '攻击成功时，对方在下回合结束时损失 1 点气数',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.BREAK_QI]: {
@@ -331,12 +331,12 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.ENERGIZE]: {
     id: EffectId.ENERGIZE, name: '蓄能',
-    desc: '攻击成功下回合闪避最终点数 +1',
+    desc: '攻击成功时，下回合闪避最终点数 +1',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.REBOUND]: {
     id: EffectId.REBOUND, name: '反震',
-    desc: '守备成功时对攻击方反弹 1 次攻击',
+    desc: '守备成功时，对攻击方反弹 1 次攻击',
     applicableTo: [Action.GUARD],
   },
   [EffectId.AURA_SHIELD]: {
@@ -351,7 +351,7 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.ENTRENCH]: {
     id: EffectId.ENTRENCH, name: '固守',
-    desc: '守备成功时下回合守备 +1 最终点数',
+    desc: '守备成功时，下回合守备 +1 最终点数',
     applicableTo: [Action.GUARD],
   },
   [EffectId.IRON_WALL]: {
@@ -366,12 +366,12 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.INSPIRE]: {
     id: EffectId.INSPIRE, name: '振奋',
-    desc: '守备成功下回合消耗精力 -1',
+    desc: '守备成功时，下回合消耗精力 -1',
     applicableTo: [Action.GUARD],
   },
   [EffectId.AGILITY]: {
     id: EffectId.AGILITY, name: '灵巧',
-    desc: '闪避成功时下回合最终速度 +1',
+    desc: '闪避成功时，下回合最终速度 +1',
     applicableTo: [Action.DODGE],
   },
   [EffectId.AFTERIMAGE]: {
@@ -401,7 +401,7 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.DEPRESS]: {
     id: EffectId.DEPRESS, name: '低落',
-    desc: '闪避成功下回合对方精力消耗 +1',
+    desc: '闪避成功时，下回合对方精力消耗 +1',
     applicableTo: [Action.DODGE],
   },
 });
