@@ -129,6 +129,7 @@ function createPlayerState(id, overrides = {}) {
       [Action.DODGE]: emptySlots(),
     },
     effectIntel: [],                              // 已获取的敌方效果情报
+    speedDiscountSpent: 0,                        // 本回合因提速消耗的 discount 计数（用于精确归还）
     ...overrides,
   };
 }
@@ -287,15 +288,18 @@ export class BattleEngine {
 
       if (delta > 0) {
         // 加速：逐级扣有效精力（每级 1 精力）
-        // 至少预留 1 点有效精力给基础攻击/闪避等行动
         const effectiveStamina = p.stamina + (p.staminaDiscount || 0) - (p.staminaPenalty || 0);
-        const affordable = Math.min(delta, effectiveStamina - 1); 
+        const affordable = Math.min(delta, effectiveStamina);
         const actualBoost = Math.max(0, affordable);
         
         // 扣除精力（优先扣 discount）
         for (let i = 0; i < actualBoost; i++) {
-          if (p.staminaDiscount > 0) p.staminaDiscount--;
-          else p.stamina--;
+          if (p.staminaDiscount > 0) {
+            p.staminaDiscount--;
+            p.speedDiscountSpent = (p.speedDiscountSpent || 0) + 1;
+          } else {
+            p.stamina--;
+          }
         }
         
         p.speed = currentSpeed + actualBoost;
@@ -304,7 +308,14 @@ export class BattleEngine {
         // 降速：归还精力（重决策时可能改用更低速度）
         const refund = Math.abs(delta);
         p.speed = Math.max(DefaultStats.BASE_SPEED, targetSpeed);
-        p.stamina = Math.min(DefaultStats.MAX_STAMINA, p.stamina + refund);
+        for (let i = 0; i < refund; i++) {
+          if ((p.speedDiscountSpent || 0) > 0) {
+            p.speedDiscountSpent--;
+            p.staminaDiscount = (p.staminaDiscount || 0) + 1;
+          } else {
+            p.stamina = Math.min(DefaultStats.MAX_STAMINA, p.stamina + 1);
+          }
+        }
         p.actionCtx.speed = p.speed;
       }
     }
@@ -332,16 +343,12 @@ export class BattleEngine {
 
     if (delta > 0) {
       // 提速：单次消耗 1 点有效精力
-      const effectiveActionCost = (p.actionCtx?.action && p.actionCtx.action !== Action.STANDBY)
-        ? calcActionCost(p.actionCtx, p)
-        : Math.max(0, 1 + (p.staminaPenalty || 0) - (p.staminaDiscount || 0));
-      
-      // 提速后有效精力必须 >= 行动所需有效代价
-      if (effectiveStamina - 1 < effectiveActionCost) return;
+      if (effectiveStamina <= 0) return;
       
       // 优先消耗一回合有效期的 discount
       if (p.staminaDiscount > 0) {
         p.staminaDiscount--;
+        p.speedDiscountSpent = (p.speedDiscountSpent || 0) + 1;
       } else {
         p.stamina--;
       }
@@ -349,8 +356,13 @@ export class BattleEngine {
     } else if (delta < 0) {
       if (p.speed <= DefaultStats.BASE_SPEED) return;
       p.speed--;
-      // 降速归还精力的逻辑：优先还给真实 stamina（保证回合后留存收益最高）
-      p.stamina = Math.min(DefaultStats.MAX_STAMINA, p.stamina + 1);
+      // 降速归还时需对齐提速时的扣减来源，避免 discount->stamina 套利
+      if ((p.speedDiscountSpent || 0) > 0) {
+        p.speedDiscountSpent--;
+        p.staminaDiscount = (p.staminaDiscount || 0) + 1;
+      } else {
+        p.stamina = Math.min(DefaultStats.MAX_STAMINA, p.stamina + 1);
+      }
     }
 
     // 同步更新行动配置中的速度
@@ -449,14 +461,21 @@ export class BattleEngine {
     if (caster.insightUsed) return;      // 每回合只能主动洞察一次
 
     const effectiveStamina = caster.stamina + (caster.staminaDiscount || 0) - (caster.staminaPenalty || 0);
-    if (effectiveStamina <= 0) return;   // 精力不足
+    if (effectiveStamina <= 0) return;   // 精力不足（按有效精力判定）
     if (caster.ready) return;            // 已就绪则无需洞察
 
-    // 优先消耗有效期只有一回合的 discount，防止体力被扣成负数
-    if (caster.staminaDiscount > 0) {
+    // 洞察消耗规则：
+    // - 基础固定 1 点
+    // - 受低落（staminaPenalty）增加
+    // - 不被振奋（staminaDiscount）直接减为 0
+    // 支付顺序仍是先扣 discount，再扣真实 stamina。
+    let insightCost = 1 + (caster.staminaPenalty || 0);
+    while (insightCost > 0 && caster.staminaDiscount > 0) {
       caster.staminaDiscount--;
-    } else {
-      caster.stamina--;
+      insightCost--;
+    }
+    if (insightCost > 0) {
+      caster.stamina = Math.max(0, caster.stamina - insightCost);
     }
 
     caster.insightUsed = true;
@@ -587,6 +606,7 @@ export class BattleEngine {
       p.pendingPassiveReveal = false;
       p.canRedecide = false;
       p.didRedecide = false;
+      p.speedDiscountSpent = 0;
       p.speed = DefaultStats.BASE_SPEED; // resolver 会在结算时应用灵巧等速度加成
       p.actionCtx = createActionCtx(Action.STANDBY);
     });

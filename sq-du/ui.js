@@ -154,6 +154,11 @@ function getProjectedStamina(player) {
   return Math.max(0, Math.min(DefaultStats.MAX_STAMINA, s));
 }
 
+/** 当前可用于“是否还能执行一次行为/洞察”的有效精力 */
+function getEffectiveStamina(player) {
+  return (player.stamina || 0) + (player.staminaDiscount || 0) - (player.staminaPenalty || 0);
+}
+
 /** 刷新行动按钮上的点数显示，并根据精力控制按钮可用性 */
 function refreshPoints(stamina, speed) {
   const atkPt = 1 + (selectedAction === 'attack' ? localEnhance : 0);
@@ -176,8 +181,8 @@ function refreshPoints(stamina, speed) {
   ui.btnGuard.toggleAttribute('disabled', !canAct);
   ui.btnDodge.toggleAttribute('disabled', !canAct);
   
-  // 要提速，必须在满足基础行动(1点)的前提下，还有多余的有效精力
-  ui.p1SpeedUp.disabled = effectiveStamina <= 1;
+  // 只要还有有效精力即可提速；是否透支行动由玩家自行选择
+  ui.p1SpeedUp.disabled = effectiveStamina <= 0;
   ui.p1SpeedDown.disabled = p1.speed <= DefaultStats.BASE_SPEED;
 }
 
@@ -187,6 +192,10 @@ function refreshPoints(stamina, speed) {
 
 /** 同步强化栏与效果槽数显示，并展示当前行动对应的已装配效果 */
 function updateConfigPanel() {
+  if (!selectedAction) {
+    ui.actionConfigPanel.classList.remove('show');
+    return;
+  }
   ui.enhanceRow.classList.remove('disabled'); // 闪避幅度同样可强化
 
   const snap = engine.getSnapshot();
@@ -242,6 +251,8 @@ function selectAction(type, btn) {
   const snap = engine.getSnapshot();
   const p1 = snap.players[PlayerId.P1];
   if (p1.ready) return;
+  // 真正无可用精力时，禁止再选择攻击/守备/闪避
+  if (getEffectiveStamina(p1) < 1) return;
 
   if (selectedAction === type) {
     cancelSelection();
@@ -254,6 +265,7 @@ function selectAction(type, btn) {
   localEnhance = 0;
 
   engine.submitAction(PlayerId.P1, { action: Action[type.toUpperCase()], enhance: 0 });
+  if (!selectedAction) return;
   ui.actionConfigPanel.classList.add('show');
   updateConfigPanel();
 }
@@ -294,8 +306,7 @@ function resetForNewTurn() {
 
   // 新回合开始：insightUsed 必然被引擎重置为 false，
   // 此处只需判断精力是否足够（避免在 _beginTurn 还未执行时读到旧 insightUsed）
-  const projStam = getProjectedStamina(p1);
-  ui.insightBtn.disabled = projStam < 1;
+  ui.insightBtn.disabled = getEffectiveStamina(p1) < 1;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -448,7 +459,7 @@ engine.on(EngineEvent.ACTION_UPDATED, ({ playerId }) => {
   updatePips('p1-stam', projStam, DefaultStats.MAX_STAMINA, 'stam');
 
   if (!p1.ready) {
-    ui.insightBtn.disabled = p1.insightUsed || projStam < 1;
+    ui.insightBtn.disabled = p1.insightUsed || getEffectiveStamina(p1) < 1;
   }
 });
 
@@ -496,15 +507,24 @@ engine.on(EngineEvent.REDECIDED, ({ playerId }) => {
     ui.waitingLabel.classList.remove('show');
     const snap = engine.getSnapshot();
     const p1State = snap.players[PlayerId.P1];
-    ui.insightBtn.disabled = p1State.insightUsed || getProjectedStamina(p1State) < 1;
+    ui.insightBtn.disabled = p1State.insightUsed || getEffectiveStamina(p1State) < 1;
+  }
+});
+
+// 进入洞察期（30s）就立即提示，不等到倒计时结束
+engine.on(EngineEvent.PHASE_SHIFT, ({ playerId }) => {
+  if (playerId === PlayerId.P1) {
+    showInsightNotice('随着时间推移，你的意图已经处于被对方洞察的状态。');
+  } else if (playerId === PlayerId.P2) {
+    showInsightNotice('随着时间推移，对方的意图正在被你洞察。');
   }
 });
 
 engine.on(EngineEvent.PASSIVE_INSIGHT, ({ targetId, revealedAction }) => {
   const isP1Target = targetId === PlayerId.P1;
   const msg = isP1Target
-    ? '随着时间推移，你的行为已经被洞察。'
-    : `对方拖延太久——${ActionName[revealedAction?.action ?? 'standby']} 的意图已暴露。`;
+    ? '你的意图已被对方锁定。'
+    : `对方意图已暴露：【${ActionName[revealedAction?.action ?? 'standby']}】`;
   showInsightNotice(msg);
 });
 
@@ -529,7 +549,7 @@ engine.on(EngineEvent.ACTIVE_INSIGHT, ({ casterId, revealedAction, revealed }) =
     refreshPoints(p1.stamina, p1.speed);
 
     if (!p1.ready) {
-      ui.insightBtn.disabled = p1.insightUsed || projStam < 1;
+      ui.insightBtn.disabled = p1.insightUsed || getEffectiveStamina(p1) < 1;
     }
   }
 });
@@ -936,7 +956,7 @@ engine.on(EngineEvent.EQUIP_PHASE_END, () => {
     ui.standbyBtn.disabled = false;
     ui.readyBtn.disabled = false;
     const projStam = getProjectedStamina(p1);
-    ui.insightBtn.disabled = p1.insightUsed || projStam < 1;
+    ui.insightBtn.disabled = p1.insightUsed || getEffectiveStamina(p1) < 1;
   }
 });
 
