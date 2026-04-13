@@ -783,6 +783,9 @@
       font-size: 0.8rem;
       cursor: pointer;
       transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
 
     .insight-btn:hover:not(:disabled) {
@@ -1701,7 +1704,10 @@
     <span class="waiting-label" id="waitingLabel">等待对方就绪…</span>
 
     <!-- 主动洞察 -->
-    <button class="insight-btn" id="insightBtn">👁 洞察对方（消耗 1 精力）</button>
+    <button class="insight-btn" id="insightBtn">
+      <img src="ui/sq-du/effect/eye.svg" style="width: 1.2em; height: 1.2em;">
+      洞察对方（消耗 1 精力）
+    </button>
   </div>
 
   <!-- ═══ 行动配置侧边栏（框架） ═══ -->
