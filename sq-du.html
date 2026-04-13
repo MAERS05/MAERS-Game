@@ -1608,7 +1608,10 @@
 
   <!-- ═══ 情报框（常驻于 P2 / 敌方卡下方）═══ -->
   <div class="intel-box" id="intelBox">
-    <div class="intel-title">已获取敌方情报</div>
+    <div class="intel-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <div class="intel-title" style="margin-bottom:0;">已获取敌方情报</div>
+      <button class="intel-close" id="intelClose" style="background:none; border:none; color:var(--text-muted); font-size:1.1rem; cursor:pointer; padding:2px 6px; line-height:1; font-family:sans-serif;">✕</button>
+    </div>
     <div class="intel-list" id="intelList">
       <span class="intel-empty">尚未获取任何情报</span>
     </div>

@@ -998,6 +998,15 @@ if (ui.p2IntelBtn) {
   });
 }
 
+const intelClose = document.getElementById('intelClose');
+if (intelClose) {
+  intelClose.addEventListener('click', (e) => {
+    e.stopPropagation();
+    ui.intelBox.classList.remove('show');
+    if (ui.intelBox._timeoutId) clearTimeout(ui.intelBox._timeoutId);
+  });
+}
+
 if (ui.globalPauseBtn) {
   const pauseOverlay = $('pauseOverlay');
   ui.globalPauseBtn.addEventListener('click', () => {
