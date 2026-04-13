@@ -114,7 +114,7 @@ export function resolve(p1Ctx, p2Ctx, p1State, p2State, bothInsighted, turn) {
   // ==== 消耗所有旧状态（他们只生效一个回合） ====
   p1State.chargeBoost = 0; p1State.ptsDebuff = 0; p1State.guardBoost = 0; p1State.guardDebuff = 0;
   p1State.dodgeBoost = 0; p1State.dodgeDebuff = 0; p1State.staminaPenalty = 0; p1State.staminaDiscount = 0; p1State.hpDrain = 0; p1State.agilityBoost = 0;
-  
+
   p2State.chargeBoost = 0; p2State.ptsDebuff = 0; p2State.guardBoost = 0; p2State.guardDebuff = 0;
   p2State.dodgeBoost = 0; p2State.dodgeDebuff = 0; p2State.staminaPenalty = 0; p2State.staminaDiscount = 0; p2State.hpDrain = 0; p2State.agilityBoost = 0;
 
@@ -388,12 +388,12 @@ function _deriveClash(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2) {
   // ── 单方攻击 vs 待命 ────────────────────────────────────
   if (p1Act === Action.ATTACK && p2Act === Action.STANDBY)
     return _withExecute(Clash.ONE_SIDE_ATTACK,
-      `你趁敌方松懈待命，以 ${p1Ctx.speed} 的最终速度发动攻击（最终点数 ${p1Ctx.pts}）——命中！`,
+      `你趁敌方待命，以 ${p1Ctx.speed} 的最终速度发动攻击（最终点数 ${p1Ctx.pts}）——命中！`,
       rawDmgP1, rawDmgP2, p1State, p2State);
 
   if (p2Act === Action.ATTACK && p1Act === Action.STANDBY)
     return _withExecute(Clash.ONE_SIDE_ATTACK,
-      `敌方趁你松懈待命，以 ${p2Ctx.speed} 的最终速度发动攻击（最终点数 ${p2Ctx.pts}）——命中！`,
+      `敌方趁你待命，以 ${p2Ctx.speed} 的最终速度发动攻击（最终点数 ${p2Ctx.pts}）——命中！`,
       rawDmgP1, rawDmgP2, p1State, p2State);
 
   // ── 非攻击 vs 待命（行动落空）──────────────────────────
@@ -489,8 +489,8 @@ function _deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2)
     clash = Clash.PREEMPT;
     const slowSpeed = firstIsP1 ? p2Ctx.speed : p1Ctx.speed;
     clashDesc = firstIsP1
-      ? `你凭借最终速度（${fastSpeed}）攻击（最终点数 ${p1Ctx.pts}）率先命中敌方；随后敌方以最终速度（${slowSpeed}）反击（最终点数 ${p2Ctx.pts}）也命中了你。【抢攻】`
-      : `敌方凭借最终速度（${fastSpeed}）攻击（最终点数 ${p2Ctx.pts}）率先命中你；随后你以最终速度（${slowSpeed}）反击（最终点数 ${p1Ctx.pts}）也命中了敌方。【抢攻】`;
+      ? `你最终速度（${fastSpeed}）较快，攻击（最终点数 ${p1Ctx.pts}）率先命中；随后敌方以最终速度（${slowSpeed}）反击（最终点数 ${p2Ctx.pts}）也命中了你。【抢攻】`
+      : `敌方最终速度（${fastSpeed}）较快，攻击（最终点数 ${p2Ctx.pts}）率先命中；随后你以最终速度（${slowSpeed}）反击（最终点数 ${p1Ctx.pts}）也命中了敌方。【抢攻】`;
 
   } else if (evade) {
     // 闪避速度 > 攻速：闪避 buff 已就位，攻击落空
@@ -505,8 +505,8 @@ function _deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2)
     const atkIsP1 = dodgeOutmaneuvered.attackerId === PlayerId.P1;
     clash = Clash.DODGE_OUTMANEUVERED;
     clashDesc = atkIsP1
-      ? `双方最终速度相同（${dodgeOutmaneuvered.speed}），敌方凭借更高的闪避最终点数（${dodgeOutmaneuvered.dodgePts}）躲开了你的攻击（最终点数 ${dodgeOutmaneuvered.atkPts}）。【虚步】`
-      : `双方最终速度相同（${dodgeOutmaneuvered.speed}），你凭借更高的闪避最终点数（${dodgeOutmaneuvered.dodgePts}）躲开了敌方的攻击（最终点数 ${dodgeOutmaneuvered.atkPts}）。【虚步】`;
+      ? `双方最终速度相同（${dodgeOutmaneuvered.speed}），敌方闪避最终点数（${dodgeOutmaneuvered.dodgePts}）超过你的攻击最终点数（${dodgeOutmaneuvered.atkPts}），闪身躲开。【虚步】`
+      : `双方最终速度相同（${dodgeOutmaneuvered.speed}），你闪避最终点数（${dodgeOutmaneuvered.dodgePts}）超过敌方的攻击最终点数（${dodgeOutmaneuvered.atkPts}），闪身躲开。【虚步】`;
 
   } else if (attackOverpowers) {
     // 同速，攻击点数 > 闪避幅度 → 强突
@@ -525,19 +525,31 @@ function _deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2)
     // 盾牌就位，且硬度 >= 攻击点数：完全格挡
     const atkIsP1 = fortify.attackerId === PlayerId.P1;
     clash = Clash.FORTIFY;
-    let timingWord = fortify.shieldSpeed > fortify.atkSpeed ? "抢先" : "同速";
-    clashDesc = atkIsP1
-      ? `敌方率先（最终速度 ${fortify.shieldSpeed}，你的攻击最终速度 ${fortify.atkSpeed}）举起守备（最终点数 ${fortify.shieldPts}），稳稳挡下了你的攻击（最终点数 ${fortify.atkPts}）。【坚固】`
-      : `你率先（最终速度 ${fortify.shieldSpeed}，敌方的攻击最终速度 ${fortify.atkSpeed}）举起守备（最终点数 ${fortify.shieldPts}），稳稳挡下了敌方的攻击（最终点数 ${fortify.atkPts}）。【坚固】`;
+    const isFaster = fortify.shieldSpeed > fortify.atkSpeed;
+    if (atkIsP1) {
+      clashDesc = isFaster
+        ? `敌方抢先（最终速度 ${fortify.shieldSpeed}，你的攻击速度 ${fortify.atkSpeed}）举起守备（最终点数 ${fortify.shieldPts}），稳稳挡下了你的攻击（最终点数 ${fortify.atkPts}）。【坚固】`
+        : `敌方同时（双方最终速度 ${fortify.shieldSpeed}）举起守备（最终点数 ${fortify.shieldPts}），稳稳挡下了你的攻击（最终点数 ${fortify.atkPts}）。【坚固】`;
+    } else {
+      clashDesc = isFaster
+        ? `你抢先（最终速度 ${fortify.shieldSpeed}，敌方的攻击速度 ${fortify.atkSpeed}）举起守备（最终点数 ${fortify.shieldPts}），稳稳挡下了敌方的攻击（最终点数 ${fortify.atkPts}）。【坚固】`
+        : `你同时（双方最终速度 ${fortify.shieldSpeed}）举起守备（最终点数 ${fortify.shieldPts}），稳稳挡下了敌方的攻击（最终点数 ${fortify.atkPts}）。【坚固】`;
+    }
 
   } else if (breakEvt) {
     // 盾牌就位，但硬度 < 攻击点数：攻击击穿
     const atkIsP1 = breakEvt.attackerId === PlayerId.P1;
     clash = Clash.BREAK;
-    let timingWord = breakEvt.shieldSpeed > breakEvt.atkSpeed ? "抢先" : "同速";
-    clashDesc = atkIsP1
-      ? `敌方虽然率先（最终速度 ${breakEvt.shieldSpeed}，你的攻击最终速度 ${breakEvt.atkSpeed}）举起了守备（最终点数 ${breakEvt.shieldPts}），但依然被你的攻击（最终点数 ${breakEvt.atkPts}）无情击穿！【破势】`
-      : `你虽然率先（最终速度 ${breakEvt.shieldSpeed}，敌方的攻击最终速度 ${breakEvt.atkSpeed}）举起了守备（最终点数 ${breakEvt.shieldPts}），但依然被敌方的攻击（最终点数 ${breakEvt.atkPts}）无情击穿！【破势】`;
+    const isFaster = breakEvt.shieldSpeed > breakEvt.atkSpeed;
+    if (atkIsP1) {
+      clashDesc = isFaster
+        ? `敌方虽抢先（最终速度 ${breakEvt.shieldSpeed}，你的攻击速度 ${breakEvt.atkSpeed}）举起守备（最终点数 ${breakEvt.shieldPts}），但仍被你的攻击（最终点数 ${breakEvt.atkPts}）无情击穿！【破势】`
+        : `敌方同时（双方最终速度 ${breakEvt.shieldSpeed}）举起守备（最终点数 ${breakEvt.shieldPts}），但仍被你的攻击（最终点数 ${breakEvt.atkPts}）无情击穿！【破势】`;
+    } else {
+      clashDesc = isFaster
+        ? `你虽抢先（最终速度 ${breakEvt.shieldSpeed}，敌方的攻击速度 ${breakEvt.atkSpeed}）举起守备（最终点数 ${breakEvt.shieldPts}），但仍被敌方的攻击（最终点数 ${breakEvt.atkPts}）无情击穿！【破势】`
+        : `你同时（双方最终速度 ${breakEvt.shieldSpeed}）举起守备（最终点数 ${breakEvt.shieldPts}），但仍被敌方的攻击（最终点数 ${breakEvt.atkPts}）无情击穿！【破势】`;
+    }
 
   } else if (hits.length === 1) {
     // 唯一一次 HIT：目标无防御 buff（守备/闪避未能在攻击前挂上）
@@ -620,28 +632,32 @@ function _buildResult(
     p1ExposedEffects,
     p2ExposedEffects,
     newState: {
-      p1: { hp: newP1Hp, stamina: newP1Stamina,
-             chargeBoost: p1State.chargeBoost || 0,
-             ptsDebuff:   p1State.ptsDebuff   || 0,
-             guardBoost:  p1State.guardBoost  || 0,
-             guardDebuff: p1State.guardDebuff || 0,
-             dodgeBoost:  p1State.dodgeBoost  || 0,
-             dodgeDebuff: p1State.dodgeDebuff || 0,
-             agilityBoost: p1State.agilityBoost || 0,
-             staminaPenalty:  p1State.staminaPenalty  || 0,
-             staminaDiscount: p1State.staminaDiscount || 0,
-             hpDrain:     p1State.hpDrain     || 0 },
-      p2: { hp: newP2Hp, stamina: newP2Stamina,
-             chargeBoost: p2State.chargeBoost || 0,
-             ptsDebuff:   p2State.ptsDebuff   || 0,
-             guardBoost:  p2State.guardBoost  || 0,
-             guardDebuff: p2State.guardDebuff || 0,
-             dodgeBoost:  p2State.dodgeBoost  || 0,
-             dodgeDebuff: p2State.dodgeDebuff || 0,
-             agilityBoost: p2State.agilityBoost || 0,
-             staminaPenalty:  p2State.staminaPenalty  || 0,
-             staminaDiscount: p2State.staminaDiscount || 0,
-             hpDrain:     p2State.hpDrain     || 0 },
+      p1: {
+        hp: newP1Hp, stamina: newP1Stamina,
+        chargeBoost: p1State.chargeBoost || 0,
+        ptsDebuff: p1State.ptsDebuff || 0,
+        guardBoost: p1State.guardBoost || 0,
+        guardDebuff: p1State.guardDebuff || 0,
+        dodgeBoost: p1State.dodgeBoost || 0,
+        dodgeDebuff: p1State.dodgeDebuff || 0,
+        agilityBoost: p1State.agilityBoost || 0,
+        staminaPenalty: p1State.staminaPenalty || 0,
+        staminaDiscount: p1State.staminaDiscount || 0,
+        hpDrain: p1State.hpDrain || 0
+      },
+      p2: {
+        hp: newP2Hp, stamina: newP2Stamina,
+        chargeBoost: p2State.chargeBoost || 0,
+        ptsDebuff: p2State.ptsDebuff || 0,
+        guardBoost: p2State.guardBoost || 0,
+        guardDebuff: p2State.guardDebuff || 0,
+        dodgeBoost: p2State.dodgeBoost || 0,
+        dodgeDebuff: p2State.dodgeDebuff || 0,
+        agilityBoost: p2State.agilityBoost || 0,
+        staminaPenalty: p2State.staminaPenalty || 0,
+        staminaDiscount: p2State.staminaDiscount || 0,
+        hpDrain: p2State.hpDrain || 0
+      },
     },
     // 情报暴露：本回合已生效的效果列表
     p1ExposedEffects,
