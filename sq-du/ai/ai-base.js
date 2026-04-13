@@ -44,11 +44,49 @@ import {
  * @returns {{ cancel: () => void }}
  */
 export function scheduleAI(ctx) {
-  // 决策时间分布：
+  const { ai, player } = ctx.getState();
+  const history = ctx.getHistory ? ctx.getHistory() : [];
+  const snap = _snapshot(ai, player, history);
+
+  // AI 也有概率主动洞察：
+  // 条件：精力充足（>=2）且对手血量健康，或自身濒危且精力 >=1。
+  // 概率控制在 15% 乃至 40%，避免过度频繁使用。
+  const wantInsight = ctx.useInsight && !ai.insightUsed && ai.stamina >= 1 && (
+    (ai.stamina >= 2 && snap.playerHpRatio > 0.5 && Math.random() < 0.20) ||
+    (snap.aiHpRatio <= 0.33 && Math.random() < 0.40)
+  );
+
+  if (wantInsight) {
+    // 随机一个较早的时间发起洞察 (2~8s)
+    const insightDelay = (2 + Math.random() * 6) * 1000;
+    const insightHandle = setTimeout(() => {
+      if (ctx.engineState() !== EngineState.TICKING) return;
+      const currentState = ctx.getState().ai;
+      if (currentState.stamina >= 1 && !currentState.ready) {
+        ctx.useInsight(PlayerId.P2, PlayerId.P1);
+      }
+    }, insightDelay);
+
+    // AI 发动手刹（洞察）后，等待对手锁定后依靠重决策逻辑进行响应
+    // 兜底时间 40~45s 防挂机
+    const fallbackDelay = (40 + Math.random() * 5) * 1000;
+    const fallbackHandle = setTimeout(() => {
+      if (ctx.engineState() !== EngineState.TICKING) return;
+      const currentAi = ctx.getState().ai;
+      if (currentAi.ready) return; // 已经响应则取消
+      
+      const decision = buildDecision(currentAi, ctx.getState().player, ctx.getHistory ? ctx.getHistory() : []);
+      ctx.submitAction(PlayerId.P2, decision);
+      ctx.setReady(PlayerId.P2);
+    }, fallbackDelay);
+
+    return { cancel: () => { clearTimeout(insightHandle); clearTimeout(fallbackHandle); } };
+  }
+
+  // 正常不洞察的决策时间分布：
   //   60% → 5 ~ 20s（快速反应）
   //   30% → 20 ~ 30s（常规思考）
   //   10% → 30 ~ 40s（谨慎考虑）
-  // 每档内 min(r1,r2) 向低端偏斜，避免总在末尾才决策。
   const early = () => Math.min(Math.random(), Math.random());
   const r = Math.random();
   const delay = r < 0.60
@@ -60,9 +98,8 @@ export function scheduleAI(ctx) {
   const handle = setTimeout(() => {
     if (ctx.engineState() !== EngineState.TICKING) return;
 
-    const { ai, player } = ctx.getState();
-    const history = ctx.getHistory ? ctx.getHistory() : [];
-    const decision = buildDecision(ai, player, history);
+    const currentAi = ctx.getState().ai;
+    const decision = buildDecision(currentAi, ctx.getState().player, history);
     ctx.submitAction(PlayerId.P2, decision);
     ctx.setReady(PlayerId.P2);
   }, delay);
@@ -509,7 +546,7 @@ function _pickEffects(action, enhance, ai) {
   const slots = Math.min(1 + enhance, EFFECT_SLOTS);
   
   // 自残类效果 ID 列表
-  const selfHarmEffects = ['break_qi', 'break_limit', 'extreme', 'afterimage'];
+  const selfHarmEffects = ['break_qi', 'break_limit', 'extreme', 'afterimage', 'aura_shield'];
   
   const inventory = (ai.effectInventory?.[action] ?? [])
     .filter(id => EffectDefs[id]?.applicableTo.includes(action))
@@ -520,6 +557,12 @@ function _pickEffects(action, enhance, ai) {
       }
       return true;
     });
+
+  // 洗牌，使得 AI 配效果具有随机性和不可预测性
+  for (let i = inventory.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [inventory[i], inventory[j]] = [inventory[j], inventory[i]];
+  }
 
   const result = Array(EFFECT_SLOTS).fill(null);
   for (let i = 0; i < slots && i < inventory.length; i++) {

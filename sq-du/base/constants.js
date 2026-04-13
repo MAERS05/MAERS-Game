@@ -264,6 +264,7 @@ export const EffectId = Object.freeze({
   CHARGE:      'charge',      // 蓄力：本回合攻击不执行，下回合攻击 +1 点数
   POUNCE:      'pounce',      // 猛扑：下回合最终闪避威力-1，本回合攻击威力+1
   RECKLESS:    'reckless',    // 舍身：下回合最终守备威力-1，本回合攻击威力+1
+  ENERGIZE:    'energize',    // 蓄能：攻击成功下回合闪避最终点数+1
   // ── 守备类效果 ──
   REBOUND:     'rebound',     // 反震：守备成功抵挡攻击时，对攻击方反弹一次攻击
   AURA_SHIELD: 'aura_shield', // 御气：消耗自身 1 点气数，本回合守备 +1 点数
@@ -271,6 +272,7 @@ export const EffectId = Object.freeze({
   ENTRENCH:    'entrench',    // 固守：本回合未受到伤害，下回合守备 +1 点数
   IRON_WALL:   'iron_wall',   // 铁壁：下回合最终攻击威力-1，本回合守备威力+1
   PHALANX:     'phalanx',     // 步阵：下回合最终闪避威力-1，本回合守备威力+1
+  INSPIRE:     'inspire',     // 振奋：守备成功下回合消耗精力-1
   // ── 闪避类效果 ──
   AGILITY:     'agility',     // 灵巧：闪避成功后下回合速度 +1
   AFTERIMAGE:  'afterimage',  // 残影：消耗自身 1 点气数，本回合闪避 +1 幅度
@@ -278,6 +280,7 @@ export const EffectId = Object.freeze({
   MOMENTUM:    'momentum',    // 借势：闪避成功且未受伤，恢复 1 点精力
   SIDE_STEP:   'side_step',   // 侧步：下回合最终攻击威力-1，本回合闪避威力+1
   DISARM:      'disarm',      // 解甲：下回合最终守备威力-1，本回合闪避威力+1
+  DEPRESS:     'depress',     // 低落：闪避成功下回合对方精力消耗+1
 });
 
 
@@ -326,6 +329,11 @@ export const EffectDefs = Object.freeze({
     desc: '本回合攻击 +1 最终点数，下回合守备 -1 最终点数',
     applicableTo: [Action.ATTACK],
   },
+  [EffectId.ENERGIZE]: {
+    id: EffectId.ENERGIZE, name: '蓄能',
+    desc: '攻击成功且造成伤害后，下回合闪避 +1 最终点数',
+    applicableTo: [Action.ATTACK],
+  },
   [EffectId.REBOUND]: {
     id: EffectId.REBOUND, name: '反震',
     desc: '守备成功抵挡攻击时，对攻击方反弹 1 次伤害',
@@ -356,6 +364,11 @@ export const EffectDefs = Object.freeze({
     desc: '本回合守备 +1 最终点数，下回合闪避 -1 最终点数',
     applicableTo: [Action.GUARD],
   },
+  [EffectId.INSPIRE]: {
+    id: EffectId.INSPIRE, name: '振奋',
+    desc: '守备成功且完全防挡来袭时，下回合精力消耗 -1',
+    applicableTo: [Action.GUARD],
+  },
   [EffectId.AGILITY]: {
     id: EffectId.AGILITY, name: '灵巧',
     desc: '闪避成功后下回合最终速度 +1',
@@ -384,6 +397,11 @@ export const EffectDefs = Object.freeze({
   [EffectId.DISARM]: {
     id: EffectId.DISARM, name: '解甲',
     desc: '本回合闪避 +1 最终点数，下回合守备 -1 最终点数',
+    applicableTo: [Action.DODGE],
+  },
+  [EffectId.DEPRESS]: {
+    id: EffectId.DEPRESS, name: '低落',
+    desc: '成功规避攻击或通过虚步闪躲后，下回合对方精力消耗 +1',
     applicableTo: [Action.DODGE],
   },
 });

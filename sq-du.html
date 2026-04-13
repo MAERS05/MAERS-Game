@@ -612,7 +612,6 @@
       transition: opacity 0.3s, transform 0.3s;
       max-width: 620px;
       line-height: 1.65;
-      cursor: pointer;
       pointer-events: none;
     }
 
@@ -693,24 +692,26 @@
       transform: none !important;
     }
 
-    /* 删掉 hover 放大的同时，增加仅高亮的纯光效 */
-    .act-btn.dodge:hover:not(:disabled):not(.selected) {
-      border-color: rgba(20, 184, 166, 0.65);
-      box-shadow: 0 0 18px rgba(20, 184, 166, 0.25);
-      color: var(--color-dod);
-      transform: none;
-    }
+    /* 删掉 hover 放大的同时，增加仅高亮的纯光效，使用 hover:hover 防止移动端残留 */
+    @media (hover: hover) {
+      .act-btn.dodge:hover:not(:disabled):not(.selected) {
+        border-color: rgba(20, 184, 166, 0.65);
+        box-shadow: 0 0 18px rgba(20, 184, 166, 0.25);
+        color: var(--color-dod);
+        transform: none;
+      }
 
-    .act-btn.guard:hover:not(:disabled):not(.selected) {
-      border-color: rgba(100, 116, 139, 0.75);
-      box-shadow: 0 0 18px rgba(100, 116, 139, 0.25);
-      color: var(--color-def);
-      transform: none;
-    }
+      .act-btn.guard:hover:not(:disabled):not(.selected) {
+        border-color: rgba(100, 116, 139, 0.75);
+        box-shadow: 0 0 18px rgba(100, 116, 139, 0.25);
+        color: var(--color-def);
+        transform: none;
+      }
 
-    .act-btn.attack:hover:not(:disabled):not(.selected) {
-      color: var(--color-atk);
-      transform: none;
+      .act-btn.attack:hover:not(:disabled):not(.selected) {
+        color: var(--color-atk);
+        transform: none;
+      }
     }
 
     .act-pt {
@@ -761,9 +762,14 @@
       color: var(--color-dod);
     }
 
-    .act-btn-container:has(.act-btn.attack:not(:disabled):hover),
     .act-btn-container:has(.act-btn.attack.selected) {
       filter: drop-shadow(0 0 10px var(--color-atk));
+    }
+
+    @media (hover: hover) {
+      .act-btn-container:has(.act-btn.attack:not(:disabled):hover) {
+        filter: drop-shadow(0 0 10px var(--color-atk));
+      }
     }
 
     .act-sub-label {

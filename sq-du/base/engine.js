@@ -741,12 +741,15 @@ export class BattleEngine {
   // 识破判定（内部）
   // ═══════════════════════════════════════════
 
-  /** 检查双方是否都经历了洞察（识破条件） */
+  /** 双方是否都被看穿了（识破） */
   _checkInsightClash() {
-    return (
-      this._players[PlayerId.P1].wasInsighted &&
-      this._players[PlayerId.P2].wasInsighted
-    );
+    const p1 = this._players[PlayerId.P1];
+    const p2 = this._players[PlayerId.P2];
+
+    const p1KnowsP2 = p1.insightUsed || p2.wasInsighted;
+    const p2KnowsP1 = p2.insightUsed || p1.wasInsighted;
+
+    return p1KnowsP2 && p2KnowsP1;
   }
 
   // ═══════════════════════════════════════════
@@ -862,6 +865,7 @@ export class BattleEngine {
         player: { ...this._players[PlayerId.P1] },
       }),
       getHistory: () => [...this._aiHistory],
+      useInsight: (caster, target) => this.useInsight(caster, target),
       submitAction: (id, dec) => this.submitAction(id, dec),
       setReady: (id) => this.setReady(id),
     });
@@ -884,16 +888,20 @@ export class BattleEngine {
 
     // 闪避基础消耗为 1（速度消耗已提前支付），其它基础消耗为 1
     const baseCost = 1;
-    const currentCost = baseCost + (p.actionCtx.enhance || 0) + effectCost;
+    const pen = p.staminaPenalty || 0;
+    const dis = p.staminaDiscount || 0;
+    // 即使减抵免后也至少保证耗能>=0（计算在基础花费上）
+    const minCost = Math.max(0, baseCost + effectCost + pen - dis);
+    const currentCost = Math.max(0, baseCost + (p.actionCtx.enhance || 0) + effectCost + pen - dis);
 
     if (p.stamina < currentCost) {
-      if (p.stamina < baseCost + effectCost) {
+      if (p.stamina < minCost) {
         // 连基础模型或必带效果的耗能都出不起，直接崩盘破防转待命
         p.actionCtx = createActionCtx(Action.STANDBY);
       } else {
         // 付得起基础模型，但多挂的强化付不起，强行剥离超额强化
-        p.actionCtx.enhance = Math.max(0, p.stamina - baseCost - effectCost);
-        p.actionCtx.cost = baseCost + p.actionCtx.enhance + effectCost;
+        p.actionCtx.enhance = Math.max(0, p.stamina - baseCost - effectCost - pen + dis);
+        p.actionCtx.cost = Math.max(0, baseCost + p.actionCtx.enhance + effectCost + pen - dis);
         p.actionCtx.pts = 1 + p.actionCtx.enhance; // 闪避点数也是 1+enhance
       }
     }
@@ -917,7 +925,10 @@ export class BattleEngine {
   /** 计算行动精力消耗 */
   _calcCost(ctx, playerState) {
     if (ctx.action === Action.STANDBY) return 0;
-    return 1 + (ctx.enhance || 0);
+    const base = 1 + (ctx.enhance || 0);
+    const pen = playerState?.staminaPenalty || 0;
+    const dis = playerState?.staminaDiscount || 0;
+    return Math.max(0, base + pen - dis);
   }
 }
 

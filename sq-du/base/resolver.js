@@ -113,10 +113,10 @@ export function resolve(p1Ctx, p2Ctx, p1State, p2State, bothInsighted, turn) {
 
   // ==== 消耗所有旧状态（他们只生效一个回合） ====
   p1State.chargeBoost = 0; p1State.ptsDebuff = 0; p1State.guardBoost = 0; p1State.guardDebuff = 0;
-  p1State.dodgeBoost = 0; p1State.dodgeDebuff = 0; p1State.staminaPenalty = 0; p1State.staminaDiscount = 0; p1State.hpDrain = 0; p1State.agilityBoost = 0;
+  p1State.dodgeBoost = 0; p1State.dodgeDebuff = 0; p1State.staminaPenalty = 0; p1State.staminaDiscount = 0; p1State.hpDrain = 0; p1State.agilityBoost = 0; p1State.directDamage = 0;
 
   p2State.chargeBoost = 0; p2State.ptsDebuff = 0; p2State.guardBoost = 0; p2State.guardDebuff = 0;
-  p2State.dodgeBoost = 0; p2State.dodgeDebuff = 0; p2State.staminaPenalty = 0; p2State.staminaDiscount = 0; p2State.hpDrain = 0; p2State.agilityBoost = 0;
+  p2State.dodgeBoost = 0; p2State.dodgeDebuff = 0; p2State.staminaPenalty = 0; p2State.staminaDiscount = 0; p2State.hpDrain = 0; p2State.agilityBoost = 0; p2State.directDamage = 0;
 
   // ── 效果层：顺位失效 + 前置修正（如铁壁、破甲）────────────
   const { ctx: p1CtxEff, triggered: p1TriggeredEffects } = _applyEffects(p1Ctx, p1State, p2Ctx);
@@ -147,10 +147,13 @@ export function resolve(p1Ctx, p2Ctx, p1State, p2State, bothInsighted, turn) {
   _applyPostEffects(p2CtxEff, p2State, p1State, p2TriggeredEffects, bs[PlayerId.P2].dmgReceived, derived.finalDmgP1, p1CtxEff);
 
   // ── 4. 构造并返回结果 ──────────────────────────────────────
+  const finalDmgP1 = derived.finalDmgP1 + (p1State.directDamage || 0);
+  const finalDmgP2 = derived.finalDmgP2 + (p2State.directDamage || 0);
+
   return _buildResult(
     turn, p1CtxEff, p2CtxEff, p1State, p2State,
     derived.clash, derived.clashDesc,
-    derived.finalDmgP1, derived.finalDmgP2,
+    finalDmgP1, finalDmgP2,
     derived.executeP1, derived.executeP2,
     p1TriggeredEffects, p2TriggeredEffects
   );

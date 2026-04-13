@@ -24,21 +24,13 @@ export const ReboundEffect = Object.freeze({
   applicableTo: [Action.GUARD],
 
   /**
-   * 后置钩子：守备完全抵挡（坚固）时调用，给攻击方造成 1 点反弹伤害。
-   * @param {{
-   *   attackerId: string,
-   *   defenderId: string,
-   *   log:        object[],
-   *   bs:         Record<string, { dmgReceived: number }>
-   * }} ctx
+   * 后置钩子：如果在本身处于守备状态时，对手发动攻击且并未对自己造成实质伤害，
+   * 视为通过坚固挡下了攻击，向对手造成 1 点反弹伤害。
    */
-  onFortify(ctx) {
-    ctx.bs[ctx.attackerId].dmgReceived += 1;
-    ctx.log.push({
-      kind: 'EFFECT_REBOUND',
-      effectId: EffectId.REBOUND,
-      attackerId: ctx.attackerId,
-      defenderId: ctx.defenderId,
-    });
+  onPost(ctx, selfState, oppState, dmgTaken, oppDmgTaken, oppCtx) {
+    if (oppCtx.action === Action.ATTACK && dmgTaken === 0) {
+      // 触发反震：记录 1 点直接伤害，由 resolver 一并计入 finalDmg
+      oppState.directDamage = (oppState.directDamage || 0) + 1;
+    }
   },
 });

@@ -161,14 +161,18 @@ function refreshPoints(stamina, speed) {
   ui.ptGuard.textContent = grdPt;
   ui.ptDodge.textContent = dgePt;
 
-  const canAct = stamina >= 1;
+  const snap = engine.getSnapshot();
+  const p1 = snap.players[PlayerId.P1];
+
+  const pen = p1.staminaPenalty || 0;
+  const dis = p1.staminaDiscount || 0;
+  const minCost = Math.max(0, 1 + pen - dis);
+  const canAct = stamina >= minCost;
+  
   ui.btnAttack.toggleAttribute('disabled', !canAct);
   ui.btnGuard.toggleAttribute('disabled', !canAct);
   ui.btnDodge.toggleAttribute('disabled', !canAct);
-
-  const snap = engine.getSnapshot();
-  const p1 = snap.players[PlayerId.P1];
-  ui.p1SpeedUp.disabled = p1.stamina <= 1;
+  ui.p1SpeedUp.disabled = p1.stamina <= minCost;
   ui.p1SpeedDown.disabled = p1.speed <= DefaultStats.BASE_SPEED;
 }
 
@@ -403,15 +407,19 @@ engine.on(EngineEvent.TIMER_TICK, payload => {
 // 强制保证 UI 表象与可用精力一致
 function enforceUIConstraints(p1) {
   if (selectedAction) {
+    const pen = p1.staminaPenalty || 0;
+    const dis = p1.staminaDiscount || 0;
+    const baseCost = Math.max(0, 1 + pen - dis);
+
     if (selectedAction !== 'dodge') {
-      const maxEnhance = Math.max(0, p1.stamina - 1);
+      const maxEnhance = Math.max(0, p1.stamina - baseCost);
       if (localEnhance > maxEnhance) {
         localEnhance = maxEnhance;
         engine.submitAction(PlayerId.P1, { enhance: localEnhance });
         updateConfigPanel();
         return false; // 下调导致触发了新的 ACTION_UPDATED，终止当前执行链
       }
-    } else if (p1.stamina < 1) {
+    } else if (p1.stamina < baseCost) {
       cancelSelection();
       return false;
     }
