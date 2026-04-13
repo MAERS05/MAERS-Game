@@ -689,9 +689,9 @@ function updateStatusIcons(playerId, state) {
   if (state.guardDebuff > 0) addIcon('broken-shield.svg', `本回合守备点数减少 ${state.guardDebuff}`);
   if (state.chargeBoost > 0) addIcon('strong.svg', `本回合攻击点数增加 ${state.chargeBoost}`);
   if (state.ptsDebuff > 0) addIcon('broken-knife.svg', `本回合攻击点数减少 ${state.ptsDebuff}`);
-  if (state.dodgeBoost > 0) addIcon('fast.svg', `本回合闪避点数增加 ${state.dodgeBoost}`);
+  if (state.dodgeBoost > 0) addIcon('avoid.svg', `本回合闪避点数增加 ${state.dodgeBoost}`);
   if (state.dodgeDebuff > 0) addIcon('heavy.svg', `本回合闪避点数减少 ${state.dodgeDebuff}`);
-  if (state.agilityBoost > 0) addIcon('eye.svg', `本回合速度增加 ${state.agilityBoost}`);
+  if (state.agilityBoost > 0) addIcon('fast.svg', `本回合速度增加 ${state.agilityBoost}`);
   if (state.hpDrain > 0) addIcon('wound.svg', `本回合结束时损失 ${state.hpDrain} 点气数`);
 }
 
