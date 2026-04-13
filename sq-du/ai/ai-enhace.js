@@ -60,6 +60,29 @@ export class AIEnhaceLayer {
       normalized.speed = DefaultStats.BASE_SPEED;
     }
 
+    // 底线2.5：低精力时默认禁止强化，避免把自己压到空精力线。
+    if (
+      normalized.action !== Action.STANDBY &&
+      normalized.enhance > 0 &&
+      effectiveStamina <= 2 &&
+      player.hp > 1
+    ) {
+      normalized.enhance = 0;
+    }
+
+    // 底线2.8：仅剩 1 点有效精力且对手并非可收割态时，直接待命回气。
+    if (
+      normalized.action !== Action.STANDBY &&
+      effectiveStamina <= 1 &&
+      player.hp > 1 &&
+      player.stamina > 0
+    ) {
+      normalized.action = Action.STANDBY;
+      normalized.speed = DefaultStats.BASE_SPEED;
+      normalized.enhance = 0;
+      normalized.effects = [null, null, null];
+    }
+
     // 底线3：蓄力是“本回合让招、下回合收益”的 setup 效果。
     // 若本回合支付后有效精力归零（或已在蓄力态），则移除该效果，避免连续空转送节奏。
     if (normalized.action === Action.ATTACK && Array.isArray(normalized.effects)) {
