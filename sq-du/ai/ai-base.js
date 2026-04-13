@@ -52,7 +52,7 @@ export function scheduleAI(ctx) {
   const early = () => Math.min(Math.random(), Math.random());
   const r = Math.random();
   const delay = r < 0.60
-    ? (5  + early() * 15) * 1000
+    ? (5 + early() * 15) * 1000
     : r < 0.90
       ? (20 + early() * 10) * 1000
       : (30 + early() * 10) * 1000;
@@ -131,24 +131,24 @@ export function buildDecision(ai, player, history = []) {
  */
 function _snapshot(ai, player, history) {
   const MAX_STAMINA = DefaultStats.MAX_STAMINA;
-  const MAX_HP      = DefaultStats.MAX_HP;
+  const MAX_HP = DefaultStats.MAX_HP;
 
   // 历史属性均值（只记数值，不记情形）
   const recent = history.slice(-3); // 只看最近 3 回合
-  const oppSpeedTrend   = recent.length
-    ? recent.reduce((s, h) => s + (h.opponentSpeed   ?? DefaultStats.BASE_SPEED), 0) / recent.length
+  const oppSpeedTrend = recent.length
+    ? recent.reduce((s, h) => s + (h.opponentSpeed ?? DefaultStats.BASE_SPEED), 0) / recent.length
     : DefaultStats.BASE_SPEED;
   const oppEnhanceTrend = recent.length
     ? recent.reduce((s, h) => s + (h.opponentEnhance ?? 0), 0) / recent.length
     : 0;
-  const oppAggression   = recent.length
+  const oppAggression = recent.length
     ? recent.filter(h => h.opponentAction === Action.ATTACK).length / recent.length
     : 0.33; // 无历史时假设均等
 
   return {
-    aiHpRatio:          ai.hp          / MAX_HP,
-    playerHpRatio:      player.hp      / MAX_HP,
-    aiStaminaRatio:     ai.stamina     / MAX_STAMINA,
+    aiHpRatio: ai.hp / MAX_HP,
+    playerHpRatio: player.hp / MAX_HP,
+    aiStaminaRatio: ai.stamina / MAX_STAMINA,
     playerStaminaRatio: player.stamina / MAX_STAMINA,
     oppSpeedTrend,
     oppEnhanceTrend,
@@ -165,53 +165,42 @@ function _snapshot(ai, player, history) {
  * 不依赖行动对（"对手攻击 → 我守备"），只依赖压力数值。
  */
 function _pickAction(snap, ai) {
-  // 加入待命（Standby）作为基础选择项，默认权重较低
-  const w = { attack: 1.0, guard: 1.0, dodge: 1.0, standby: 0.2 };
+  const w = { attack: 1.0, guard: 1.0, dodge: 1.0 };
 
   // ── 处决机会：对手精力耗尽时，攻击性质最强 ───────────
   if (snap.playerStaminaRatio <= 0) {
     w.attack += 8;
-    w.guard  *= 0.1;
-    w.dodge  *= 0.1;
-    w.standby *= 0.1;
+    w.guard *= 0.1;
+    w.dodge *= 0.1;
   }
 
-  // ── 自身精力极低时，必须优先考虑恢复（除有击杀机会外） ──
-  if (snap.aiStaminaRatio <= 0.34) { // 只剩 1 点精力
-    w.standby += 2.0; // 极高意愿待命回精
-    w.guard   += 1.0; // 若防也可防，但偏向于不消耗（guard需1点基础cost）
-    w.attack  -= 0.8;
-  } else if (snap.aiStaminaRatio <= 0.67) { // 剩 2 点精力
-    w.standby += 0.8;
-  }
-
-  // ── 自身气数压力：气数越低，防御与蛰伏权重越高 ──────────
+  // ── 自身气数压力：气数越低，防御性质权重越高 ──────────
+  // 不是"气数=1才防"，而是线性压力，让行为更自然
   const aiHpPressure = 1 - snap.aiHpRatio;          // 0~1，越高越危险
-  w.guard  += aiHpPressure * 3.0;
-  w.dodge  += aiHpPressure * 2.0;
-  // 危险时如果精力不差，也可以考虑待命诱敌
-  if (snap.aiStaminaRatio > 0.34) w.standby += aiHpPressure * 1.5;
+  w.guard += aiHpPressure * 2.5;
+  w.dodge += aiHpPressure * 1.5;
   w.attack -= aiHpPressure * 0.5;
 
-  // ── 进攻机会：对手气数低，且我方精力充足，提高攻击欲望 ──────
+  // ── 进攻机会：对手气数压力越高，攻击性质权重越高 ──────
   const playerHpPressure = 1 - snap.playerHpRatio;  // 0~1，越高机会越大
   if (ai.stamina >= 2) {
-    w.attack += playerHpPressure * 3.5;
-    w.standby -= 0.5; // 有优势就不要怂
+    w.attack += playerHpPressure * 3.0;
   }
 
   // ── 对手近期进攻倾向：对手越爱攻击，我越倾向防御 ──────
-  w.guard  += snap.oppAggression * 1.5;
-  w.dodge  += snap.oppAggression * 1.0;
-  // 对手若疯狂进攻，待命很容易被打穿，因此降低待命权重
-  w.standby -= snap.oppAggression * 1.0;
+  // 这是纯属性反应：对手攻击性高 → 我受击概率高 → 防御价值高
+  w.guard += snap.oppAggression * 1.5;
+  w.dodge += snap.oppAggression * 1.0;
+  w.attack -= snap.oppAggression * 0.5;
 
-  return _pickWeighted({
-    [Action.ATTACK]: Math.max(0, w.attack),
-    [Action.GUARD]: Math.max(0, w.guard),
-    [Action.DODGE]: Math.max(0, w.dodge),
-    [Action.STANDBY]: Math.max(0, w.standby)
-  });
+  // ── 精力预算：精力越少，越不值得主动出击 ──────────────
+  if (snap.aiStaminaRatio <= 0.34) { // 仅剩 1 格
+    // 剩 1 格时攻击和守备消耗一样，但守备更安全
+    w.guard += 1.0;
+    w.attack -= 0.5;
+  }
+
+  return _pickWeighted({ [Action.ATTACK]: w.attack, [Action.GUARD]: w.guard, [Action.DODGE]: w.dodge });
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -227,44 +216,38 @@ function _pickAction(snap, ai) {
  * 加速需预留精力，因此内部会做可行性检查。
  */
 function _pickSpeed(snap, action, ai) {
-  const BASE  = DefaultStats.BASE_SPEED;
-
-  if (action === Action.STANDBY) return BASE;
+  const BASE = DefaultStats.BASE_SPEED;
 
   let speedBoostWeight = 0;
 
-  // ── 防御时（守备/闪避），速度至关重要 ──
-  // 防御的速度必须 >= 敌方的攻击速度才能成功
-  if (action === Action.GUARD || action === Action.DODGE) {
-    // 敌方喜欢提速 -> 我方必须跟着提速防守
-    speedBoostWeight += (snap.oppSpeedTrend - BASE) * 2.5;
-    // 敌方经常攻击 -> 我的防御大概率要被触发，因此需要先手
-    speedBoostWeight += snap.oppAggression * 1.5;
-  }
-  
-  // ── 攻击时，速度也很重要 ──
-  // 抢先攻击可以打断未挂载的防御（袭击/迅攻），或者实现处决
-  if (action === Action.ATTACK) {
-    // 如果敌方可能用防御且他们通常偏快，我也要加速击破
-    speedBoostWeight += (snap.oppSpeedTrend - BASE) * 1.0;
-    // 如果敌方精力低（可能待命），没必要加速
-    if (snap.playerStaminaRatio <= 0.34) speedBoostWeight -= 0.5;
-  }
+  // 对手速度倾向高 → 速度性质的价值升高
+  speedBoostWeight += (snap.oppSpeedTrend - BASE) * 0.8;
 
-  // 自身精力充足时更容易接受加速
-  speedBoostWeight += (snap.aiStaminaRatio - 0.5) * 1.0;
+  // 对手进攻倾向高 → 快就能抢先或弹开攻击
+  speedBoostWeight += snap.oppAggression * 0.5;
 
-  // 精力预算检查：行动本身消耗 1
-  const availableForBoost = ai.stamina - 1;
+  // ── 生存法则：防抽干的平滑权重曲线 ──
+  // 精力越趋近于满，加速欲望越高；一旦脱离满精力（<0.9），为了避免把自己抽干吃处决，意愿会大幅倒扣！
+  // 满精力(1.0) -> +0.4 ; 两格(0.66) -> -0.9 ; 一格(0.33) -> -2.2
+  speedBoostWeight += (snap.aiStaminaRatio - 0.9) * 4.0;
+
+  // 杀机对冲：如果你快死了或者你快没精力了，它的求生恐惧就会被嗜血欲抵消
+  const playerWeakness = 1 - Math.max(snap.playerHpRatio, snap.playerStaminaRatio);
+  speedBoostWeight += playerWeakness * 2.0;
+
+  // 闪避时：速度决定能否在攻击前挂载闪避 buff
+  // “如果对手进攻倾向高，我需要更快雨年花彈”
+  if (action === Action.DODGE) speedBoostWeight += snap.oppAggression * 1.2;
+
+  // 精力不足时降低加速意愿（需给行动本身留出 1 格）
+  const availableForBoost = ai.stamina - 1;  // 行动本身消耗 1
   if (availableForBoost <= 0) return BASE;
 
-  const boostProb = Math.max(0, Math.min(0.95, 0.2 + speedBoostWeight * 0.3));
-  // 有时可能会选择连续加速 2 格（如果精力特别充足且有必要）
-  let boost = 0;
-  if (Math.random() < boostProb) boost = 1;
-  if (boost === 1 && availableForBoost >= 2 && Math.random() < boostProb * 0.5) boost = 2;
+  const boostProb = Math.max(0, Math.min(0.9, 0.3 + speedBoostWeight * 0.3));
+  const boost = Math.random() < boostProb ? 1 : 0;
 
-  return BASE + boost;
+  const canAfford = ai.stamina >= 1 + boost;
+  return BASE + (canAfford ? boost : 0);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -413,7 +396,7 @@ export function buildRedecideDecision(ai, player, revealedAction) {
     return { action: Action.STANDBY, enhance: 0, speed: DefaultStats.BASE_SPEED };
   }
 
-  const snap     = _snapshot(ai, player, []);
+  const snap = _snapshot(ai, player, []);
   const revealed = revealedAction ?? {
     action: Action.STANDBY, speed: DefaultStats.BASE_SPEED, enhance: 0, pts: 0,
   };
@@ -424,8 +407,8 @@ export function buildRedecideDecision(ai, player, revealedAction) {
   // 基础情势权重（与正常决策相同，保持连续性）
   if (player.stamina <= 0) { w.attack += 8; w.guard *= 0.1; w.dodge *= 0.1; }
   const aiHpPressure = 1 - snap.aiHpRatio;
-  w.guard  += aiHpPressure * 2.0;
-  w.dodge  += aiHpPressure * 1.2;
+  w.guard += aiHpPressure * 2.0;
+  w.dodge += aiHpPressure * 1.2;
   if (ai.stamina >= 2) w.attack += (1 - snap.playerHpRatio) * 2.5;
 
   // ── 已知对手意图的「进攻性」和「防御被动性」两个独立属性轴 ─────────
@@ -434,55 +417,53 @@ export function buildRedecideDecision(ai, player, revealedAction) {
 
   // 进攻性（对手意图对我的威胁程度，0~1 连续值）
   const attackNature = {
-    [Action.ATTACK]:  1.0,   // 强威胁
-    [Action.DODGE]:   0.2,   // 轻微威胁（对我的攻击会规避）
-    [Action.GUARD]:  -0.2,   // 反威胁（守备本身不主动攻我）
-    [Action.STANDBY]:-0.5,   // 无威胁
+    [Action.ATTACK]: 1.0,   // 强威胁
+    [Action.DODGE]: 0.2,   // 轻微威胁（对我的攻击会规避）
+    [Action.GUARD]: -0.2,   // 反威胁（守备本身不主动攻我）
+    [Action.STANDBY]: -0.5,   // 无威胁
   }[revealed.action] ?? 0;
 
   // 防御被动性（对手意图在多大程度上「等待被击」）
   const passiveNature = {
     [Action.STANDBY]: 1.2,   // 完全被动
-    [Action.GUARD]:   1.0,   // 被动防守
-    [Action.DODGE]:   0.4,   // 躲避中
+    [Action.GUARD]: 1.0,   // 被动防守
+    [Action.DODGE]: 0.4,   // 躲避中
     [Action.ATTACK]: -0.3,   // 主动进攻
   }[revealed.action] ?? 0;
 
   // 进攻性高 → 防御价值上升
-  w.guard  += attackNature * REVEAL_W * 1.3;
-  w.dodge  += attackNature * REVEAL_W * 0.8;
+  w.guard += attackNature * REVEAL_W * 1.3;
+  w.dodge += attackNature * REVEAL_W * 0.8;
   w.attack -= attackNature * REVEAL_W * 0.4;
 
   // 防御被动性高 → 攻击价值上升
   w.attack += passiveNature * REVEAL_W * 1.5;
-  w.guard  -= passiveNature * REVEAL_W * 0.3;
-  w.dodge  -= passiveNature * REVEAL_W * 0.3;
+  w.guard -= passiveNature * REVEAL_W * 0.3;
+  w.dodge -= passiveNature * REVEAL_W * 0.3;
 
   const action = _pickWeighted({
     [Action.ATTACK]: Math.max(0, w.attack),
-    [Action.GUARD]:  Math.max(0, w.guard),
-    [Action.DODGE]:  Math.max(0, w.dodge),
+    [Action.GUARD]: Math.max(0, w.guard),
+    [Action.DODGE]: Math.max(0, w.dodge),
   });
 
+  // ── Axis 2：速度轴（对手速度值作为独立轴影响我的速度决策）──────────
   const revealedSpeed = revealed.speed ?? DefaultStats.BASE_SPEED;
   let speedBoostWeight = 0;
-  // 对手速度越高，我方所需速度越大（防御和抢攻都需要）
-  speedBoostWeight += (revealedSpeed - DefaultStats.BASE_SPEED) * 2.0;
+  // 对手速度越高，速度性质的价值越高（对双方都是）
+  speedBoostWeight += (revealedSpeed - DefaultStats.BASE_SPEED) * 1.5;
+  // 我选闪避时，速度是核心（与行动无关的轴性质）
+  if (action === Action.DODGE) speedBoostWeight += 1.5;
 
-  // 闪避和守备：对速度最敏感
-  if (action === Action.DODGE || action === Action.GUARD) {
-    if (revealed.action === Action.ATTACK) {
-      speedBoostWeight += (revealedSpeed - DefaultStats.BASE_SPEED) * 3.0; // 敌方攻击我，我必须抢快
-    }
-  }
+  // 上帝视角下的生存与击杀权重博弈
+  speedBoostWeight += (snap.aiStaminaRatio - 0.9) * 4.0;
+  const playerWeakness = 1 - Math.max(snap.playerHpRatio, snap.playerStaminaRatio);
+  speedBoostWeight += playerWeakness * 2.0;
 
   const availableForBoost = ai.stamina - 1;
-  const boostProb = Math.max(0, Math.min(0.95, 0.25 + speedBoostWeight * 0.35));
-  let boost = 0;
-  if (availableForBoost > 0 && Math.random() < boostProb) boost = 1;
-  if (boost === 1 && availableForBoost >= 2 && Math.random() < boostProb * 0.6) boost = 2; // 给识破局更高的二次加速概率
-
-  const speed = DefaultStats.BASE_SPEED + boost;
+  const boostProb = Math.max(0, Math.min(0.9, 0.25 + speedBoostWeight * 0.35));
+  const boost = (availableForBoost > 0 && Math.random() < boostProb) ? 1 : 0;
+  const speed = DefaultStats.BASE_SPEED + (ai.stamina >= 1 + boost ? boost : 0);
 
   // ── Axis 3：强化轴（对手点数值作为独立轴影响我的强化决策）──────────
   if (action === Action.STANDBY) {
@@ -492,16 +473,20 @@ export function buildRedecideDecision(ai, player, revealedAction) {
   const revealedPts = revealed.pts ?? (1 + (revealed.enhance ?? 0));
   let enhWeight = 0;
   // 对手点数越高，「我需要提升点数」的性质越强
-  enhWeight += revealedPts * 0.6;
-  
-  if (action === Action.GUARD && revealed.action === Action.ATTACK) {
-    enhWeight += (revealedPts - 1) * 1.0; // 硬生生要顶上去
-  }
+  enhWeight += revealedPts * 0.5;
+
+  // ── 生存法则：防抽干的平滑权重曲线 ──
+  // 强化额外消耗 1 精力。为了防处决，非满状态大幅倒扣强化意愿
+  enhWeight += (snap.aiStaminaRatio - 0.9) * 4.0;
+
+  // 杀机对冲：对手越弱，这股保守防御的恐惧就越能被抵消，越敢于强化输出/防御
+  const playerWeakness = 1 - Math.max(snap.playerHpRatio, snap.playerStaminaRatio);
+  enhWeight += playerWeakness * 2.5;
 
   const canEnhance = ai.stamina >= (1 + boost + 1);
   if (!canEnhance) return { action, enhance: 0, speed };
 
-  const enhProb = Math.max(0, Math.min(0.9, 0.15 + enhWeight * 0.35));
+  const enhProb = Math.max(0, Math.min(0.85, 0.15 + enhWeight * 0.3));
   const enhance = Math.random() < enhProb ? 1 : 0;
 
   return { action, enhance, speed };
@@ -522,8 +507,8 @@ export function buildRedecideDecision(ai, player, revealedAction) {
  */
 function _pickEffects(action, enhance, ai) {
   const EFFECT_SLOTS = 3;
-  const slots        = Math.min(1 + enhance, EFFECT_SLOTS);
-  const inventory    = (ai.effectInventory?.[action] ?? [])
+  const slots = Math.min(1 + enhance, EFFECT_SLOTS);
+  const inventory = (ai.effectInventory?.[action] ?? [])
     .filter(id => EffectDefs[id]?.applicableTo.includes(action));
 
   const result = Array(EFFECT_SLOTS).fill(null);
