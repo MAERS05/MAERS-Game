@@ -165,42 +165,53 @@ function _snapshot(ai, player, history) {
  * 不依赖行动对（"对手攻击 → 我守备"），只依赖压力数值。
  */
 function _pickAction(snap, ai) {
-  const w = { attack: 1.0, guard: 1.0, dodge: 1.0 };
+  // 加入待命（Standby）作为基础选择项，默认权重较低
+  const w = { attack: 1.0, guard: 1.0, dodge: 1.0, standby: 0.2 };
 
   // ── 处决机会：对手精力耗尽时，攻击性质最强 ───────────
   if (snap.playerStaminaRatio <= 0) {
     w.attack += 8;
     w.guard  *= 0.1;
     w.dodge  *= 0.1;
+    w.standby *= 0.1;
   }
 
-  // ── 自身气数压力：气数越低，防御性质权重越高 ──────────
-  // 不是"气数=1才防"，而是线性压力，让行为更自然
+  // ── 自身精力极低时，必须优先考虑恢复（除有击杀机会外） ──
+  if (snap.aiStaminaRatio <= 0.34) { // 只剩 1 点精力
+    w.standby += 2.0; // 极高意愿待命回精
+    w.guard   += 1.0; // 若防也可防，但偏向于不消耗（guard需1点基础cost）
+    w.attack  -= 0.8;
+  } else if (snap.aiStaminaRatio <= 0.67) { // 剩 2 点精力
+    w.standby += 0.8;
+  }
+
+  // ── 自身气数压力：气数越低，防御与蛰伏权重越高 ──────────
   const aiHpPressure = 1 - snap.aiHpRatio;          // 0~1，越高越危险
-  w.guard  += aiHpPressure * 2.5;
-  w.dodge  += aiHpPressure * 1.5;
+  w.guard  += aiHpPressure * 3.0;
+  w.dodge  += aiHpPressure * 2.0;
+  // 危险时如果精力不差，也可以考虑待命诱敌
+  if (snap.aiStaminaRatio > 0.34) w.standby += aiHpPressure * 1.5;
   w.attack -= aiHpPressure * 0.5;
 
-  // ── 进攻机会：对手气数压力越高，攻击性质权重越高 ──────
+  // ── 进攻机会：对手气数低，且我方精力充足，提高攻击欲望 ──────
   const playerHpPressure = 1 - snap.playerHpRatio;  // 0~1，越高机会越大
   if (ai.stamina >= 2) {
-    w.attack += playerHpPressure * 3.0;
+    w.attack += playerHpPressure * 3.5;
+    w.standby -= 0.5; // 有优势就不要怂
   }
 
   // ── 对手近期进攻倾向：对手越爱攻击，我越倾向防御 ──────
-  // 这是纯属性反应：对手攻击性高 → 我受击概率高 → 防御价值高
   w.guard  += snap.oppAggression * 1.5;
   w.dodge  += snap.oppAggression * 1.0;
-  w.attack -= snap.oppAggression * 0.5;
+  // 对手若疯狂进攻，待命很容易被打穿，因此降低待命权重
+  w.standby -= snap.oppAggression * 1.0;
 
-  // ── 精力预算：精力越少，越不值得主动出击 ──────────────
-  if (snap.aiStaminaRatio <= 0.34) { // 仅剩 1 格
-    // 剩 1 格时攻击和守备消耗一样，但守备更安全
-    w.guard  += 1.0;
-    w.attack -= 0.5;
-  }
-
-  return _pickWeighted({ [Action.ATTACK]: w.attack, [Action.GUARD]: w.guard, [Action.DODGE]: w.dodge });
+  return _pickWeighted({
+    [Action.ATTACK]: Math.max(0, w.attack),
+    [Action.GUARD]: Math.max(0, w.guard),
+    [Action.DODGE]: Math.max(0, w.dodge),
+    [Action.STANDBY]: Math.max(0, w.standby)
+  });
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -218,30 +229,42 @@ function _pickAction(snap, ai) {
 function _pickSpeed(snap, action, ai) {
   const BASE  = DefaultStats.BASE_SPEED;
 
+  if (action === Action.STANDBY) return BASE;
+
   let speedBoostWeight = 0;
 
-  // 对手速度倾向高 → 速度性质的价值升高
-  speedBoostWeight += (snap.oppSpeedTrend - BASE) * 0.8;
+  // ── 防御时（守备/闪避），速度至关重要 ──
+  // 防御的速度必须 >= 敌方的攻击速度才能成功
+  if (action === Action.GUARD || action === Action.DODGE) {
+    // 敌方喜欢提速 -> 我方必须跟着提速防守
+    speedBoostWeight += (snap.oppSpeedTrend - BASE) * 2.5;
+    // 敌方经常攻击 -> 我的防御大概率要被触发，因此需要先手
+    speedBoostWeight += snap.oppAggression * 1.5;
+  }
+  
+  // ── 攻击时，速度也很重要 ──
+  // 抢先攻击可以打断未挂载的防御（袭击/迅攻），或者实现处决
+  if (action === Action.ATTACK) {
+    // 如果敌方可能用防御且他们通常偏快，我也要加速击破
+    speedBoostWeight += (snap.oppSpeedTrend - BASE) * 1.0;
+    // 如果敌方精力低（可能待命），没必要加速
+    if (snap.playerStaminaRatio <= 0.34) speedBoostWeight -= 0.5;
+  }
 
-  // 对手进攻倾向高 → 快就能抢先或弹开攻击
-  speedBoostWeight += snap.oppAggression * 0.5;
-
-  // 自身精力充足时加速性价比高
+  // 自身精力充足时更容易接受加速
   speedBoostWeight += (snap.aiStaminaRatio - 0.5) * 1.0;
 
-  // 闪避时：速度决定能否在攻击前挂载闪避 buff
-  // “如果对手进攻倾向高，我需要更快雨年花彈”
-  if (action === Action.DODGE) speedBoostWeight += snap.oppAggression * 1.2;
-
-  // 精力不足时降低加速意愿（需给行动本身留出 1 格）
-  const availableForBoost = ai.stamina - 1;  // 行动本身消耗 1
+  // 精力预算检查：行动本身消耗 1
+  const availableForBoost = ai.stamina - 1;
   if (availableForBoost <= 0) return BASE;
 
-  const boostProb = Math.max(0, Math.min(0.9, 0.3 + speedBoostWeight * 0.3));
-  const boost = Math.random() < boostProb ? 1 : 0;
+  const boostProb = Math.max(0, Math.min(0.95, 0.2 + speedBoostWeight * 0.3));
+  // 有时可能会选择连续加速 2 格（如果精力特别充足且有必要）
+  let boost = 0;
+  if (Math.random() < boostProb) boost = 1;
+  if (boost === 1 && availableForBoost >= 2 && Math.random() < boostProb * 0.5) boost = 2;
 
-  const canAfford = ai.stamina >= 1 + boost;
-  return BASE + (canAfford ? boost : 0);
+  return BASE + boost;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -441,18 +464,25 @@ export function buildRedecideDecision(ai, player, revealedAction) {
     [Action.DODGE]:  Math.max(0, w.dodge),
   });
 
-  // ── Axis 2：速度轴（对手速度值作为独立轴影响我的速度决策）──────────
   const revealedSpeed = revealed.speed ?? DefaultStats.BASE_SPEED;
   let speedBoostWeight = 0;
-  // 对手速度越高，速度性质的价值越高（对双方都是）
-  speedBoostWeight += (revealedSpeed - DefaultStats.BASE_SPEED) * 1.5;
-  // 我选闪避时，速度是核心（与行动无关的轴性质）
-  if (action === Action.DODGE) speedBoostWeight += 1.5;
+  // 对手速度越高，我方所需速度越大（防御和抢攻都需要）
+  speedBoostWeight += (revealedSpeed - DefaultStats.BASE_SPEED) * 2.0;
+
+  // 闪避和守备：对速度最敏感
+  if (action === Action.DODGE || action === Action.GUARD) {
+    if (revealed.action === Action.ATTACK) {
+      speedBoostWeight += (revealedSpeed - DefaultStats.BASE_SPEED) * 3.0; // 敌方攻击我，我必须抢快
+    }
+  }
 
   const availableForBoost = ai.stamina - 1;
-  const boostProb = Math.max(0, Math.min(0.9, 0.25 + speedBoostWeight * 0.35));
-  const boost     = (availableForBoost > 0 && Math.random() < boostProb) ? 1 : 0;
-  const speed     = DefaultStats.BASE_SPEED + (ai.stamina >= 1 + boost ? boost : 0);
+  const boostProb = Math.max(0, Math.min(0.95, 0.25 + speedBoostWeight * 0.35));
+  let boost = 0;
+  if (availableForBoost > 0 && Math.random() < boostProb) boost = 1;
+  if (boost === 1 && availableForBoost >= 2 && Math.random() < boostProb * 0.6) boost = 2; // 给识破局更高的二次加速概率
+
+  const speed = DefaultStats.BASE_SPEED + boost;
 
   // ── Axis 3：强化轴（对手点数值作为独立轴影响我的强化决策）──────────
   if (action === Action.STANDBY) {
@@ -462,12 +492,16 @@ export function buildRedecideDecision(ai, player, revealedAction) {
   const revealedPts = revealed.pts ?? (1 + (revealed.enhance ?? 0));
   let enhWeight = 0;
   // 对手点数越高，「我需要提升点数」的性质越强
-  enhWeight += revealedPts * 0.5;
+  enhWeight += revealedPts * 0.6;
+  
+  if (action === Action.GUARD && revealed.action === Action.ATTACK) {
+    enhWeight += (revealedPts - 1) * 1.0; // 硬生生要顶上去
+  }
 
   const canEnhance = ai.stamina >= (1 + boost + 1);
   if (!canEnhance) return { action, enhance: 0, speed };
 
-  const enhProb = Math.max(0, Math.min(0.85, 0.15 + enhWeight * 0.3));
+  const enhProb = Math.max(0, Math.min(0.9, 0.15 + enhWeight * 0.35));
   const enhance = Math.random() < enhProb ? 1 : 0;
 
   return { action, enhance, speed };

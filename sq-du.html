@@ -101,7 +101,7 @@
       background: linear-gradient(135deg, rgba(30, 30, 35, 0.7) 0%, rgba(10, 10, 12, 0.9) 100%);
       border: 1px solid var(--border);
       border-radius: 4px;
-      padding: 14px 20px;
+      padding: 14px 20px 28px 20px;
       backdrop-filter: blur(16px);
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.05);
       flex-shrink: 0;
@@ -1004,8 +1004,8 @@
     /* ── 敌方情报框 ─────────────────────────────────── */
     .intel-box {
       position: fixed;
-      top: 136px;          /* P2 卡片下方，根据实际排版调整 */
-      right: 12px;
+      top: 180px;          /* 避开头像框 */
+      right: 48px;         /* 和 hud-top padding 对齐 */
       width: 200px;
       background: rgba(10,10,18,0.82);
       border: 1px solid rgba(148, 163, 184, 0.3);
@@ -1013,6 +1013,28 @@
       padding: 10px 14px;
       backdrop-filter: blur(8px);
       z-index: 80;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .intel-box.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    
+    .intel-icon-btn {
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      width: 14px;
+      height: 14px;
+      cursor: pointer;
+      opacity: 0.6;
+      transition: opacity 0.2s;
+      z-index: 20;
+    }
+    .intel-icon-btn:hover {
+      opacity: 1;
     }
     .intel-title {
       font-size: 0.7rem;
@@ -1021,17 +1043,43 @@
       text-transform: uppercase;
       margin-bottom: 8px;
     }
-    .intel-list { display: flex; flex-direction: column; gap: 5px; }
+    .intel-list { display: flex; flex-direction: column; gap: 8px; }
     .intel-empty { font-size: 0.72rem; color: #334155; }
+    
+    .intel-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .intel-group-title {
+      font-size: 0.65rem;
+      color: #94a3b8;
+      border-left: 2px solid #475569;
+      padding-left: 4px;
+      line-height: 1;
+    }
+    .intel-group-tags {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
     .intel-tag {
       font-size: 0.75rem;
-      padding: 3px 9px;
-      border-radius: 12px;
-      background: rgba(96, 165, 250, 0.12);
-      border: 1px solid rgba(96, 165, 250, 0.35);
-      color: #93c5fd;
+      padding: 6px 10px;
+      border-radius: 8px;
+      background: rgba(30, 41, 59, 0.4);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      color: #cbd5e1;
+      line-height: 1.4;
     }
-    .intel-tag span { font-size: 0.68rem; color: var(--text-muted); margin-left: 4px; }
+    .intel-tag strong {
+      color: #93c5fd;
+      font-weight: normal;
+      margin-right: 2px;
+    }
+    .intel-tag span {
+      font-size: 0.7rem; color: #94a3b8;
+    }
 
     .equip-overlay {
       position: fixed;
@@ -1192,6 +1240,35 @@
     .effect-item-cost { font-size: 0.72rem; color: #60a5fa; white-space: nowrap; }
     .effect-item.incompatible { opacity: 0.3; cursor: not-allowed; }
 
+    /* ── 状态图标栏 ──────────────────────────────────── */
+    .status-icon-tray {
+      display: flex; gap: 4px; padding: 0; flex-wrap: wrap; 
+      width: 100%; min-height: 16px;
+    }
+    .status-icon {
+      width: 15px; height: 15px; object-fit: contain; opacity: 1; 
+      filter: drop-shadow(0 0 2px rgba(0,0,0,1));
+      cursor: pointer;
+    }
+    
+    .status-tooltip {
+      position: absolute;
+      top: calc(100% + 26px); left: 50%; transform: translateX(-50%);
+      background: #ffffff;
+      color: #000000;
+      padding: 4px 8px;
+      border-radius: 2px;
+      font-size: 0.65rem;
+      white-space: nowrap;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+      z-index: 100;
+      pointer-events: none;
+      display: none;
+    }
+    .status-tooltip.show {
+      display: block;
+    }
+
   </style>
 </head>
 
@@ -1215,9 +1292,13 @@
         <div class="timer-ready-overlay">✓</div>
       </div>
 
-      <!-- 方形头像框 -->
-      <div class="avatar-frame" id="p1Avatar">
-        <img src="ui/sq-du/avatar/girl.jpg" alt="少女" style="width:100%;height:100%;object-fit:cover;">
+      <!-- 头像和状态图标组合 -->
+      <div class="avatar-wrap" style="position:relative;">
+        <div class="avatar-frame" id="p1Avatar">
+          <img src="ui/sq-du/avatar/girl.jpg" alt="少女" style="width:100%;height:100%;object-fit:cover;">
+        </div>
+        <div class="status-icon-tray" id="p1-status" style="position:absolute; bottom:-22px; left:0; width:100%; justify-content:center; padding:0; min-height:16px;"></div>
+        <div class="status-tooltip" id="p1StatusTooltip"></div>
       </div>
 
       <!-- 属性 -->
@@ -1252,10 +1333,16 @@
     <!-- P2 状态卡（敌方） -->
     <div class="status-card status-enemy" id="p2Card">
 
-      <!-- 方形头像框（row-reverse 下自然出现在视觉右侧） -->
-      <div class="avatar-frame" id="p2Avatar">
-        <img src="ui/sq-du/avatar/man.jpg" alt="马厄斯" style="width:100%;height:100%;object-fit:cover;">
+      <!-- 头像和状态图标组合 -->
+      <div class="avatar-wrap" style="position:relative;">
+        <div class="avatar-frame" id="p2Avatar">
+          <img src="ui/sq-du/avatar/man.jpg" alt="马厄斯" style="width:100%;height:100%;object-fit:cover;">
+        </div>
+        <div class="status-icon-tray" id="p2-status" style="position:absolute; bottom:-22px; left:0; width:100%; justify-content:center; padding:0; min-height:16px;"></div>
+        <div class="status-tooltip" id="p2StatusTooltip"></div>
       </div>
+      
+      <img src="ui/all/information.svg" class="intel-icon-btn" id="p2IntelBtn" alt="情报">
 
       <!-- 属性（方向翻转） -->
       <div class="stats-col">

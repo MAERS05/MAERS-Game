@@ -289,7 +289,7 @@ export const EffectId = Object.freeze({
 export const EffectDefs = Object.freeze({
   [EffectId.WOUND]: {
     id: EffectId.WOUND, name: '创伤',
-    desc: '命中后为目标附加伤口——下回合行动额外消耗 1 精力',
+    desc: '命中后为目标附加伤口——下回合结束时损失 1 点气数',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.BREAK_QI]: {

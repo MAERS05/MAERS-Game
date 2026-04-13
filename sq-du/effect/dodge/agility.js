@@ -26,19 +26,11 @@ export const AgilityEffect = Object.freeze({
   applicableTo: [Action.DODGE],
 
   /**
-   * 后置钩子：闪避成功（规避 / 虚步）时调用，为闪避方标记下回合速度加成。
-   * @param {{
-   *   dodgerId:  string,
-   *   log:       object[],
-   *   nextState: Record<string, { agilityBoost?: number }>
-   * }} ctx
+   * 后置钩子：闪避成功（未受全额伤害）时调用，为闪避方标记下回合速度加成。
    */
-  onEvade(ctx) {
-    ctx.nextState[ctx.dodgerId].agilityBoost = (ctx.nextState[ctx.dodgerId].agilityBoost ?? 0) + 1;
-    ctx.log.push({
-      kind: 'EFFECT_AGILITY_GAINED',
-      effectId: EffectId.AGILITY,
-      dodgerId: ctx.dodgerId,
-    });
+  onPost(ctx, selfState, oppState, dmgTaken) {
+    if (ctx.action === Action.DODGE && dmgTaken === 0) {
+      selfState.agilityBoost = (selfState.agilityBoost || 0) + 1;
+    }
   },
 });

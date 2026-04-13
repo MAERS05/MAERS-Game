@@ -328,9 +328,17 @@ export class BattleEngine {
 
     // 将玩家在快捷槽里预装的效果合并进本次行动
     // 仅限有意义的行动（待命没有效果槽）
+    // 若 actionCtx.effects 中已有非空值（如 AI 通过 submitAction 提交的），则保留不覆盖
     const action = p.actionCtx.action;
-    if (action !== Action.STANDBY && p.equippedEffects[action]) {
-      p.actionCtx.effects = [...p.equippedEffects[action]];
+    if (action !== Action.STANDBY) {
+      const hasExplicitEffects = p.actionCtx.effects?.some(e => e !== null);
+      if (!hasExplicitEffects) {
+        // 人类玩家路径：从装备槽同步
+        p.actionCtx.effects = p.equippedEffects[action]
+          ? [...p.equippedEffects[action]]
+          : Array(EFFECT_SLOTS).fill(null);
+      }
+      // AI 路径：effects 已由 submitAction 写入，直接保留
     } else {
       p.actionCtx.effects = Array(EFFECT_SLOTS).fill(null);
     }
@@ -747,15 +755,30 @@ export class BattleEngine {
     p1.chargeBoost = result.newState.p1.chargeBoost ?? 0;
     p1.ptsDebuff   = result.newState.p1.ptsDebuff   ?? 0;
     p1.guardBoost  = result.newState.p1.guardBoost  ?? 0;
+    p1.guardDebuff = result.newState.p1.guardDebuff ?? 0;
+    p1.dodgeBoost  = result.newState.p1.dodgeBoost  ?? 0;
+    p1.dodgeDebuff = result.newState.p1.dodgeDebuff ?? 0;
+    p1.agilityBoost = result.newState.p1.agilityBoost ?? 0;
+    p1.staminaPenalty  = result.newState.p1.staminaPenalty  ?? 0;
+    p1.staminaDiscount = result.newState.p1.staminaDiscount ?? 0;
+    p1.hpDrain     = result.newState.p1.hpDrain     ?? 0;
+
     p2.hp = result.newState.p2.hp;
     p2.stamina = result.newState.p2.stamina;
     p2.chargeBoost = result.newState.p2.chargeBoost ?? 0;
     p2.ptsDebuff   = result.newState.p2.ptsDebuff   ?? 0;
     p2.guardBoost  = result.newState.p2.guardBoost  ?? 0;
+    p2.guardDebuff = result.newState.p2.guardDebuff ?? 0;
+    p2.dodgeBoost  = result.newState.p2.dodgeBoost  ?? 0;
+    p2.dodgeDebuff = result.newState.p2.dodgeDebuff ?? 0;
+    p2.agilityBoost = result.newState.p2.agilityBoost ?? 0;
+    p2.staminaPenalty  = result.newState.p2.staminaPenalty  ?? 0;
+    p2.staminaDiscount = result.newState.p2.staminaDiscount ?? 0;
+    p2.hpDrain     = result.newState.p2.hpDrain     ?? 0;
 
-    // 回合末速度归1（加速为临时性的）
-    p1.speed = DefaultStats.BASE_SPEED;
-    p2.speed = DefaultStats.BASE_SPEED;
+    // 回合末速度归1（加速为临时性的），但加上灵巧带来的速度提升
+    p1.speed = DefaultStats.BASE_SPEED + p1.agilityBoost;
+    p2.speed = DefaultStats.BASE_SPEED + p2.agilityBoost;
 
     // 情报同步：将本回合对方生效的效果追加进己方的 effectIntel（去重）
     if (result.p2ExposedEffects?.length) {

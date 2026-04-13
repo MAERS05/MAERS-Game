@@ -21,25 +21,23 @@ import { Action, EffectId } from '../../base/constants.js';
 export const WoundEffect = Object.freeze({
   id: EffectId.WOUND,
   name: '创伤',
-  desc: '命中后为目标附加伤口——下回合行动额外消耗 1 精力',
+  desc: '命中后为目标附加伤口——下回合结束时损失 1 点气数',
   staminaCost: 0,
   applicableTo: [Action.ATTACK],
 
   /**
-   * 后置钩子：攻击命中时调用，为目标打上伤口标记。
-   * @param {{
-   *   attackerId: string,
-   *   targetId:   string,
-   *   log:        object[],
-   *   nextState:  Record<string, { wound?: boolean }>
-   * }} ctx
+   * 后置钩子：攻击命中（造成伤害）时调用，为目标打上伤口标记。
+   * 下回合结算时将扣除目标一点气数。
+   * @param {object} ctx
+   * @param {object} selfState
+   * @param {object} oppState
+   * @param {number} dmgTaken
+   * @param {number} oppDmgTaken
    */
-  onHit(ctx) {
-    ctx.nextState[ctx.targetId].wound = true;
-    ctx.log.push({
-      kind: 'EFFECT_WOUND_APPLIED',
-      effectId: EffectId.WOUND,
-      targetId: ctx.targetId,
-    });
+  onPost(ctx, selfState, oppState, dmgTaken, oppDmgTaken) {
+    if (oppDmgTaken > 0) {
+      oppState.hpDrain = (oppState.hpDrain || 0) + 1;
+    }
   },
+
 });

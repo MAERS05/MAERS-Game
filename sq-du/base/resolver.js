@@ -78,32 +78,45 @@ export function resolve(p1Ctx, p2Ctx, p1State, p2State, bothInsighted, turn) {
   // ── 蓄力跨回合增益（基础设施，非效果定义）─────────────────
   if (p1Ctx.action === Action.ATTACK && p1State.chargeBoost) {
     p1Ctx = { ...p1Ctx, pts: p1Ctx.pts + p1State.chargeBoost };
-    p1State.chargeBoost = 0; // 已消耗，重置（newState 将同步回零）
   }
   if (p2Ctx.action === Action.ATTACK && p2State.chargeBoost) {
     p2Ctx = { ...p2Ctx, pts: p2Ctx.pts + p2State.chargeBoost };
-    p2State.chargeBoost = 0;
   }
 
   // ── 卸力跨回合补丁（ptsDebuff）─────────────────────────────
   if (p1Ctx.action === Action.ATTACK && p1State.ptsDebuff) {
     p1Ctx = { ...p1Ctx, pts: Math.max(1, p1Ctx.pts - p1State.ptsDebuff) };
-    p1State.ptsDebuff = 0;
   }
   if (p2Ctx.action === Action.ATTACK && p2State.ptsDebuff) {
     p2Ctx = { ...p2Ctx, pts: Math.max(1, p2Ctx.pts - p2State.ptsDebuff) };
-    p2State.ptsDebuff = 0;
   }
 
   // ── 固守跨回合增益（guardBoost）────────────────────────────
   if (p1Ctx.action === Action.GUARD && p1State.guardBoost) {
     p1Ctx = { ...p1Ctx, pts: p1Ctx.pts + p1State.guardBoost };
-    p1State.guardBoost = 0;
   }
   if (p2Ctx.action === Action.GUARD && p2State.guardBoost) {
     p2Ctx = { ...p2Ctx, pts: p2Ctx.pts + p2State.guardBoost };
-    p2State.guardBoost = 0;
   }
+
+  // ── 闪避跨回合增幅 / 衰减 ───────────────────────────────
+  if (p1Ctx.action === Action.DODGE) {
+    p1Ctx = { ...p1Ctx, pts: Math.max(1, p1Ctx.pts + (p1State.dodgeBoost || 0) - (p1State.dodgeDebuff || 0)) };
+  }
+  if (p2Ctx.action === Action.DODGE) {
+    p2Ctx = { ...p2Ctx, pts: Math.max(1, p2Ctx.pts + (p2State.dodgeBoost || 0) - (p2State.dodgeDebuff || 0)) };
+  }
+
+  // ==== 先消耗旧 hpDrain（上回合疯伤状态）====
+  if (p1State.hpDrain) p1State.hp = Math.max(0, p1State.hp - p1State.hpDrain);
+  if (p2State.hpDrain) p2State.hp = Math.max(0, p2State.hp - p2State.hpDrain);
+
+  // ==== 消耗所有旧状态（他们只生效一个回合） ====
+  p1State.chargeBoost = 0; p1State.ptsDebuff = 0; p1State.guardBoost = 0; p1State.guardDebuff = 0;
+  p1State.dodgeBoost = 0; p1State.dodgeDebuff = 0; p1State.staminaPenalty = 0; p1State.staminaDiscount = 0; p1State.hpDrain = 0; p1State.agilityBoost = 0;
+  
+  p2State.chargeBoost = 0; p2State.ptsDebuff = 0; p2State.guardBoost = 0; p2State.guardDebuff = 0;
+  p2State.dodgeBoost = 0; p2State.dodgeDebuff = 0; p2State.staminaPenalty = 0; p2State.staminaDiscount = 0; p2State.hpDrain = 0; p2State.agilityBoost = 0;
 
   // ── 效果层：顺位失效 + 前置修正（如铁壁、破甲）────────────
   const { ctx: p1CtxEff, triggered: p1TriggeredEffects } = _applyEffects(p1Ctx, p1State, p2Ctx);
@@ -121,16 +134,17 @@ export function resolve(p1Ctx, p2Ctx, p1State, p2State, bothInsighted, turn) {
   };
   const log = _executeTimeline(timeline, bs, p1CtxEff, p2CtxEff, p1TriggeredEffects, p2TriggeredEffects);
 
-  // ── 后置效果钩子（时间轴结算后，知晓实际受伤数）──────────
-  _applyPostEffects(p1CtxEff, p1State, p2State, p1TriggeredEffects, bs[PlayerId.P1].dmgReceived);
-  _applyPostEffects(p2CtxEff, p2State, p1State, p2TriggeredEffects, bs[PlayerId.P2].dmgReceived);
-
-  // ── 3. 从日志涌现推断情形，含处决覆盖 ────────────────────
+  // ── 从日志涌现推断情形，含处决覆盖 ────────
   const derived = _deriveClash(
     log, p1CtxEff, p2CtxEff, p1State, p2State,
     bs[PlayerId.P1].dmgReceived,
     bs[PlayerId.P2].dmgReceived
   );
+
+  // ── 后置效果钩子（时间轴结算后，知晓实际受伤数）──────────
+  // 注意传入自己和对方最终受到的伤害总数
+  _applyPostEffects(p1CtxEff, p1State, p2State, p1TriggeredEffects, bs[PlayerId.P1].dmgReceived, derived.finalDmgP2);
+  _applyPostEffects(p2CtxEff, p2State, p1State, p2TriggeredEffects, bs[PlayerId.P2].dmgReceived, derived.finalDmgP1);
 
   // ── 4. 构造并返回结果 ──────────────────────────────────────
   return _buildResult(
@@ -320,10 +334,10 @@ function _resolveSingleAttack(attack, bs, log) {
   if (target.shields.length > 0) {
     const best = target.shields.reduce((b, s) => s.pts > b.pts ? s : b);
     if (best.pts >= attack.pts) {
-      log.push({ kind: 'FORTIFY', attackerId: attack.actorId, defenderId: attack.targetId, shieldPts: best.pts, atkPts: attack.pts });
+      log.push({ kind: 'FORTIFY', attackerId: attack.actorId, defenderId: attack.targetId, shieldPts: best.pts, shieldSpeed: best.speed, atkPts: attack.pts, atkSpeed: attack.speed });
     } else {
       bs[attack.targetId].dmgReceived += 1;
-      log.push({ kind: 'BREAK', attackerId: attack.actorId, defenderId: attack.targetId, shieldPts: best.pts, atkPts: attack.pts });
+      log.push({ kind: 'BREAK', attackerId: attack.actorId, defenderId: attack.targetId, shieldPts: best.pts, shieldSpeed: best.speed, atkPts: attack.pts, atkSpeed: attack.speed });
     }
     return;
   }
@@ -490,37 +504,39 @@ function _deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2)
     const atkIsP1 = dodgeOutmaneuvered.attackerId === PlayerId.P1;
     clash = Clash.DODGE_OUTMANEUVERED;
     clashDesc = atkIsP1
-      ? `同等速度下，敌方的闪避幅度（${dodgeOutmaneuvered.dodgePts}）超过你的攻击（${dodgeOutmaneuvered.atkPts}），轻巧躲开！【虚步】`
-      : `同等速度下，你的闪避幅度（${dodgeOutmaneuvered.dodgePts}）超过敌方攻击（${dodgeOutmaneuvered.atkPts}），轻巧躲开！【虚步】`;
+      ? `同等速度（${dodgeOutmaneuvered.speed}）下，敌方的闪避幅度（${dodgeOutmaneuvered.dodgePts}）超过你的攻击（${dodgeOutmaneuvered.atkPts}），轻巧躲开！【虚步】`
+      : `同等速度（${dodgeOutmaneuvered.speed}）下，你的闪避幅度（${dodgeOutmaneuvered.dodgePts}）超过敌方攻击（${dodgeOutmaneuvered.atkPts}），轻巧躲开！【虚步】`;
 
   } else if (attackOverpowers) {
     // 同速，攻击点数 > 闪避幅度 → 强突
     const atkIsP1 = attackOverpowers.attackerId === PlayerId.P1;
     clash = Clash.ATTACK_OVERPOWERS;
     clashDesc = atkIsP1
-      ? `同等速度下，你的攻击（${attackOverpowers.atkPts}）压过敌方闪避幅度（${attackOverpowers.dodgePts}），强行命中！【强突】`
-      : `同等速度下，敌方攻击（${attackOverpowers.atkPts}）压过你的闪避幅度（${attackOverpowers.dodgePts}），强行命中！【强突】`;
+      ? `同等速度（${attackOverpowers.speed}）下，你的攻击（${attackOverpowers.atkPts}）压过敌方闪避幅度（${attackOverpowers.dodgePts}），强行命中！【强突】`
+      : `同等速度（${attackOverpowers.speed}）下，敌方攻击（${attackOverpowers.atkPts}）压过你的闪避幅度（${attackOverpowers.dodgePts}），强行命中！【强突】`;
 
   } else if (mutualHit) {
     // 同速且幅度相等 → 侥幸，双方互中，无效果触发
     clash = Clash.MUTUAL_HIT;
-    clashDesc = `速度（${mutualHit.speed}）与幅度（${mutualHit.dodgePts}）完全相当——双方擦肩而过，无事发生。【侥幸】`;
+    clashDesc = `速度（${mutualHit.speed}）与幅度（${mutualHit.dodgePts}）完全相当——双方擦肩而过，互相毫发无损。【侥幸】`;
 
   } else if (fortify) {
     // 盾牌就位，且硬度 >= 攻击点数：完全格挡
     const atkIsP1 = fortify.attackerId === PlayerId.P1;
     clash = Clash.FORTIFY;
+    let timingWord = fortify.shieldSpeed > fortify.atkSpeed ? "抢先" : "同速";
     clashDesc = atkIsP1
-      ? `敌方守备（${fortify.shieldPts}点）稳稳承接了你的攻击（${fortify.atkPts}点）——【坚固】，毫无损伤。`
-      : `你的守备（${fortify.shieldPts}点）稳稳承接了敌方的攻击（${fortify.atkPts}点）——【坚固】，毫无损伤。`;
+      ? `敌方凭借${timingWord}（速度${fortify.shieldSpeed}）拉起守备（${fortify.shieldPts}点），稳稳承接了你的攻击（${fortify.atkPts}点）——【坚固】，毫无损伤。`
+      : `你凭借${timingWord}（速度${fortify.shieldSpeed}）拉起守备（${fortify.shieldPts}点），稳稳承接了敌方的攻击（${fortify.atkPts}点）——【坚固】，毫无损伤。`;
 
   } else if (breakEvt) {
     // 盾牌就位，但硬度 < 攻击点数：攻击击穿
     const atkIsP1 = breakEvt.attackerId === PlayerId.P1;
     clash = Clash.BREAK;
+    let timingWord = breakEvt.shieldSpeed > breakEvt.atkSpeed ? "抢先" : "同速";
     clashDesc = atkIsP1
-      ? `你的攻击（${breakEvt.atkPts}点）击穿了敌方薄弱的守备（${breakEvt.shieldPts}点）——【破势】！`
-      : `敌方攻击（${breakEvt.atkPts}点）击穿了你薄弱的守备（${breakEvt.shieldPts}点）——【破势】！`;
+      ? `敌方虽凭借${timingWord}（速度${breakEvt.shieldSpeed}）完成设防（${breakEvt.shieldPts}点），但仍被你的攻击（${breakEvt.atkPts}点）无情击穿——【破势】！`
+      : `你虽凭借${timingWord}（速度${breakEvt.shieldSpeed}）完成设防（${breakEvt.shieldPts}点），但仍被敌方攻击（${breakEvt.atkPts}点）无情击穿——【破势】！`;
 
   } else if (hits.length === 1) {
     // 唯一一次 HIT：目标无防御 buff（守备/闪避未能在攻击前挂上）
@@ -580,13 +596,13 @@ function _buildResult(
     DefaultStats.MAX_STAMINA,
     (p1Ctx.action === Action.STANDBY
       ? p1State.stamina + 1
-      : Math.max(0, p1State.stamina - _calcCost(p1Ctx))) + p1Bonus
+      : Math.max(0, p1State.stamina - _calcCost(p1Ctx, p1State))) + p1Bonus
   );
   const newP2Stamina = Math.min(
     DefaultStats.MAX_STAMINA,
     (p2Ctx.action === Action.STANDBY
       ? p2State.stamina + 1
-      : Math.max(0, p2State.stamina - _calcCost(p2Ctx))) + p2Bonus
+      : Math.max(0, p2State.stamina - _calcCost(p2Ctx, p2State))) + p2Bonus
   );
 
   return {
@@ -604,11 +620,25 @@ function _buildResult(
       p1: { hp: newP1Hp, stamina: newP1Stamina,
              chargeBoost: p1State.chargeBoost || 0,
              ptsDebuff:   p1State.ptsDebuff   || 0,
-             guardBoost:  p1State.guardBoost  || 0 },
+             guardBoost:  p1State.guardBoost  || 0,
+             guardDebuff: p1State.guardDebuff || 0,
+             dodgeBoost:  p1State.dodgeBoost  || 0,
+             dodgeDebuff: p1State.dodgeDebuff || 0,
+             agilityBoost: p1State.agilityBoost || 0,
+             staminaPenalty:  p1State.staminaPenalty  || 0,
+             staminaDiscount: p1State.staminaDiscount || 0,
+             hpDrain:     p1State.hpDrain     || 0 },
       p2: { hp: newP2Hp, stamina: newP2Stamina,
              chargeBoost: p2State.chargeBoost || 0,
              ptsDebuff:   p2State.ptsDebuff   || 0,
-             guardBoost:  p2State.guardBoost  || 0 },
+             guardBoost:  p2State.guardBoost  || 0,
+             guardDebuff: p2State.guardDebuff || 0,
+             dodgeBoost:  p2State.dodgeBoost  || 0,
+             dodgeDebuff: p2State.dodgeDebuff || 0,
+             agilityBoost: p2State.agilityBoost || 0,
+             staminaPenalty:  p2State.staminaPenalty  || 0,
+             staminaDiscount: p2State.staminaDiscount || 0,
+             hpDrain:     p2State.hpDrain     || 0 },
     },
     // 情报暴露：本回合已生效的效果列表
     p1ExposedEffects,
@@ -617,9 +647,12 @@ function _buildResult(
 }
 
 /** 精力消耗（速度加速已在 engine 层提前支付，此处仅计行动本身） */
-function _calcCost(ctx) {
+function _calcCost(ctx, playerState) {
   if (ctx.action === Action.STANDBY) return 0;
-  return 1 + (ctx.enhance || 0);
+  const base = 1 + (ctx.enhance || 0);
+  const pen = playerState?.staminaPenalty || 0;
+  const dis = playerState?.staminaDiscount || 0;
+  return Math.max(0, base + pen - dis);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -680,12 +713,14 @@ function _applyEffects(ctx, state, oppCtxEff = null) {
  * @param {object}   oppState      - 对手 PlayerState（如 ptsDebuff 写入对手）
  * @param {string[]} triggeredEffects - 本回合已触发的效果 ID 列表
  * @param {number}   dmgTaken      - 本回合使用方受到的总伤害次数
+ * @param {number}   oppDmgTaken   - 本回合对方受到的总伤害次数（供攻击特效判定）
  */
-function _applyPostEffects(ctx, selfState, oppState, triggeredEffects, dmgTaken) {
+function _applyPostEffects(ctx, selfState, oppState, triggeredEffects, dmgTaken, oppDmgTaken) {
   for (const effectId of triggeredEffects) {
     const handler = EffectHandlers[effectId];
     if (handler?.onPost) {
-      handler.onPost(ctx, selfState, oppState, dmgTaken);
+      handler.onPost(ctx, selfState, oppState, dmgTaken, oppDmgTaken);
     }
   }
 }
+

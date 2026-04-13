@@ -48,6 +48,8 @@ const ui = {
   // 状态显示
   p1SpeedVal:   $('p1SpeedVal'),
   p2SpeedVal:   $('p2SpeedVal'),
+  p1StatusTray: $('p1-status'),
+  p2StatusTray: $('p2-status'),
   // 行动按钮
   btnDodge:     $('btn-dodge'),
   btnGuard:     $('btn-guard'),
@@ -88,6 +90,7 @@ const ui = {
   // 情报框
   intelBox:       $('intelBox'),
   intelList:      $('intelList'),
+  p2IntelBtn:     $('p2IntelBtn'),
   // 装备期
   equipOverlay:   $('equipOverlay'),
   equipCountdown: $('equipCountdown'),
@@ -347,8 +350,8 @@ ui.battleLog.addEventListener('click', () => {
     ui.turnIndicator.textContent = "TURN 1";
     ui.battleLog.querySelector('.log-hint').textContent = "点击关闭，开始下一回合";
     
-    initUI();
     engine.restartGame();
+    initUI();
     resetForNewTurn();
   }
 });
@@ -527,18 +530,33 @@ engine.on(EngineEvent.TURN_RESOLVED, result => {
   updatePips('p2-hp',   result.newState.p2.hp,       DefaultStats.MAX_HP,      'hp');
   updatePips('p2-stam', result.newState.p2.stamina,  DefaultStats.MAX_STAMINA, 'stam');
 
+  updateStatusIcons(PlayerId.P1, result.newState.p1);
+  updateStatusIcons(PlayerId.P2, result.newState.p2);
+
   ui.p1SpeedVal.textContent = DefaultStats.BASE_SPEED;
   ui.p2SpeedVal.textContent = DefaultStats.BASE_SPEED;
 
+  const p1Eff = formatEffects(result.p1Action);
+  const p2Eff = formatEffects(result.p2Action);
+
+  let extDesc = result.clashDesc;
+  if (p1Eff || p2Eff) {
+    extDesc += `<br><br><span style="color:var(--text-muted);font-size:0.9em;opacity:0.8;">` +
+      (p1Eff ? `你的携带效果：【${p1Eff}】` : '') +
+      (p1Eff && p2Eff ? '<br>' : '') +
+      (p2Eff ? `敌方携带效果：【${p2Eff}】` : '') +
+      `</span>`;
+  }
+
   ui.clashName.textContent = result.clashName;
-  ui.logDetail.innerHTML   = result.clashDesc;
+  ui.logDetail.innerHTML   = extDesc;
   ui.battleLog.classList.add('show');
 
   matchHistory.push(`
     <div style="color:var(--text-main);font-weight:bold;margin-bottom:4px">
       [TURN ${result.turn}] ${result.clashName}
     </div>
-    <div style="color:var(--text-muted)">${result.clashDesc}</div>
+    <div style="color:var(--text-muted)">${extDesc}</div>
     ${result.damageToP1 > 0 ? `<div style="color:var(--color-hp)">你受到 ${result.damageToP1} 次伤害</div>` : ''}
     ${result.damageToP2 > 0 ? `<div style="color:var(--color-atk)">敌方受到 ${result.damageToP2} 次伤害</div>` : ''}
   `);
@@ -549,8 +567,11 @@ engine.on(EngineEvent.TURN_RESOLVED, result => {
     resetForNewTurn();
   }
 
-  // 情报框：每回合结算后刷新
+  // 情报框：每回合结算后刷新并短暂自动显示
   updateIntelBox();
+  if (engine.getSnapshot().players[PlayerId.P1].effectIntel?.length > 0) {
+    showTemporaryIntelBox();
+  }
 });
 
 engine.on(EngineEvent.GAME_OVER, ({ reason }) => {
@@ -565,6 +586,15 @@ engine.on(EngineEvent.GAME_OVER, ({ reason }) => {
 // ═══════════════════════════════════════════════════════
 // 辅助渲染
 // ═══════════════════════════════════════════════════════
+
+function formatEffects(actionCtx) {
+  if (!actionCtx || !actionCtx.effects) return '';
+  const names = actionCtx.effects
+    .filter(id => id !== null)
+    .map(id => EffectDefs[id]?.name)
+    .filter(Boolean);
+  return names.length > 0 ? names.join('、') : '';
+}
 
 function updateHistoryUI() {
   if (!matchHistory.length) return;
@@ -598,6 +628,53 @@ function initUI() {
   ui.p2Arc.style.strokeDashoffset = 0;
   ui.p1Sec.textContent = TimerConfig.DECISION_TIME;
   ui.p2Sec.textContent = TimerConfig.DECISION_TIME;
+
+  updateStatusIcons(PlayerId.P1, engine.getSnapshot().players[PlayerId.P1]);
+  updateStatusIcons(PlayerId.P2, engine.getSnapshot().players[PlayerId.P2]);
+}
+
+function updateStatusIcons(playerId, state) {
+  const tray = playerId === PlayerId.P1 ? ui.p1StatusTray : ui.p2StatusTray;
+  if (!tray) return;
+  tray.innerHTML = '';
+  
+  const addIcon = (filename, title) => {
+    const img = document.createElement('img');
+    img.className = 'status-icon';
+    img.src = `ui/sq-du/effect/${filename}`;
+    
+    // 点击查看说明（移动端友好）
+    img.onclick = (e) => {
+      e.stopPropagation();
+      const tooltip = playerId === PlayerId.P1 
+        ? document.getElementById('p1StatusTooltip') 
+        : document.getElementById('p2StatusTooltip');
+      
+      if (!tooltip) return;
+      if (tooltip._timeoutId) clearTimeout(tooltip._timeoutId);
+      
+      document.querySelectorAll('.status-tooltip').forEach(el => el.classList.remove('show'));
+      tooltip.textContent = title;
+      tooltip.classList.add('show');
+      
+      tooltip._timeoutId = setTimeout(() => {
+        tooltip.classList.remove('show');
+      }, 2000);
+    };
+    
+    tray.appendChild(img);
+  };
+  
+  if (state.staminaPenalty > 0)  addIcon('tired.svg', `本回合增加 ${state.staminaPenalty} 点精力消耗`);
+  if (state.staminaDiscount > 0) addIcon('excited.svg', `本回合减少 ${state.staminaDiscount} 点精力消耗`);
+  if (state.guardBoost > 0)      addIcon('shield.svg', `本回合守备点数增加 ${state.guardBoost}`);
+  if (state.guardDebuff > 0)     addIcon('broken-shield.svg', `本回合守备点数减少 ${state.guardDebuff}`);
+  if (state.chargeBoost > 0)     addIcon('strong.svg', `本回合攻击点数增加 ${state.chargeBoost}`);
+  if (state.ptsDebuff > 0)       addIcon('broken-knife.svg', `本回合攻击点数减少 ${state.ptsDebuff}`);
+  if (state.dodgeBoost > 0)      addIcon('fast.svg', `本回合闪避点数增加 ${state.dodgeBoost}`);
+  if (state.dodgeDebuff > 0)     addIcon('heavy.svg', `本回合闪避点数减少 ${state.dodgeDebuff}`);
+  if (state.agilityBoost > 0)    addIcon('eye.svg', `本回合速度增加 ${state.agilityBoost}`);
+  if (state.hpDrain > 0)         addIcon('wound.svg', `本回合结束时损失 ${state.hpDrain} 点气数`);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -846,14 +923,68 @@ function updateIntelBox() {
     return;
   }
 
+  const grouped = {
+    [Action.ATTACK]: [],
+    [Action.GUARD]: [],
+    [Action.DODGE]: []
+  };
+
+  const actionName = {
+    [Action.ATTACK]: '攻击',
+    [Action.GUARD]: '守备',
+    [Action.DODGE]: '闪避',
+  };
+
+  // 分类归档
   intel.forEach(effectId => {
     const def = EffectDefs[effectId];
     if (!def) return;
+    def.applicableTo.forEach(act => {
+      if (grouped[act]) grouped[act].push(def);
+    });
+  });
 
-    const tag = document.createElement('div');
-    tag.className = 'intel-tag';
-    tag.innerHTML = `${def.name}<span>${def.desc}</span>`;
-    ui.intelList.appendChild(tag);
+  // 渲染各类别
+  [Action.ATTACK, Action.GUARD, Action.DODGE].forEach(act => {
+    if (grouped[act].length === 0) return;
+    
+    const groupDiv = document.createElement('div');
+    groupDiv.className = 'intel-group';
+    
+    const titleDiv = document.createElement('div');
+    titleDiv.className = 'intel-group-title';
+    titleDiv.textContent = actionName[act];
+    groupDiv.appendChild(titleDiv);
+    
+    const tagsDiv = document.createElement('div');
+    tagsDiv.className = 'intel-group-tags';
+    
+    grouped[act].forEach(def => {
+      const tag = document.createElement('div');
+      tag.className = 'intel-tag';
+      tag.innerHTML = `<strong>${def.name}</strong><span>${def.desc}</span>`;
+      tagsDiv.appendChild(tag);
+    });
+    
+    groupDiv.appendChild(tagsDiv);
+    ui.intelList.appendChild(groupDiv);
+  });
+}
+
+function showTemporaryIntelBox() {
+  ui.intelBox.classList.add('show');
+  if (ui.intelBox._timeoutId) clearTimeout(ui.intelBox._timeoutId);
+  ui.intelBox._timeoutId = setTimeout(() => {
+    ui.intelBox.classList.remove('show');
+  }, 2000);
+}
+
+// 绑定 P2 人物框的情报图标点击事件
+if (ui.p2IntelBtn) {
+  ui.p2IntelBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    ui.intelBox.classList.toggle('show');
+    if (ui.intelBox._timeoutId) clearTimeout(ui.intelBox._timeoutId);
   });
 }
 
