@@ -37,7 +37,7 @@ import {
 
 import { DualTimer } from './timer.js';
 import { resolve } from './resolver.js';
-import { scheduleAI, scheduleAIRedecide } from '../ai/ai-base.js';
+import { scheduleAI, scheduleAIRedecide } from '../ai/ai-scheduler.js';
 import '../ai/ai-manual.js'; // 初始化 ManualAI 测试工具挂载到 window
 
 // ─────────────────────────────────────────────
