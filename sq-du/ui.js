@@ -768,12 +768,12 @@ function refreshEquipSlots() {
 /** 打开效果库弹窗，供指定 (action, slot) 选择 */
 function openEffectPicker(action, slot) {
   _pickCtx = { action, slot };
+  ui.effectPickerList.scrollTop = 0; // 切换动作或槽位时，重置列表滚动位置
+  ui.effectPickerList.innerHTML = '';
 
   const snap = engine.getSnapshot();
   const p1 = snap.players[PlayerId.P1];
   const inv = p1.effectInventory?.[action] ?? [];
-
-  ui.effectPickerList.innerHTML = '';
 
   // 已装备在其他槽的效果 ID 集合（不含当前槽）
   const equippedElsewhere = new Set(
@@ -892,11 +892,15 @@ ui.equipOverlay.addEventListener('click', e => {
     return;
   }
 
-  // 常规流程：打开效果库
+  // 常规流程：打开或切换效果库
   if (ui.effectPicker.classList.contains('show')) {
-    ui.effectPicker.classList.remove('show');
-    _pickCtx = null;
-    return;
+    const isSame = _pickCtx && _pickCtx.action === action && _pickCtx.slot === slot;
+    if (isSame) {
+      ui.effectPicker.classList.remove('show');
+      _pickCtx = null;
+      return;
+    }
+    // 如果点的是另一个槽，不再执行 return，而是直接透传给下方的 openEffectPicker 重新刷新内容
   }
   openEffectPicker(action, slot);
 });

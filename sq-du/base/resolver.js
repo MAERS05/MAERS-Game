@@ -617,18 +617,24 @@ function _buildResult(
   // 精力结算：待命 +1，行动消耗 cost；借势 staminaBonus 在成功出赵后加回
   const p1Bonus = p1State.staminaBonus || 0;
   const p2Bonus = p2State.staminaBonus || 0;
-  const newP1Stamina = Math.min(
-    DefaultStats.MAX_STAMINA,
-    (p1Ctx.action === Action.STANDBY
-      ? p1State.stamina + 1
-      : Math.max(0, p1State.stamina - _calcCost(p1Ctx, p1State))) + p1Bonus
-  );
-  const newP2Stamina = Math.min(
-    DefaultStats.MAX_STAMINA,
-    (p2Ctx.action === Action.STANDBY
-      ? p2State.stamina + 1
-      : Math.max(0, p2State.stamina - _calcCost(p2Ctx, p2State))) + p2Bonus
-  );
+  let newP1Stamina = p1State.stamina;
+  let newP2Stamina = p2State.stamina;
+
+  // 如果是识破结束的废回合，不再产生任何行动耗能，也不触发待命的回能
+  if (clash !== Clash.INSIGHT_CLASH) {
+    newP1Stamina = Math.min(
+      DefaultStats.MAX_STAMINA,
+      (p1Ctx.action === Action.STANDBY
+        ? p1State.stamina + 1
+        : Math.max(0, p1State.stamina - _calcCost(p1Ctx, p1State))) + p1Bonus
+    );
+    newP2Stamina = Math.min(
+      DefaultStats.MAX_STAMINA,
+      (p2Ctx.action === Action.STANDBY
+        ? p2State.stamina + 1
+        : Math.max(0, p2State.stamina - _calcCost(p2Ctx, p2State))) + p2Bonus
+    );
+  }
 
   return {
     turn,
