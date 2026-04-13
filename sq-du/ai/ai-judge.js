@@ -17,35 +17,25 @@ export class AIJudgeLayer {
   /**
    * AI 决策主入口。
    *
-   * 聚合三条独立维度（来自基础逻辑层）：行事类型、速度、强化
-   * 并执行验证流程。
-   *
    * @param {import('../base/constants.js').PlayerState} ai
    * @param {import('../base/constants.js').PlayerState} player
    * @param {Array} history
    * @returns {Partial<import('../base/constants.js').ActionCtx>}
    */
   static buildDecision(ai, player, history = []) {
-    const penalty = ai.staminaPenalty || 0;
-    const discount = ai.staminaDiscount || 0;
-    const effectiveMinCost = Math.max(0, 1 + penalty - discount);
+    const effectiveStamina = AIBaseLogic.getEffectiveStamina(ai);
 
-    if (ai.stamina < effectiveMinCost) {
+    if (effectiveStamina <= 0) {
       return { action: Action.STANDBY, enhance: 0, speed: DefaultStats.BASE_SPEED };
     }
 
-    // ── Axis 0：情势快照（基础层下发数值） ─────────────
-    const snap = AIBaseLogic.snapshot(ai, player, history);
-
-    // ── Axis 1/2/3：向基础逻辑层索取涌现值 ─────────────────
-    const action = AIBaseLogic.pickAction(snap, ai);
+    const snap     = AIBaseLogic.snapshot(ai, player, history);
+    const action   = AIBaseLogic.pickAction(snap, ai);
     const speedRaw = AIBaseLogic.pickSpeed(snap, action, ai);
     const enhanceRaw = AIBaseLogic.pickEnhance(snap, action, ai);
 
-    // ── 预算验证：裁判层执行统一约束检查 ────────────
     const { speed, enhance } = this.validateBudget(ai, action, speedRaw, enhanceRaw);
 
-    // ── Axis 4：效果轴（交由扩展层接手配装）──
     const effects = AIExtraLayer.pickEffects(action, enhance, ai, { player, isRedecide: false });
     return AIEnhaceLayer.constrainDecision(
       { action, enhance, speed, effects },
@@ -55,114 +45,37 @@ export class AIJudgeLayer {
 
   /**
    * AI 重新决策核心：已知对手意图时的完美信息分轴决策。
-   * 与标准决策共享预算与效果系统，但权重判定算法基于确定的盘面。
+   *
+   * 核心改动：根据已知的对手行动进行明确的克制选择，而非仅依赖权重叠加。
    *
    * @param {import('../base/constants.js').PlayerState} ai
    * @param {import('../base/constants.js').PlayerState} player
    * @param {import('../base/constants.js').ActionCtx}   revealedAction
+   * @param {Array} history
    * @returns {Partial<import('../base/constants.js').ActionCtx>}
    */
   static buildRedecideDecision(ai, player, revealedAction, history = []) {
-    const rdPenalty = ai.staminaPenalty || 0;
-    const rdDiscount = ai.staminaDiscount || 0;
-    const rdEffectiveMinCost = Math.max(0, 1 + rdPenalty - rdDiscount);
+    const effectiveStamina = AIBaseLogic.getEffectiveStamina(ai);
 
-    if (ai.stamina < rdEffectiveMinCost) {
+    if (effectiveStamina <= 0) {
       return { action: Action.STANDBY, enhance: 0, speed: DefaultStats.BASE_SPEED };
     }
 
-    const snap = AIBaseLogic.snapshot(ai, player, history);
+    const snap    = AIBaseLogic.snapshot(ai, player, history);
+    const indicators = AIBaseLogic.buildIndicators(snap, effectiveStamina);
     const revealed = revealedAction ?? {
       action: Action.STANDBY, speed: DefaultStats.BASE_SPEED, enhance: 0, pts: 0,
     };
 
-    const w = { attack: 1.0, guard: 1.0, dodge: 1.0, standby: 0.2 };
-    const rdEffectiveStamina = ai.stamina + (ai.staminaDiscount || 0) - (ai.staminaPenalty || 0);
-    const indicators = AIBaseLogic.buildIndicators(snap, rdEffectiveStamina);
+    // ── 完美信息克制逻辑 ────────────────────────────────
+    // 知道对手底牌后，AI 应以最优反制策略为第一优先级
+    const action = this._pickCounterAction(revealed, snap, ai, effectiveStamina, indicators);
 
-    if (player.stamina <= 0) { w.attack += 9; w.guard *= 0.1; w.dodge *= 0.1; w.standby *= 0.05; }
-    const aiHpPressure = 1 - snap.aiHpRatio;
-    w.guard += aiHpPressure * 2.0;
-    w.dodge += aiHpPressure * 1.2;
-    if (rdEffectiveStamina >= 2) w.attack += (1 - snap.playerHpRatio) * 2.5;
-    if (rdEffectiveStamina <= 1 && player.hp > 1 && player.stamina > 0) {
-      w.standby += 3.0;
-      w.attack -= 0.6;
-      w.dodge -= 0.3;
-    }
-    if (rdEffectiveStamina <= 2 && snap.playerHpRatio > 0.35) {
-      w.standby += 1.2;
-      w.attack -= 0.3;
-    }
+    // ── 速度决策（在已知对手速度的前提下精确超速）────────
+    const speedRaw = this._pickCounterSpeed(revealed, snap, action, ai, effectiveStamina);
 
-    const REVEAL_W = 3.8;
-
-    const attackNature = {
-      [Action.ATTACK]: 1.0,
-      [Action.DODGE]: 0.2,
-      [Action.GUARD]: -0.2,
-      [Action.STANDBY]: -0.5,
-    }[revealed.action] ?? 0;
-
-    const passiveNature = {
-      [Action.STANDBY]: 1.2,
-      [Action.GUARD]: 1.0,
-      [Action.DODGE]: 0.4,
-      [Action.ATTACK]: -0.3,
-    }[revealed.action] ?? 0;
-
-    w.guard += attackNature * REVEAL_W * 1.3;
-    w.dodge += attackNature * REVEAL_W * 0.8;
-    w.attack -= attackNature * REVEAL_W * 0.4;
-
-    w.attack += passiveNature * REVEAL_W * 1.5;
-    w.guard -= passiveNature * REVEAL_W * 0.3;
-    w.dodge -= passiveNature * REVEAL_W * 0.3;
-
-    const action = AIBaseLogic.pickSmartAction({
-      [Action.ATTACK]: Math.max(0, w.attack),
-      [Action.GUARD]: Math.max(0, w.guard),
-      [Action.DODGE]: Math.max(0, w.dodge),
-      [Action.STANDBY]: Math.max(0, w.standby),
-    }, indicators);
-
-    const revealedSpeed = revealed.speed ?? DefaultStats.BASE_SPEED;
-    let speedBoostWeight = 0;
-    speedBoostWeight += (revealedSpeed - DefaultStats.BASE_SPEED) * 1.5;
-    if (action === Action.DODGE) speedBoostWeight += 1.5;
-
-    speedBoostWeight += (snap.aiStaminaRatio - 0.9) * 4.0;
-    const playerWeakness = 1 - Math.max(snap.playerHpRatio, snap.playerStaminaRatio);
-    speedBoostWeight += playerWeakness * 2.0;
-
-    const availableForBoost = rdEffectiveStamina - 1;
-    if (availableForBoost <= 1 && snap.playerHpRatio > 0.4) {
-      speedBoostWeight -= 0.5;
-    }
-    const staminaConserve = Math.max(0.45, Math.min(1.0, snap.aiStaminaRatio + 0.15));
-    const boostProb = Math.max(0, Math.min(0.75, (0.16 + speedBoostWeight * 0.22) * staminaConserve));
-    const speedBoostRaw = (availableForBoost > 0 && Math.random() < boostProb) ? 1 : 0;
-    const speedRaw = DefaultStats.BASE_SPEED + speedBoostRaw;
-
-    let enhanceRaw = 0;
-    if (action !== Action.STANDBY) {
-      const revealedPts = revealed.pts ?? (1 + (revealed.enhance ?? 0));
-      let enhWeight = 0;
-      enhWeight += revealedPts * 0.5;
-      enhWeight += (snap.aiStaminaRatio - 0.9) * 4.0;
-      enhWeight += playerWeakness * 2.5;
-
-      const rdBaseCost = Math.max(0, 1 + rdPenalty - rdDiscount);
-      const canEnhance = rdEffectiveStamina >= rdBaseCost + 1;
-      if (canEnhance) {
-        if (snap.aiStaminaRatio < 0.45 && snap.playerHpRatio > 0.35) {
-          enhanceRaw = 0;
-        } else {
-          const enhProb = Math.max(0, Math.min(0.75, (0.12 + enhWeight * 0.24) * staminaConserve));
-          enhanceRaw = Math.random() < enhProb ? 1 : 0;
-        }
-      }
-    }
+    // ── 强化决策（针对已知行动强化力度）─────────────────
+    const enhanceRaw = this._pickCounterEnhance(revealed, snap, action, ai, effectiveStamina, indicators);
 
     const { speed, enhance } = this.validateBudget(ai, action, speedRaw, enhanceRaw);
     const effects = AIExtraLayer.pickEffects(action, enhance, ai, { player, revealedAction: revealed, isRedecide: true });
@@ -173,12 +86,144 @@ export class AIJudgeLayer {
   }
 
   /**
+   * 完美信息下的克制行动选择。
+   * 对手出攻击 → 优先守备或闪避（根据点数与速度决定哪个更合适）。
+   * 对手出守备 → 优先攻击命中空隙或发动袭击。
+   * 对手待命   → 直接攻击。
+   */
+  static _pickCounterAction(revealed, snap, ai, effectiveStamina, indicators) {
+    const revealedAct = revealed.action;
+    const revealedPts = revealed.pts ?? (1 + (revealed.enhance ?? 0));
+    const revealedSpd = revealed.speed ?? DefaultStats.BASE_SPEED;
+    const aiKillWindow = indicators.killWindow > 0 || indicators.executeWindow > 0;
+
+    // 斩杀窗口永远优先出攻击
+    if (aiKillWindow && effectiveStamina >= 1) {
+      return Action.ATTACK;
+    }
+
+    // 对手出攻击时的反制
+    if (revealedAct === Action.ATTACK) {
+      if (effectiveStamina < 1) return Action.STANDBY;
+
+      // 低血量时优先闪避（不吃伤害）；高点数攻击时选守备（还可以反造伤害）
+      if (snap.aiHpRatio <= 0.25) return Action.DODGE;
+
+      // 对手攻击点数高（≥3）时守备更可靠
+      if (revealedPts >= 3) return Action.GUARD;
+
+      // 对手攻击速度快（≥3）时选闪避博命中差
+      if (revealedSpd >= 3) return Action.DODGE;
+
+      // 常规情况：守备克制攻击
+      return Math.random() < 0.60 ? Action.GUARD : Action.DODGE;
+    }
+
+    // 对手出守备时反制
+    if (revealedAct === Action.GUARD) {
+      if (effectiveStamina >= 2) {
+        // 足够精力且能打穿守备（需要 pts 比对手守备点数高）则强化攻击
+        // 否则待命回气，等更好时机
+        if (revealedPts >= 3 && snap.aiHpRatio > 0.3) {
+          // 对手守备点数高，硬攻不值，等待
+          return effectiveStamina >= 2 ? Action.STANDBY : Action.STANDBY;
+        }
+        return Action.ATTACK;
+      }
+      return Action.STANDBY;
+    }
+
+    // 对手出闪避时：攻击无效（会被闪开），选择待命或强化以做下回合准备
+    if (revealedAct === Action.DODGE) {
+      // 对手闪避中 → 尝试用速度压制（比闪避速度快则命中），否则待命
+      if (effectiveStamina >= 2) {
+        return Action.ATTACK; // 靠速度尝试在闪避前命中
+      }
+      return Action.STANDBY;
+    }
+
+    // 对手待命 → 进攻
+    if (revealedAct === Action.STANDBY) {
+      if (effectiveStamina >= 1) return Action.ATTACK;
+      return Action.STANDBY;
+    }
+
+    // 其他情形（兜底）：走基础逻辑
+    return AIBaseLogic.pickAction(snap, ai);
+  }
+
+  /**
+   * 完美信息下的速度选择。
+   * 对手出攻击：守备/闪避速度应超过对手攻击速度。
+   * 对手出守备/待命：加速没什么意义，保守为主。
+   */
+  static _pickCounterSpeed(revealed, snap, action, ai, effectiveStamina) {
+    const BASE = DefaultStats.BASE_SPEED;
+    const availableForBoost = effectiveStamina - 1;
+    if (availableForBoost <= 0) return BASE;
+
+    const revealedSpd = revealed.speed ?? BASE;
+    const revealedAct = revealed.action;
+
+    // 对手出攻击时：守备/闪避需要速度 > 对手速度才能提前就位
+    if (revealedAct === Action.ATTACK && (action === Action.GUARD || action === Action.DODGE)) {
+      // 如果对手速度超过 BASE，且有余量，一定加速
+      if (revealedSpd > BASE && availableForBoost >= 1) return BASE + 1;
+      // 对手 BASE 速时：随机50%加速（防止被预测）
+      if (revealedSpd <= BASE) return Math.random() < 0.40 ? BASE + 1 : BASE;
+    }
+
+    // 自身出攻击时对手出待命/守备：不需要特别快，节省精力
+    if (action === Action.ATTACK) {
+      const playerWeakness = 1 - Math.max(snap.playerHpRatio, snap.playerStaminaRatio);
+      const prob = Math.min(0.6, playerWeakness * 0.8 + (snap.aiStaminaRatio - 0.5) * 0.4);
+      return (availableForBoost >= 1 && Math.random() < prob) ? BASE + 1 : BASE;
+    }
+
+    return BASE;
+  }
+
+  /**
+   * 完美信息下的强化选择。
+   */
+  static _pickCounterEnhance(revealed, snap, action, ai, effectiveStamina, indicators) {
+    if (action === Action.STANDBY) return 0;
+    if (effectiveStamina < 2) return 0;
+
+    const revealedAct = revealed.action;
+    const revealedPts = revealed.pts ?? (1 + (revealed.enhance ?? 0));
+
+    // 对手守备：强化以打穿（攻击点数需 > 守备点数）
+    if (action === Action.ATTACK && revealedAct === Action.GUARD) {
+      // 如果不强化攻不穿（我方 pts=1，对手 pts≥1），强化
+      if (revealedPts >= 1 && effectiveStamina >= 2) return 1;
+    }
+
+    // 对手攻击时守备强化（提高防御点数，确保能扛住高强化攻击）
+    if (action === Action.GUARD && revealedAct === Action.ATTACK) {
+      if (revealedPts >= 2 && effectiveStamina >= 2) return 1;
+    }
+
+    // 闪避强化（提高规避点数）
+    if (action === Action.DODGE && revealedAct === Action.ATTACK) {
+      if (revealedPts >= 2 && effectiveStamina >= 2) return 1;
+    }
+
+    // 斩杀窗口：强化攻击
+    if (action === Action.ATTACK && (indicators.killWindow > 0 || indicators.executeWindow > 0)) {
+      return effectiveStamina >= 2 ? 1 : 0;
+    }
+
+    return 0;
+  }
+
+  /**
    * 统一精力预算验证。
    *
-   * 此函数按优先级裁剪多余开销：
-   *   1. 行动基础消耗（1 精力）—— 最高优先，不可裁剪
-   *   2. 速度加速消耗（0 或 1 精力）—— 中优先
-   *   3. 强化消耗（0 或 1 精力）—— 最低优先，先裁剪
+   * 按优先级裁剪多余开销：
+   *   1. 行动基础消耗（1 有效精力）—— 最高优先，不可裁剪
+   *   2. 速度加速消耗（0 或 1）—— 中优先
+   *   3. 强化消耗（0 或 1）—— 最低优先，先裁剪
    *
    * @param {import('../base/constants.js').PlayerState} ai
    * @param {string} action
@@ -193,28 +238,28 @@ export class AIJudgeLayer {
       return { speed: BASE, enhance: 0 };
     }
 
-    const effectiveStamina = ai.stamina + (ai.staminaDiscount || 0) - (ai.staminaPenalty || 0);
+    const effectiveStamina = AIBaseLogic.getEffectiveStamina(ai);
     const speedBoost = Math.max(0, speedRaw - BASE);
-    const baseCost = 1; // 基础行动耗费1点有效精力
+    const baseCost = 1;
 
     let finalSpeedBoost = speedBoost;
-    let finalEnhance = enhanceRaw;
-    let totalNeeded = finalSpeedBoost + baseCost + finalEnhance;
+    let finalEnhance    = enhanceRaw;
+    let totalNeeded     = finalSpeedBoost + baseCost + finalEnhance;
 
     if (totalNeeded > effectiveStamina) {
       finalEnhance = Math.max(0, effectiveStamina - finalSpeedBoost - baseCost);
-      totalNeeded = finalSpeedBoost + baseCost + finalEnhance;
+      totalNeeded  = finalSpeedBoost + baseCost + finalEnhance;
     }
 
     if (totalNeeded > effectiveStamina) {
       finalSpeedBoost = Math.max(0, effectiveStamina - baseCost);
-      finalEnhance = 0;
-      totalNeeded = finalSpeedBoost + baseCost;
+      finalEnhance    = 0;
+      totalNeeded     = finalSpeedBoost + baseCost;
     }
 
     if (totalNeeded > effectiveStamina) {
       finalSpeedBoost = 0;
-      finalEnhance = 0;
+      finalEnhance    = 0;
     }
 
     return { speed: BASE + finalSpeedBoost, enhance: finalEnhance };

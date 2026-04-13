@@ -54,13 +54,18 @@ export class AIExtraLayer {
       const hpCost = EffectDefs[id]?.hpCost || 0;
       if (hpCost > 0 && selfHarmHpCost + hpCost > maxSelfHarmHp) {
         // 再选这个效果会导致 HP 归零甚至自杀，跳过
+        this._removeFromPool(remainingPool, id);
         continue;
       }
       if (hpCost > 0 && lowHp) {
         // 低血量时尽量避免自伤效果，除非没有其他可选项
         const hasSafeAlternative = remainingPool.some(candidate => (EffectDefs[candidate]?.hpCost || 0) <= 0);
-        if (hasSafeAlternative) continue;
+        if (hasSafeAlternative) {
+          this._removeFromPool(remainingPool, id);
+          continue;
+        }
       }
+      this._removeFromPool(remainingPool, id);
       selfHarmHpCost += hpCost;
 
       result[filled] = id;
@@ -73,10 +78,13 @@ export class AIExtraLayer {
     if (!Array.isArray(pool) || pool.length === 0) return null;
     const scored = pool.map(id => ({ id, score: this._scoreEffect(id, action, ai, scene) }));
     scored.sort((a, b) => b.score - a.score);
-    const id = scored[0].id;
+    return scored[0].id;
+  }
+
+  static _removeFromPool(pool, id) {
+    if (!Array.isArray(pool)) return;
     const idx = pool.indexOf(id);
     if (idx >= 0) pool.splice(idx, 1);
-    return id;
   }
 
   static _scoreEffect(id, action, ai, scene) {
