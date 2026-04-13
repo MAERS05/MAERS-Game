@@ -169,13 +169,15 @@ function refreshPoints(stamina, speed) {
 
   const pen = p1.staminaPenalty || 0;
   const dis = p1.staminaDiscount || 0;
-  const minCost = Math.max(0, 1 + pen - dis);
-  const canAct = stamina >= minCost;
+  const effectiveStamina = stamina + dis - pen;
+  const canAct = effectiveStamina >= 1; // 基础行动必定消耗1点有效精力（待命除外但在选择栏位代表必然非待命）
   
   ui.btnAttack.toggleAttribute('disabled', !canAct);
   ui.btnGuard.toggleAttribute('disabled', !canAct);
   ui.btnDodge.toggleAttribute('disabled', !canAct);
-  ui.p1SpeedUp.disabled = p1.stamina <= minCost;
+  
+  // 要提速，必须在满足基础行动(1点)的前提下，还有多余的有效精力
+  ui.p1SpeedUp.disabled = effectiveStamina <= 1;
   ui.p1SpeedDown.disabled = p1.speed <= DefaultStats.BASE_SPEED;
 }
 

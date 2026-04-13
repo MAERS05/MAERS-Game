@@ -38,6 +38,7 @@ import {
 import { DualTimer } from './timer.js';
 import { resolve } from './resolver.js';
 import { scheduleAI, scheduleAIRedecide } from '../ai/ai-base.js';
+import '../ai/ai-manual.js'; // 初始化 ManualAI 测试工具挂载到 window
 
 // ─────────────────────────────────────────────
 // 事件总线（内部工具类）
@@ -285,11 +286,19 @@ export class BattleEngine {
       const delta = targetSpeed - currentSpeed;
 
       if (delta > 0) {
-        // 加速：逐级扣精力（每级 1 精力）
-        const affordable = Math.min(delta, p.stamina - 1); // 至少留 1 精力给行动
+        // 加速：逐级扣有效精力（每级 1 精力）
+        // 至少预留 1 点有效精力给基础攻击/闪避等行动
+        const effectiveStamina = p.stamina + (p.staminaDiscount || 0) - (p.staminaPenalty || 0);
+        const affordable = Math.min(delta, effectiveStamina - 1); 
         const actualBoost = Math.max(0, affordable);
+        
+        // 扣除精力（优先扣 discount）
+        for (let i = 0; i < actualBoost; i++) {
+          if (p.staminaDiscount > 0) p.staminaDiscount--;
+          else p.stamina--;
+        }
+        
         p.speed = currentSpeed + actualBoost;
-        p.stamina -= actualBoost;
         p.actionCtx.speed = p.speed;
       } else if (delta < 0) {
         // 降速：归还精力（重决策时可能改用更低速度）
@@ -319,19 +328,28 @@ export class BattleEngine {
     const p = this._players[playerId];
     if (!p || p.ready) return;
 
+    const effectiveStamina = p.stamina + (p.staminaDiscount || 0) - (p.staminaPenalty || 0);
+
     if (delta > 0) {
-      // 提速：消耗 1 精力
-      // 确保提速后仍能负担当前行动或可能选择的行动的精力代价
+      // 提速：单次消耗 1 点有效精力
       const effectiveActionCost = (p.actionCtx?.action && p.actionCtx.action !== Action.STANDBY)
         ? calcActionCost(p.actionCtx, p)
         : Math.max(0, 1 + (p.staminaPenalty || 0) - (p.staminaDiscount || 0));
-      // 提速后精力必须 >= 行动的有效代价
-      if (p.stamina - 1 < effectiveActionCost) return;
-      p.stamina--;
+      
+      // 提速后有效精力必须 >= 行动所需有效代价
+      if (effectiveStamina - 1 < effectiveActionCost) return;
+      
+      // 优先消耗一回合有效期的 discount
+      if (p.staminaDiscount > 0) {
+        p.staminaDiscount--;
+      } else {
+        p.stamina--;
+      }
       p.speed++;
     } else if (delta < 0) {
       if (p.speed <= DefaultStats.BASE_SPEED) return;
       p.speed--;
+      // 降速归还精力的逻辑：优先还给真实 stamina（保证回合后留存收益最高）
       p.stamina = Math.min(DefaultStats.MAX_STAMINA, p.stamina + 1);
     }
 
@@ -429,10 +447,18 @@ export class BattleEngine {
     const target = this._players[targetId];
     if (!caster || !target) return;
     if (caster.insightUsed) return;      // 每回合只能主动洞察一次
-    if (caster.stamina <= 0) return;     // 精力不足
+
+    const effectiveStamina = caster.stamina + (caster.staminaDiscount || 0) - (caster.staminaPenalty || 0);
+    if (effectiveStamina <= 0) return;   // 精力不足
     if (caster.ready) return;            // 已就绪则无需洞察
 
-    caster.stamina--;
+    // 优先消耗有效期只有一回合的 discount，防止体力被扣成负数
+    if (caster.staminaDiscount > 0) {
+      caster.staminaDiscount--;
+    } else {
+      caster.stamina--;
+    }
+
     caster.insightUsed = true;
     caster.pendingInsightTarget = targetId; // 标记目标，待其就绪时才揭示
     // 注意：不设置 target.wasInsighted。
@@ -743,7 +769,11 @@ export class BattleEngine {
 
         // PVE 模式：AI 利用已知的对手意图进行重决策
         if (this._mode === EngineMode.PVE && earlyId === PlayerId.P2) {
-          scheduleAIRedecide({
+          const aiDriver = (typeof window !== 'undefined' && window.DEBUG_AI?.active) 
+            ? window.DEBUG_AI 
+            : { scheduleAIRedecide };
+
+          aiDriver.scheduleAIRedecide({
             engineState: () => this._state,
             getState: () => ({
               ai: { ...this._players[PlayerId.P2] },
@@ -890,7 +920,11 @@ export class BattleEngine {
   _scheduleAI() {
     if (this._aiHandle) this._aiHandle.cancel();
 
-    this._aiHandle = scheduleAI({
+    const aiDriver = (typeof window !== 'undefined' && window.DEBUG_AI?.active) 
+      ? window.DEBUG_AI 
+      : { scheduleAI };
+
+    this._aiHandle = aiDriver.scheduleAI({
       engineState: () => this._state,
       getState: () => ({
         ai: { ...this._players[PlayerId.P2] },

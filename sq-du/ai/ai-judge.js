@@ -168,28 +168,26 @@ export class AIJudgeLayer {
       return { speed: BASE, enhance: 0 };
     }
 
-    const penalty = ai.staminaPenalty || 0;
-    const discount = ai.staminaDiscount || 0;
+    const effectiveStamina = ai.stamina + (ai.staminaDiscount || 0) - (ai.staminaPenalty || 0);
     const speedBoost = Math.max(0, speedRaw - BASE);
-    const baseCost = Math.max(0, 1 + penalty - discount);
-    const available = ai.stamina;
+    const baseCost = 1; // 基础行动耗费1点有效精力
 
     let finalSpeedBoost = speedBoost;
     let finalEnhance = enhanceRaw;
     let totalNeeded = finalSpeedBoost + baseCost + finalEnhance;
 
-    if (totalNeeded > available) {
-      finalEnhance = Math.max(0, available - finalSpeedBoost - baseCost);
+    if (totalNeeded > effectiveStamina) {
+      finalEnhance = Math.max(0, effectiveStamina - finalSpeedBoost - baseCost);
       totalNeeded = finalSpeedBoost + baseCost + finalEnhance;
     }
 
-    if (totalNeeded > available) {
-      finalSpeedBoost = Math.max(0, available - baseCost);
+    if (totalNeeded > effectiveStamina) {
+      finalSpeedBoost = Math.max(0, effectiveStamina - baseCost);
       finalEnhance = 0;
       totalNeeded = finalSpeedBoost + baseCost;
     }
 
-    if (totalNeeded > available) {
+    if (totalNeeded > effectiveStamina) {
       finalSpeedBoost = 0;
       finalEnhance = 0;
     }

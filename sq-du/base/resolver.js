@@ -33,7 +33,7 @@ export function resolve(p1Ctx, p2Ctx, p1State, p2State, bothInsighted, turn) {
   if (bothInsighted) {
     return JudgeLayer.buildFinalResult(
       turn, p1Ctx, p2Ctx, p1State, p2State,
-      null, true, [], []
+      null, true, [], [], 0, 0
     );
   }
 
@@ -43,8 +43,13 @@ export function resolve(p1Ctx, p2Ctx, p1State, p2State, bothInsighted, turn) {
     p1TriggeredEffects, p2TriggeredEffects 
   } = EffectLayer.processPreEffects(p1Ctx, p2Ctx, p1State, p2State);
 
+  // ── 1.5 快照本回合有效精力（前置处理后 discount/penalty 已确定，后置处理前尚未污染）─────────
+  // 处决检测必须用这一帧的数值，避免 onPost 写入的"下回合修正"干扰判断
+  const p1EntryEffective = p1State.stamina + (p1State.staminaDiscount || 0) - (p1State.staminaPenalty || 0);
+  const p2EntryEffective = p2State.stamina + (p2State.staminaDiscount || 0) - (p2State.staminaPenalty || 0);
+
   // ── 2. 裁判层：构建物理时间轴并推演博弈结果 ─────────
-  const { bs, derived } = JudgeLayer.evaluateTimeline(p1CtxEff, p2CtxEff, p1State, p2State);
+  const { bs, derived } = JudgeLayer.evaluateTimeline(p1CtxEff, p2CtxEff, p1State, p2State, p1EntryEffective, p2EntryEffective);
 
   // ── 3. 效果层（后置处理）：执行基于伤害或博弈结果的效果（如荆棘、受击增益）─────────
   EffectLayer.processPostEffects(
@@ -57,6 +62,8 @@ export function resolve(p1Ctx, p2Ctx, p1State, p2State, bothInsighted, turn) {
   // ── 4. 裁判层（最终裁定）：集成最终损伤、扣减/回复精力、整理账单并封装传出 ─────────
   return JudgeLayer.buildFinalResult(
     turn, p1CtxEff, p2CtxEff, p1State, p2State,
-    derived, false, p1TriggeredEffects, p2TriggeredEffects
+    derived, false, p1TriggeredEffects, p2TriggeredEffects,
+    p1EntryEffective, p2EntryEffective
   );
 }
+

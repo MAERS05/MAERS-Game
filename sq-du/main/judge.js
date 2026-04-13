@@ -18,7 +18,7 @@ export class JudgeLayer {
   /**
    * 计算基础博弈推演结果（时间轴引擎）
    */
-  static evaluateTimeline(p1CtxEff, p2CtxEff, p1State, p2State) {
+  static evaluateTimeline(p1CtxEff, p2CtxEff, p1State, p2State, p1EntryEffective = 0, p2EntryEffective = 0) {
     const timeline = [];
     this._addEvents(timeline, PlayerId.P1, p1CtxEff);
     this._addEvents(timeline, PlayerId.P2, p2CtxEff);
@@ -28,14 +28,13 @@ export class JudgeLayer {
       [PlayerId.P2]: { hp: p2State.hp, shields: [], evasions: [], dmgReceived: 0 },
     };
     
-    // 返回 log 和 bs 战场状态对象
     const log = this._executeTimeline(timeline, bs);
 
-    // 从日志推演胜负局势
     const derived = this._deriveClash(
       log, p1CtxEff, p2CtxEff, p1State, p2State,
       bs[PlayerId.P1].dmgReceived,
-      bs[PlayerId.P2].dmgReceived
+      bs[PlayerId.P2].dmgReceived,
+      p1EntryEffective, p2EntryEffective
     );
 
     return { log, bs, derived };
@@ -46,7 +45,8 @@ export class JudgeLayer {
    */
   static buildFinalResult(
     turn, p1CtxEff, p2CtxEff, p1State, p2State, 
-    derived, bothInsighted, p1TriggeredEffects, p2TriggeredEffects
+    derived, bothInsighted, p1TriggeredEffects, p2TriggeredEffects,
+    p1EntryEffective = 0, p2EntryEffective = 0
   ) {
     if (bothInsighted) {
       return this._buildResultObj(
@@ -160,7 +160,7 @@ export class JudgeLayer {
     log.push({ kind: 'HIT', attackerId: attack.actorId, targetId: attack.targetId, atkSpeed: attack.speed, atkPts: attack.pts });
   }
 
-  static _deriveClash(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2) {
+  static _deriveClash(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2, p1EntryEffective = 0, p2EntryEffective = 0) {
     const p1Act = p1Ctx.action;
     const p2Act = p2Ctx.action;
 
@@ -185,10 +185,10 @@ export class JudgeLayer {
     }
 
     if (p1Act === Action.ATTACK && p2Act === Action.STANDBY)
-      return this._withExecute(Clash.ONE_SIDE_ATTACK, `你趁敌方待命，以 ${p1Ctx.speed} 的最终速度发动攻击（最终点数 ${p1Ctx.pts}）——命中！`, rawDmgP1, rawDmgP2, p1State, p2State);
+      return this._withExecute(Clash.ONE_SIDE_ATTACK, `你趁敌方待命，以 ${p1Ctx.speed} 的最终速度发动攻击（最终点数 ${p1Ctx.pts}）——命中！`, rawDmgP1, rawDmgP2, p1State, p2State, p1EntryEffective, p2EntryEffective);
 
     if (p2Act === Action.ATTACK && p1Act === Action.STANDBY)
-      return this._withExecute(Clash.ONE_SIDE_ATTACK, `敌方趁你待命，以 ${p2Ctx.speed} 的最终速度发动攻击（最终点数 ${p2Ctx.pts}）——命中！`, rawDmgP1, rawDmgP2, p1State, p2State);
+      return this._withExecute(Clash.ONE_SIDE_ATTACK, `敌方趁你待命，以 ${p2Ctx.speed} 的最终速度发动攻击（最终点数 ${p2Ctx.pts}）——命中！`, rawDmgP1, rawDmgP2, p1State, p2State, p1EntryEffective, p2EntryEffective);
 
     if (p1Act !== Action.ATTACK && p2Act === Action.STANDBY) {
       const actName = p1Act === Action.GUARD ? '守备' : '闪避';
@@ -200,24 +200,30 @@ export class JudgeLayer {
       return this._zero(Clash.WASTED_ACTION, `敌方发动了${actName}（最终速度 ${p2Ctx.speed}、最终点数 ${p2Ctx.pts}），而你处于待命状态——行动毫无意义。`);
     }
 
-    return this._deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2);
+    return this._deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2, p1EntryEffective, p2EntryEffective);
   }
 
   static _zero(clash, clashDesc) {
     return { clash, clashDesc, executeP1: false, executeP2: false, finalDmgP1: 0, finalDmgP2: 0 };
   }
 
-  static _withExecute(clash, clashDesc, rawDmgP1, rawDmgP2, p1State, p2State) {
+  /**
+   * 处决逻辑：
+   * - rawDmgP1 > 0：攻击确实穿透到了 P1（非闪避/守备/对峙场合）
+   * - p1EntryEffective <= 0：P1 在本回合行动开始时有效精力已耗尽（含 discount 抵扣）
+   * 两个条件缺一不可，防止「闪避成功」「守备挡住」「对峙抵消」等无伤害情形误触发处决。
+   */
+  static _withExecute(clash, clashDesc, rawDmgP1, rawDmgP2, p1State, p2State, p1EntryEffective = 0, p2EntryEffective = 0) {
     let executeP1 = false, executeP2 = false;
     let finalDmgP1 = rawDmgP1, finalDmgP2 = rawDmgP2;
 
-    if (rawDmgP1 > 0 && p1State.stamina <= 0) {
+    if (rawDmgP1 > 0 && p1EntryEffective <= 0) {
       executeP1 = true;
       finalDmgP1 = p1State.hp;
       clash = Clash.EXECUTE;
       clashDesc = '你已精力耗尽——敌方的攻击将彻底终结这场战斗！【处决】';
     }
-    if (rawDmgP2 > 0 && p2State.stamina <= 0) {
+    if (rawDmgP2 > 0 && p2EntryEffective <= 0) {
       executeP2 = true;
       finalDmgP2 = p2State.hp;
       clash = Clash.EXECUTE;
@@ -227,7 +233,7 @@ export class JudgeLayer {
     return { clash, clashDesc, executeP1, executeP2, finalDmgP1, finalDmgP2 };
   }
 
-  static _deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2) {
+  static _deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2, p1EntryEffective = 0, p2EntryEffective = 0) {
     const confront = log.find(e => e.kind === 'CONFRONT');
     const suppress = log.find(e => e.kind === 'SUPPRESS');
     const hits = log.filter(e => e.kind === 'HIT');
@@ -335,7 +341,7 @@ export class JudgeLayer {
       clashDesc = '发生了不在预期内的交锋结果。';
     }
 
-    return this._withExecute(clash, clashDesc, rawDmgP1, rawDmgP2, p1State, p2State);
+    return this._withExecute(clash, clashDesc, rawDmgP1, rawDmgP2, p1State, p2State, p1EntryEffective, p2EntryEffective);
   }
 
   static _buildResultObj(
@@ -354,11 +360,12 @@ export class JudgeLayer {
     if (clash !== Clash.INSIGHT_CLASH) {
       const p1IsRealStandby = p1Ctx.action === Action.STANDBY && !p1Ctx.isCharge;
       const p2IsRealStandby = p2Ctx.action === Action.STANDBY && !p2Ctx.isCharge;
+      // 使用已冻结在 ctx 中的真实 cost，避免后置效果赋予的下回合 penalty 污染本回合结算
       newP1Stamina = Math.min(DefaultStats.MAX_STAMINA,
-        (p1IsRealStandby ? p1State.stamina + 1 : Math.max(0, p1State.stamina - calcActionCost(p1Ctx, p1State))) + p1Bonus
+        (p1IsRealStandby ? p1State.stamina + 1 : Math.max(0, p1State.stamina - (p1Ctx.cost || 0))) + p1Bonus
       );
       newP2Stamina = Math.min(DefaultStats.MAX_STAMINA,
-        (p2IsRealStandby ? p2State.stamina + 1 : Math.max(0, p2State.stamina - calcActionCost(p2Ctx, p2State))) + p2Bonus
+        (p2IsRealStandby ? p2State.stamina + 1 : Math.max(0, p2State.stamina - (p2Ctx.cost || 0))) + p2Bonus
       );
     }
 

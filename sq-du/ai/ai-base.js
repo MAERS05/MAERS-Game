@@ -156,11 +156,12 @@ export class AIBaseLogic {
     w.dodge += snap.oppAggression * 1.0;
     w.attack -= snap.oppAggression * 0.5;
 
-    const aiDiscount = ai.staminaDiscount || 0;
-    const aiPenalty = ai.staminaPenalty || 0;
-    const aiEffectiveCost = Math.max(0, 1 + aiPenalty - aiDiscount);
-    const aiEffectiveStamina = ai.stamina - aiEffectiveCost;
-    if (aiEffectiveStamina <= 0) {
+    const aiEffectiveStamina = ai.stamina + (ai.staminaDiscount || 0) - (ai.staminaPenalty || 0);
+    // 这里不再减去 penalty/discount，因为在 validBudget 里会统一基于 effectiveStamina 裁剪
+    const aiCostEstimate = 1; 
+    const aiRemainingStamina = aiEffectiveStamina - aiCostEstimate;
+    
+    if (aiRemainingStamina <= 0) {
       w.guard += 1.0;
       w.attack -= 0.5;
     }
