@@ -142,9 +142,9 @@ export function resolve(p1Ctx, p2Ctx, p1State, p2State, bothInsighted, turn) {
   );
 
   // ── 后置效果钩子（时间轴结算后，知晓实际受伤数）──────────
-  // 注意传入自己和对方最终受到的伤害总数
-  _applyPostEffects(p1CtxEff, p1State, p2State, p1TriggeredEffects, bs[PlayerId.P1].dmgReceived, derived.finalDmgP2);
-  _applyPostEffects(p2CtxEff, p2State, p1State, p2TriggeredEffects, bs[PlayerId.P2].dmgReceived, derived.finalDmgP1);
+  // 注意传入自己和对方最终受到的伤害总数，以及对方的 actionCtx（分辨假闪避）
+  _applyPostEffects(p1CtxEff, p1State, p2State, p1TriggeredEffects, bs[PlayerId.P1].dmgReceived, derived.finalDmgP2, p2CtxEff);
+  _applyPostEffects(p2CtxEff, p2State, p1State, p2TriggeredEffects, bs[PlayerId.P2].dmgReceived, derived.finalDmgP1, p1CtxEff);
 
   // ── 4. 构造并返回结果 ──────────────────────────────────────
   return _buildResult(
@@ -716,12 +716,13 @@ function _applyEffects(ctx, state, oppCtxEff = null) {
  * @param {string[]} triggeredEffects - 本回合已触发的效果 ID 列表
  * @param {number}   dmgTaken      - 本回合使用方受到的总伤害次数
  * @param {number}   oppDmgTaken   - 本回合对方受到的总伤害次数（供攻击特效判定）
+ * @param {object}   oppCtx        - 对方行动上下文（用于判断对方是否攻击）
  */
-function _applyPostEffects(ctx, selfState, oppState, triggeredEffects, dmgTaken, oppDmgTaken) {
+function _applyPostEffects(ctx, selfState, oppState, triggeredEffects, dmgTaken, oppDmgTaken, oppCtx) {
   for (const effectId of triggeredEffects) {
     const handler = EffectHandlers[effectId];
     if (handler?.onPost) {
-      handler.onPost(ctx, selfState, oppState, dmgTaken, oppDmgTaken);
+      handler.onPost(ctx, selfState, oppState, dmgTaken, oppDmgTaken, oppCtx);
     }
   }
 }

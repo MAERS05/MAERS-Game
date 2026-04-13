@@ -28,9 +28,11 @@ export const MomentumEffect = Object.freeze({
    * @param {object} selfState - 使用方 PlayerState（可写）
    * @param {object} oppState  - 对手 PlayerState（可写）
    * @param {number} dmgTaken  - 本回合使用方受到的总伤害次数
+   * @param {number} oppDmgTaken - 对手受到的伤害次数
+   * @param {object} oppCtx    - 对方的效果修正后 ActionCtx
    */
-  onPost(ctx, selfState, oppState, dmgTaken) {
-    if (ctx.action === Action.DODGE && dmgTaken === 0) {
+  onPost(ctx, selfState, oppState, dmgTaken, oppDmgTaken, oppCtx) {
+    if (ctx.action === Action.DODGE && dmgTaken === 0 && oppCtx && oppCtx.action === Action.ATTACK) {
       selfState.staminaBonus = (selfState.staminaBonus || 0) + 1;
     }
   },
