@@ -477,8 +477,8 @@ function _deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2)
     const winIsP1 = suppress.winnerId === PlayerId.P1;
     clash = Clash.SUPPRESS;
     clashDesc = winIsP1
-      ? `双方速度相同，但你最终点数占优（${suppress.winPts} > ${suppress.losePts}），完全压制了敌方！【压制】`
-      : `双方速度相同，但敌方最终点数占优（${suppress.winPts} > ${suppress.losePts}），完全压制了你！【压制】`;
+      ? `双方最终速度相同，但你最终点数占优（${suppress.winPts} > ${suppress.losePts}），完全压制了敌方！【压制】`
+      : `双方最终速度相同，但敌方最终点数占优（${suppress.winPts} > ${suppress.losePts}），完全压制了你！【压制】`;
 
   } else if (hits.length >= 2) {
     // 两次命中，发生在不同速度 tick → 较快者先打，较慢者后打（互相命中）
@@ -486,37 +486,37 @@ function _deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2)
     const fastSpeed = firstIsP1 ? p1Ctx.speed : p2Ctx.speed;
     clash = Clash.PREEMPT;
     clashDesc = firstIsP1
-      ? `你凭借速度（${fastSpeed}）率先命中敌方，随后敌方反击命中你。【抢攻】`
-      : `敌方凭借速度（${fastSpeed}）率先命中你，随后你反击命中敌方。【抢攻】`;
+      ? `你凭借最终速度（${fastSpeed}）率先命中敌方，随后敌方反击命中你。【抢攻】`
+      : `敌方凭借最终速度（${fastSpeed}）率先命中你，随后你反击命中敌方。【抢攻】`;
 
   } else if (evade) {
     // 闪避速度 > 攻速：闪避 buff 已就位，攻击落空
     const atkIsP1 = evade.attackerId === PlayerId.P1;
     clash = Clash.EVADE;
     clashDesc = atkIsP1
-      ? `敌方的闪避速度（${evade.dodgeSpeed}）高于你的攻击速度（${evade.atkSpeed}），如鬼魅般躲开。【规避】`
-      : `你的闪避速度（${evade.dodgeSpeed}）高于敌方攻击速度（${evade.atkSpeed}），如残影般闪过。【规避】`;
+      ? `敌方的闪避最终速度（${evade.dodgeSpeed}）高于你的攻击最终速度（${evade.atkSpeed}），如鬼魅般躲开。【规避】`
+      : `你的闪避最终速度（${evade.dodgeSpeed}）高于敌方攻击最终速度（${evade.atkSpeed}），如残影般闪过。【规避】`;
 
   } else if (dodgeOutmaneuvered) {
     // 同速，闪避幅度 > 攻击点数 → 虚步
     const atkIsP1 = dodgeOutmaneuvered.attackerId === PlayerId.P1;
     clash = Clash.DODGE_OUTMANEUVERED;
     clashDesc = atkIsP1
-      ? `同等速度（${dodgeOutmaneuvered.speed}）下，敌方的闪避最终点数（${dodgeOutmaneuvered.dodgePts}）超过你的攻击最终点数（${dodgeOutmaneuvered.atkPts}），轻巧躲开！【虚步】`
-      : `同等速度（${dodgeOutmaneuvered.speed}）下，你的闪避最终点数（${dodgeOutmaneuvered.dodgePts}）超过敌方攻击最终点数（${dodgeOutmaneuvered.atkPts}），轻巧躲开！【虚步】`;
+      ? `同等最终速度（${dodgeOutmaneuvered.speed}）下，敌方的闪避最终点数（${dodgeOutmaneuvered.dodgePts}）超过你的攻击最终点数（${dodgeOutmaneuvered.atkPts}），轻巧躲开！【虚步】`
+      : `同等最终速度（${dodgeOutmaneuvered.speed}）下，你的闪避最终点数（${dodgeOutmaneuvered.dodgePts}）超过敌方攻击最终点数（${dodgeOutmaneuvered.atkPts}），轻巧躲开！【虚步】`;
 
   } else if (attackOverpowers) {
     // 同速，攻击点数 > 闪避幅度 → 强突
     const atkIsP1 = attackOverpowers.attackerId === PlayerId.P1;
     clash = Clash.ATTACK_OVERPOWERS;
     clashDesc = atkIsP1
-      ? `同等速度（${attackOverpowers.speed}）下，你的攻击最终点数（${attackOverpowers.atkPts}）压过敌方闪避最终点数（${attackOverpowers.dodgePts}），强行命中！【强突】`
-      : `同等速度（${attackOverpowers.speed}）下，敌方攻击最终点数（${attackOverpowers.atkPts}）压过你的闪避最终点数（${attackOverpowers.dodgePts}），强行命中！【强突】`;
+      ? `同等最终速度（${attackOverpowers.speed}）下，你的攻击最终点数（${attackOverpowers.atkPts}）压过敌方闪避最终点数（${attackOverpowers.dodgePts}），强行命中！【强突】`
+      : `同等最终速度（${attackOverpowers.speed}）下，敌方攻击最终点数（${attackOverpowers.atkPts}）压过你的闪避最终点数（${attackOverpowers.dodgePts}），强行命中！【强突】`;
 
   } else if (mutualHit) {
     // 同速且幅度相等 → 侥幸，双方互中，无效果触发
     clash = Clash.MUTUAL_HIT;
-    clashDesc = `速度（${mutualHit.speed}）与最终点数（${mutualHit.dodgePts}）完全相当——双方擦肩而过，互相毫发无损。【侥幸】`;
+    clashDesc = `最终速度（${mutualHit.speed}）与最终点数（${mutualHit.dodgePts}）完全相当——双方擦肩而过，互相毫发无损。【侥幸】`;
 
   } else if (fortify) {
     // 盾牌就位，且硬度 >= 攻击点数：完全格挡
@@ -524,8 +524,8 @@ function _deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2)
     clash = Clash.FORTIFY;
     let timingWord = fortify.shieldSpeed > fortify.atkSpeed ? "抢先" : "同速";
     clashDesc = atkIsP1
-      ? `敌方凭借${timingWord}（速度${fortify.shieldSpeed}）拉起守备（最终点数${fortify.shieldPts}），稳稳承接了你的攻击（最终点数${fortify.atkPts}）——【坚固】，毫无损伤。`
-      : `你凭借${timingWord}（速度${fortify.shieldSpeed}）拉起守备（最终点数${fortify.shieldPts}），稳稳承接了敌方的攻击（最终点数${fortify.atkPts}）——【坚固】，毫无损伤。`;
+      ? `敌方凭借${timingWord}（最终速度${fortify.shieldSpeed}）拉起守备（最终点数${fortify.shieldPts}），稳稳承接了你的攻击（最终点数${fortify.atkPts}）——【坚固】，毫无损伤。`
+      : `你凭借${timingWord}（最终速度${fortify.shieldSpeed}）拉起守备（最终点数${fortify.shieldPts}），稳稳承接了敌方的攻击（最终点数${fortify.atkPts}）——【坚固】，毫无损伤。`;
 
   } else if (breakEvt) {
     // 盾牌就位，但硬度 < 攻击点数：攻击击穿
@@ -533,8 +533,8 @@ function _deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2)
     clash = Clash.BREAK;
     let timingWord = breakEvt.shieldSpeed > breakEvt.atkSpeed ? "抢先" : "同速";
     clashDesc = atkIsP1
-      ? `敌方虽凭借${timingWord}（速度${breakEvt.shieldSpeed}）完成设防（最终点数 ${breakEvt.shieldPts}），但仍被你的攻击最终点数（${breakEvt.atkPts}）无情击穿——【破势】！`
-      : `你虽凭借${timingWord}（速度${breakEvt.shieldSpeed}）完成设防（最终点数 ${breakEvt.shieldPts}），但仍被敌方攻击最终点数（${breakEvt.atkPts}）无情击穿——【破势】！`;
+      ? `敌方虽凭借${timingWord}（最终速度${breakEvt.shieldSpeed}）完成设防（最终点数 ${breakEvt.shieldPts}），但仍被你的攻击最终点数（${breakEvt.atkPts}）无情击穿——【破势】！`
+      : `你虽凭借${timingWord}（最终速度${breakEvt.shieldSpeed}）完成设防（最终点数 ${breakEvt.shieldPts}），但仍被敌方攻击最终点数（${breakEvt.atkPts}）无情击穿——【破势】！`;
 
   } else if (hits.length === 1) {
     // 唯一一次 HIT：目标无防御 buff（守备/闪避未能在攻击前挂上）
@@ -546,20 +546,20 @@ function _deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2)
       // 目标选了守备，但攻击速度更快，守备 buff 的 tick 还没到
       clash = Clash.RAID;
       clashDesc = atkIsP1
-        ? `你的速度（${hit.atkSpeed}）超过敌方守备速度（${targetCtx.speed}），撕破防线——命中！【袭击】`
-        : `敌方速度（${hit.atkSpeed}）超过你的守备速度（${targetCtx.speed}），撕破防线——命中！【袭击】`;
+        ? `你的最终速度（${hit.atkSpeed}）超过敌方守备最终速度（${targetCtx.speed}），撕破防线——命中！【袭击】`
+        : `敌方最终速度（${hit.atkSpeed}）超过你的守备最终速度（${targetCtx.speed}），撕破防线——命中！【袭击】`;
     } else if (targetCtx.action === Action.DODGE) {
       // 目标选了闪避，但攻击速度更快，闪避 buff 的 tick 还没到
       clash = Clash.SWIFT_STRIKE;
       clashDesc = atkIsP1
-        ? `你的速度（${hit.atkSpeed}）超过敌方闪避速度（${targetCtx.speed}），抢先命中！【迅攻】`
-        : `敌方速度（${hit.atkSpeed}）超过你的闪避速度（${targetCtx.speed}），抢先命中！【迅攻】`;
+        ? `你的最终速度（${hit.atkSpeed}）超过敌方闪避最终速度（${targetCtx.speed}），抢先命中！【迅攻】`
+        : `敌方最终速度（${hit.atkSpeed}）超过你的闪避最终速度（${targetCtx.speed}），抢先命中！【迅攻】`;
     } else {
       // 兜底（理论上不应到达：攻击方主动命中非防御目标）
       clash = Clash.ONE_SIDE_ATTACK;
       clashDesc = atkIsP1
-        ? `你的攻击（速度 ${hit.atkSpeed}，最终点数 ${hit.atkPts}）命中敌方。`
-        : `敌方攻击（速度 ${hit.atkSpeed}，最终点数 ${hit.atkPts}）命中你。`;
+        ? `你的攻击（最终速度 ${hit.atkSpeed}，最终点数 ${hit.atkPts}）命中敌方。`
+        : `敌方攻击（最终速度 ${hit.atkSpeed}，最终点数 ${hit.atkPts}）命中你。`;
     }
 
   } else {

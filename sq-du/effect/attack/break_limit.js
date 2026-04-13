@@ -17,7 +17,7 @@ import { Action, EffectId } from '../../base/constants.js';
 export const BreakLimitEffect = Object.freeze({
   id: EffectId.BREAK_LIMIT,
   name: '破限',
-  desc: '消耗自身 1 点气数，本回合攻击 +1 速度',
+  desc: '消耗自身 1 点气数，本回合攻击 +1 最终速度',
   applicableTo: [Action.ATTACK],
 
   /**

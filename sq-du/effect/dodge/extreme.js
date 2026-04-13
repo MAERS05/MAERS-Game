@@ -14,7 +14,7 @@ import { Action, EffectId } from '../../base/constants.js';
 export const ExtremeEffect = Object.freeze({
   id: EffectId.EXTREME,
   name: '极限',
-  desc: '消耗自身 1 点气数，本回合闪避 +1 速度',
+  desc: '消耗自身 1 点气数，本回合闪避 +1 最终速度',
   applicableTo: [Action.DODGE],
 
   /**

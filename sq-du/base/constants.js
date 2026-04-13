@@ -305,7 +305,7 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.BREAK_LIMIT]: {
     id: EffectId.BREAK_LIMIT, name: '破限',
-    desc: '消耗自身 1 点气数，本回合攻击 +1 速度',
+    desc: '消耗自身 1 点气数，本回合攻击 +1 最终速度',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.CHARGE]: {
@@ -355,7 +355,7 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.AGILITY]: {
     id: EffectId.AGILITY, name: '灵巧',
-    desc: '闪避成功后下回合速度 +1',
+    desc: '闪避成功后下回合最终速度 +1',
     applicableTo: [Action.DODGE],
   },
   [EffectId.AFTERIMAGE]: {
@@ -365,7 +365,7 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.EXTREME]: {
     id: EffectId.EXTREME, name: '极限',
-    desc: '消耗自身 1 点气数，本回合闪避 +1 速度',
+    desc: '消耗自身 1 点气数，本回合闪避 +1 最终速度',
     applicableTo: [Action.DODGE],
   },
   [EffectId.MOMENTUM]: {
