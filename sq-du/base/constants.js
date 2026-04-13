@@ -301,7 +301,7 @@ export const EffectId = Object.freeze({
 export const EffectDefs = Object.freeze({
   [EffectId.WOUND]: {
     id: EffectId.WOUND, name: '创伤',
-    desc: '命中后为目标附加伤口——下回合结束时损失 1 点气数',
+    desc: '攻击成功，对方下回合结束时损失 1 点气数',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.BREAK_QI]: {
@@ -336,7 +336,7 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.REBOUND]: {
     id: EffectId.REBOUND, name: '反震',
-    desc: '守备成功抵挡攻击时，对攻击方反弹 1 次伤害',
+    desc: '守备成功时对攻击方反弹 1 次攻击',
     applicableTo: [Action.GUARD],
   },
   [EffectId.AURA_SHIELD]: {
@@ -351,7 +351,7 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.ENTRENCH]: {
     id: EffectId.ENTRENCH, name: '固守',
-    desc: '本回合未受到伤害，下回合守备 +1 最终点数',
+    desc: '守备成功时下回合守备 +1 最终点数',
     applicableTo: [Action.GUARD],
   },
   [EffectId.IRON_WALL]: {
@@ -371,7 +371,7 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.AGILITY]: {
     id: EffectId.AGILITY, name: '灵巧',
-    desc: '闪避成功后下回合最终速度 +1',
+    desc: '闪避成功时下回合最终速度 +1',
     applicableTo: [Action.DODGE],
   },
   [EffectId.AFTERIMAGE]: {
