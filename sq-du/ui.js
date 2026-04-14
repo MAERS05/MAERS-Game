@@ -11,7 +11,7 @@
  * 扩展指南：
  *  - 新增 UI 组件：在 DOM 引用区添加引用，在对应事件处理器中更新
  *  - 新增效果项：由此文件的 renderEffectList() 函数动态生成，
- *    效果定义由外部数据层（effect/ 目录）提供
+ *    效果定义由外部数据层（skill/ 目录）提供
  */
 
 'use strict';
@@ -24,6 +24,7 @@ import {
 } from './base/constants.js';
 import { EffectHandlers } from './base/effect-handlers.js';
 import { EffectLayer } from './main/effect.js';
+import { EffectTimingLabel } from './effect/timing-constants.js';
 
 // ─── 常量 ─────────────────────────────────────────────
 const RING_CIRC = 226.195; // 2π × 36（SVG 弧长）
@@ -33,6 +34,11 @@ const engine = new BattleEngine(EngineMode.PVE, {
   p1Name: '少女',
   p2Name: '马厄斯',
 });
+
+// ─── 调试暴露 (仅供控制台使用) ──────────────────────────
+window.engine = engine;
+window.Action = Action;
+window.PlayerId = PlayerId;
 
 function getEffectMeta(effectId) {
   const handler = EffectHandlers[effectId] || {};
@@ -78,6 +84,7 @@ const ui = {
   declineRedecideBtn: $('declineRedecideBtn'),
   waitingLabel: $('waitingLabel'),
   insightBtn: $('insightBtn'),
+  cancelActionBtn: $('cancelActionBtn'),
   // 行动配置面板
   actionConfigPanel: $('actionConfigPanel'),
   configCloseBtn: $('configCloseBtn'),
@@ -159,69 +166,102 @@ function updateRing(arc, ringWrap, secEl, phaseEl, remaining, phase, ready, isOp
 }
 
 /** 刷新 HP / 精力格 pip 状态 */
-function updatePips(prefix, current, max, type) {
+function updatePips(prefix, current, max, type, playerState) {
+  const penalty = playerState?.staminaPenalty || 0;
+  const discount = playerState?.staminaDiscount || 0;
+
   for (let i = 1; i <= max; i++) {
     const el = $(`${prefix}-${i}`);
     if (!el) continue;
-    if (type === 'hp') el.classList.toggle('lost', i > current);
-    if (type === 'stam') el.classList.toggle('spent', i <= max - current);
+
+    // 清除特殊状态
+    el.classList.remove('lost', 'spent', 'penalty', 'discount');
+
+    if (type === 'hp') {
+      if (i > current) el.classList.add('lost');
+    } else if (type === 'stam') {
+      const idxFromRight = max - i + 1; // 1是第一格（最下面/左边），从上往下花
+      // 真实消耗的
+      if (idxFromRight > current) {
+        el.classList.add('spent');
+      }
+      // 在当前的顶部添加 penalty 的视觉（虚假扣除）
+      else if (idxFromRight > current - penalty) {
+        el.classList.add('penalty');
+      }
+      // 如果超出了真实容量，但受到了 discount（不在此UI做超出绘制，只在已有格子上发光）
+      else if (discount > 0 && idxFromRight === current) {
+        el.classList.add('discount');
+      }
+    }
   }
 }
 
 /** 实时计算包含了当前行动消耗在内的预期精力 */
 
-/** 当前可用于“是否还能执行一次行为/洞察”的有效精力 */
+/** 当前可用于“是否还能执行一次行为/洞察”的真实剩余原始资源 */
 function getEffectiveStamina(player) {
-  return (player.stamina || 0) + (player.staminaDiscount || 0) - (player.staminaPenalty || 0);
+  return (player.stamina || 0) + (player.staminaDiscount || 0);
 }
 
 /** 统一渲染双方资源与基础状态（避免真实值/投影值显示不一致） */
 function renderPlayerResources(p1, p2) {
-  updatePips('p1-hp', p1.hp, DefaultStats.MAX_HP, 'hp');
-  updatePips('p1-stam', p1.stamina, DefaultStats.MAX_STAMINA, 'stam');
-  ui.p1SpeedVal.textContent = p1.speed;
+  updatePips('p1-hp', p1.hp, DefaultStats.MAX_HP, 'hp', p1);
+  updatePips('p1-stam', p1.stamina, DefaultStats.MAX_STAMINA, 'stam', p1);
+  const p1ActSpeed = p1.speed + (p1.agilityBoost || 0) - (p1.agilityDebuff || 0);
+  ui.p1SpeedVal.textContent = Math.max(0, p1ActSpeed);
 
   const canExposeEnemy = EffectLayer.canExposeOpponentRuntime(p1, p2, enemyInfoUnlocked);
 
   // 未被遮罩时，持续刷新敌方“最后已知状态”
   if (canExposeEnemy) {
-    enemyFogState = { hp: p2.hp, stamina: p2.stamina, speed: p2.speed };
+    enemyFogState = { hp: p2.hp, stamina: p2.stamina, speed: p2.speed, staminaPenalty: p2.staminaPenalty, staminaDiscount: p2.staminaDiscount };
   }
 
-  const showEnemy = canExposeEnemy ? { hp: p2.hp, stamina: p2.stamina, speed: p2.speed } : enemyFogState;
+  const showEnemy = canExposeEnemy ? { ...p2 } : enemyFogState;
 
-  if (showEnemy.hp == null || showEnemy.stamina == null || showEnemy.speed == null) {
-    updatePips('p2-hp', 0, DefaultStats.MAX_HP, 'hp');
-    updatePips('p2-stam', 0, DefaultStats.MAX_STAMINA, 'stam');
+  if (showEnemy.hp == null) {
+    updatePips('p2-hp', 0, DefaultStats.MAX_HP, 'hp', showEnemy);
+    updatePips('p2-stam', 0, DefaultStats.MAX_STAMINA, 'stam', showEnemy);
     ui.p2SpeedVal.textContent = '?';
   } else {
-    updatePips('p2-hp', showEnemy.hp, DefaultStats.MAX_HP, 'hp');
-    updatePips('p2-stam', showEnemy.stamina, DefaultStats.MAX_STAMINA, 'stam');
-    ui.p2SpeedVal.textContent = showEnemy.speed;
+    updatePips('p2-hp', showEnemy.hp, DefaultStats.MAX_HP, 'hp', showEnemy);
+    updatePips('p2-stam', showEnemy.stamina, DefaultStats.MAX_STAMINA, 'stam', showEnemy);
+    const p2ActSpeed = showEnemy.speed + (p2.agilityBoost || 0) - (p2.agilityDebuff || 0);
+    ui.p2SpeedVal.textContent = Math.max(0, p2ActSpeed);
   }
 }
 
 /** 刷新行动按钮上的点数显示，并根据精力控制按钮可用性 */
-function refreshPoints(stamina, speed) {
-  const atkPt = 1 + (selectedAction === 'attack' ? localEnhance : 0);
-  const grdPt = 1 + (selectedAction === 'guard' ? localEnhance : 0);
-  const dgePt = 1 + (selectedAction === 'dodge' ? localEnhance : 0);
-
-  ui.ptAttack.textContent = atkPt;
-  ui.ptGuard.textContent = grdPt;
-  ui.ptDodge.textContent = dgePt;
-
+function refreshPoints() {
   const snap = engine.getSnapshot();
   const p1 = snap.players[PlayerId.P1];
 
-  const pen = p1.staminaPenalty || 0;
-  const dis = p1.staminaDiscount || 0;
-  const effectiveStamina = stamina + dis - pen;
-  const canAct = effectiveStamina >= 1; // 基础行动必定消耗1点有效精力（待命除外但在选择栏位代表必然非待命）
+  let atkPt = 1 + (selectedAction === 'attack' ? localEnhance : 0) + (p1.chargeBoost || 0) - (p1.ptsDebuff || 0);
+  let grdPt = 1 + (selectedAction === 'guard' ? localEnhance : 0) + (p1.guardBoost || 0) - (p1.guardDebuff || 0);
+  let dgePt = 1 + (selectedAction === 'dodge' ? localEnhance : 0) + (p1.dodgeBoost || 0) - (p1.dodgeDebuff || 0);
 
-  ui.btnAttack.toggleAttribute('disabled', !canAct);
-  ui.btnGuard.toggleAttribute('disabled', !canAct);
-  ui.btnDodge.toggleAttribute('disabled', !canAct);
+  ui.ptAttack.textContent = Math.max(0, atkPt);
+  ui.ptGuard.textContent = Math.max(0, grdPt);
+  ui.ptDodge.textContent = Math.max(0, dgePt);
+
+  const effectiveStamina = getEffectiveStamina(p1);
+  // 如果你处于待命状态，你需要至少 1 点资源来发起行动（即使有高额的 penalty，只要求你余额非空）。
+  // 如果你已经选中了一个行动，你已经支付了基础成本（包括 penalty），随时可以无缝切换到其他同级选项或取消它，所以必定可以点击。
+  const canAct = effectiveStamina >= 1 || !!selectedAction;
+  const blocked = p1.actionBlocked || [];
+
+  ui.btnAttack.toggleAttribute('disabled', !canAct || blocked.includes(Action.ATTACK));
+  ui.btnGuard.toggleAttribute('disabled', !canAct || blocked.includes(Action.GUARD));
+  ui.btnDodge.toggleAttribute('disabled', !canAct || blocked.includes(Action.DODGE));
+
+  // 若当前已选中的行动被封锁，立即取消选择
+  if (selectedAction && blocked.includes(Action[selectedAction.toUpperCase()])) {
+    cancelSelection();
+  }
+
+  // 取消行为按钮：只要有行动被选中就显示
+  ui.cancelActionBtn.classList.toggle('visible', !!selectedAction);
 
   // 只要还有有效精力即可提速；是否透支行动由玩家自行选择
   ui.p1SpeedUp.disabled = effectiveStamina <= 0;
@@ -293,13 +333,14 @@ function selectAction(type, btn) {
   const snap = engine.getSnapshot();
   const p1 = snap.players[PlayerId.P1];
   if (p1.ready) return;
-  // 真正无可用精力时，禁止再选择攻击/守备/闪避
-  if (getEffectiveStamina(p1) < 1) return;
-
+  if (btn.hasAttribute('disabled')) return;
   if (selectedAction === type) {
     cancelSelection();
     return;
   }
+
+  // 真正无可用精力时，禁止选择新的攻击/守备/闪避
+  if (getEffectiveStamina(p1) < 1) return;
 
   document.querySelectorAll('.act-btn').forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
@@ -320,7 +361,7 @@ function cancelSelection() {
   engine.submitAction(PlayerId.P1, { action: Action.STANDBY, enhance: 0 });
   ui.actionConfigPanel.classList.remove('show');
   const snap = engine.getSnapshot();
-  refreshPoints(snap.players[PlayerId.P1].stamina, snap.players[PlayerId.P1].speed);
+  refreshPoints();
 }
 
 /** 新回合开始时重置 P1 操作区 */
@@ -331,7 +372,6 @@ function resetForNewTurn() {
   enemyInfoUnlocked = false;
   document.querySelectorAll('.act-btn').forEach(b => {
     b.classList.remove('selected');
-    b.removeAttribute('disabled');
   });
   ui.actionConfigPanel.classList.remove('show');
   ui.p1RingWrap.classList.remove('is-ready');
@@ -345,7 +385,7 @@ function resetForNewTurn() {
 
   const snap = engine.getSnapshot();
   const p1 = snap.players[PlayerId.P1];
-  refreshPoints(p1.stamina, p1.speed);
+  refreshPoints();
 
   // 新回合开始时，记录敌方目前的真实状态作为本回合的基础情报
   // 若本回合未执行洞察，玩家看到的敌方血量、精力、速度将一直“锁定”在这个初始快照
@@ -368,6 +408,14 @@ function resetForNewTurn() {
 ui.btnDodge.addEventListener('click', () => selectAction('dodge', ui.btnDodge));
 ui.btnGuard.addEventListener('click', () => selectAction('guard', ui.btnGuard));
 ui.btnAttack.addEventListener('click', () => selectAction('attack', ui.btnAttack));
+
+// 取消行为按钮：无论精力多少，直接取消已选行动并退还精力
+ui.cancelActionBtn.addEventListener('click', () => {
+  if (isGameOver) return;
+  const snap = engine.getSnapshot();
+  if (snap.players[PlayerId.P1].ready) return;
+  cancelSelection();
+});
 
 ui.p1SpeedUp.addEventListener('click', () => engine.adjustSpeed(PlayerId.P1, +1));
 ui.p1SpeedDown.addEventListener('click', () => engine.adjustSpeed(PlayerId.P1, -1));
@@ -491,7 +539,7 @@ function enforceUIConstraints(p1) {
   if (selectedAction) {
     // 即时扣费模式：基础行动成本已在选行动时扣除。
     // 当前剩余精力只决定“还能再强化几次”。
-    const maxEnhance = Math.max(0, p1.stamina);
+    const maxEnhance = Math.max(0, localEnhance + p1.stamina);
     if (localEnhance > maxEnhance) {
       localEnhance = maxEnhance;
       engine.submitAction(PlayerId.P1, { enhance: localEnhance });
@@ -507,7 +555,7 @@ engine.on(EngineEvent.ACTION_UPDATED, ({ playerId }) => {
   const p1 = snap.players[PlayerId.P1];
   if (playerId === PlayerId.P1) {
     if (!enforceUIConstraints(p1)) return;
-    refreshPoints(p1.stamina, p1.speed);
+    refreshPoints();
     ui.p1SpeedVal.textContent = p1.speed;
   }
   // 敌方即时变化是否可见，统一交给 renderPlayerResources/可见性策略处理
@@ -596,6 +644,20 @@ engine.on(EngineEvent.PASSIVE_INSIGHT, ({ targetId, revealedAction, revealed }) 
   }
 });
 
+// 所有引擎内部阶段变化，在此统一同步渲染（单一数据源）
+// 引擎发出的格式：{ phaseEvent, state: getSnapshot() }
+engine.on(EngineEvent.PHASE_STATE_SYNC, ({ state }) => {
+  const p1 = state.players[PlayerId.P1];
+  const p2 = state.players[PlayerId.P2];
+  if (!p1 || !p2) return; // 引擎初始化完成前不渲染
+  renderPlayerResources(p1, p2);
+  updateStatusIcons(PlayerId.P1, p1);
+  if (!p2.ready || enemyInfoUnlocked) {
+    updateStatusIcons(PlayerId.P2, p2);
+  }
+  refreshPoints(); // 包含速度、可用行为状态的刷新
+});
+
 engine.on(EngineEvent.ACTIVE_INSIGHT, ({ casterId, revealedAction, revealed }) => {
   if (casterId === PlayerId.P1) {
     if (revealed && revealedAction) {
@@ -618,7 +680,7 @@ engine.on(EngineEvent.ACTIVE_INSIGHT, ({ casterId, revealedAction, revealed }) =
     if (!enforceUIConstraints(p1)) return;
 
     updatePips('p1-stam', p1.stamina, DefaultStats.MAX_STAMINA, 'stam');
-    refreshPoints(p1.stamina, p1.speed);
+    refreshPoints();
 
     if (!p1.ready) {
       ui.insightBtn.disabled = p1.insightUsed || getEffectiveStamina(p1) < 1;
@@ -808,7 +870,7 @@ function initUI() {
   updatePips('p1-stam', DefaultStats.MAX_STAMINA, DefaultStats.MAX_STAMINA, 'stam');
   updatePips('p2-hp', DefaultStats.MAX_HP, DefaultStats.MAX_HP, 'hp');
   updatePips('p2-stam', DefaultStats.MAX_STAMINA, DefaultStats.MAX_STAMINA, 'stam');
-  refreshPoints(DefaultStats.MAX_STAMINA, DefaultStats.BASE_SPEED);
+  refreshPoints();
 
   ui.p1Arc.style.strokeDashoffset = 0;
   ui.p2Arc.style.strokeDashoffset = 0;
@@ -824,7 +886,7 @@ function updateStatusIcons(playerId, state) {
   if (!tray) return;
   tray.innerHTML = '';
 
-  const addIcon = (filename, title) => {
+  const addIcon = (filename, effectText, timingKey) => {
     const img = document.createElement('img');
     img.className = 'status-icon';
     img.src = `sq-du/effect/${filename}`;
@@ -839,7 +901,10 @@ function updateStatusIcons(playerId, state) {
       if (tooltip._timeoutId) clearTimeout(tooltip._timeoutId);
 
       document.querySelectorAll('.status-tooltip').forEach(el => el.classList.remove('show'));
-      tooltip.textContent = title;
+      const timingLabel = timingKey ? (EffectTimingLabel[timingKey] || timingKey) : null;
+      tooltip.textContent = timingLabel
+        ? `时机：${timingLabel} 效果：${effectText}`
+        : `效果：${effectText}`;
       tooltip.classList.add('show');
 
       tooltip._timeoutId = setTimeout(() => {
@@ -850,17 +915,27 @@ function updateStatusIcons(playerId, state) {
     tray.appendChild(img);
   };
 
-  if (state.staminaPenalty > 0) addIcon('tired.svg', `本回合精力消耗 +${state.staminaPenalty}`);
-  if (state.staminaDiscount > 0) addIcon('excited.svg', `本回合精力消耗 -${state.staminaDiscount}`);
-  if (state.guardBoost > 0) addIcon('shield.svg', `本回合守备点数 +${state.guardBoost}`);
-  if (state.guardDebuff > 0) addIcon('broken-shield.svg', `本回合守备点数 -${state.guardDebuff}`);
-  if (state.chargeBoost > 0) addIcon('strong.svg', `本回合攻击点数 +${state.chargeBoost}`);
-  if (state.ptsDebuff > 0) addIcon('broken-knife.svg', `本回合攻击点数 -${state.ptsDebuff}`);
-  if (state.dodgeBoost > 0) addIcon('avoid.svg', `本回合闪避点数 +${state.dodgeBoost}`);
-  if (state.dodgeDebuff > 0) addIcon('heavy.svg', `本回合闪避点数 -${state.dodgeDebuff}`);
-  if (state.agilityBoost > 0) addIcon('fast.svg', `本回合动速 +${state.agilityBoost}`);
-  if (state.agilityDebuff > 0) addIcon('slow.svg', `本回合动速 -${state.agilityDebuff}`);
-  if (state.hpDrain > 0) addIcon('wound.svg', `本回合行动期开始扣除 ${state.hpDrain} 点命数`);
+  if (state.staminaPenalty > 0) addIcon('tired.svg', `精力消耗 +${state.staminaPenalty}`, 'ACTION_START');
+  if (state.staminaDiscount > 0) addIcon('excited.svg', `精力消耗 -${state.staminaDiscount}`, 'ACTION_START');
+  if (state.guardBoost > 0) addIcon('shield.svg', `守备点数 +${state.guardBoost}`, 'ACTION_START');
+  if (state.guardDebuff > 0) addIcon('broken-shield.svg', `守备点数 -${state.guardDebuff}`, 'ACTION_START');
+  if (state.chargeBoost > 0) addIcon('strong.svg', `攻击点数 +${state.chargeBoost}`, 'ACTION_START');
+  if (state.ptsDebuff > 0) addIcon('broken-knife.svg', `攻击点数 -${state.ptsDebuff}`, 'ACTION_START');
+  if (state.dodgeBoost > 0) addIcon('avoid.svg', `闪避点数 +${state.dodgeBoost}`, 'ACTION_START');
+  if (state.dodgeDebuff > 0) addIcon('heavy.svg', `闪避点数 -${state.dodgeDebuff}`, 'ACTION_START');
+  if (state.agilityBoost > 0) addIcon('fast.svg', `动速 +${state.agilityBoost}`, 'ACTION_START');
+  if (state.agilityDebuff > 0) addIcon('slow.svg', `动速 -${state.agilityDebuff}`, 'ACTION_START');
+  if (state.hpDrain > 0) addIcon('wound.svg', `命数 -${state.hpDrain}`, 'ACTION_START');
+  if (state.hpBonusNextTurn > 0) addIcon('treat.svg', `命数 +${state.hpBonusNextTurn}`, 'TURN_START');
+
+  if (state.insightDebuff > 0) addIcon('weak-eye.svg', `洞察精力消耗 +1`, 'ACTION_START');
+  if (state.insightDebuff < 0) addIcon('eye.svg', `洞察精力消耗 -1`, 'ACTION_START');
+  if (state.insightBlocked) addIcon('close-eye.svg', `禁止洞察`, 'ACTION_START');
+  if (state.actionBlocked) {
+    if (state.actionBlocked.includes(Action.ATTACK)) addIcon('close-knife.svg', `禁止攻击`, 'ACTION_START');
+    if (state.actionBlocked.includes(Action.DODGE)) addIcon('close-avoid.svg', `禁止闪避`, 'ACTION_START');
+    if (state.actionBlocked.includes(Action.GUARD)) addIcon('close-shield.svg', `禁止防御`, 'ACTION_START');
+  }
 }
 
 // ═══════════════════════════════════════════════════════

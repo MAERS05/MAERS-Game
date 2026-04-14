@@ -48,7 +48,8 @@ export class AIBaseLogic {
       snap.playerStaminaRatio <= 0.34 &&
       aiEffectiveStamina >= 2
     ) ? 1 : 0;
-    const executeWindow   = snap.playerStamina <= 0 ? 1 : 0;
+    // 使用有效精力（含 penalty/discount 修正）判定处决窗口，而非原始精力
+    const executeWindow   = (snap.playerEffectiveStamina ?? snap.playerStamina) <= 0 ? 1 : 0;
     const antiAttackNeed  = this.clamp01((snap.oppAggression - 0.45) / 0.55);
 
     return { aiDanger, playerExposed, killWindow, executeWindow, antiAttackNeed };
@@ -96,6 +97,12 @@ export class AIBaseLogic {
       aiStaminaRatio:     this.clamp01(ai.stamina     / MAX_STAMINA),
       playerStamina:      player.stamina,  // 精确整数，用于处决判断
       playerStaminaRatio: this.clamp01(player.stamina / MAX_STAMINA),
+      // 对手有效精力（含 penalty/discount 修正），用于处决窗口和精确威胁评估
+      playerEffectiveStamina: Math.max(0, player.stamina + (player.staminaDiscount || 0) - (player.staminaPenalty || 0)),
+      // 对手当前点数减益状态（用于进攻时机评估）
+      playerPtsDebuff:   player.ptsDebuff   || 0,
+      playerDodgeDebuff: player.dodgeDebuff || 0,
+      playerGuardDebuff: player.guardDebuff || 0,
       oppSpeedTrend,
       oppEnhanceTrend,
       oppStaminaTrend,
@@ -129,6 +136,16 @@ export class AIBaseLogic {
       w.attack  += 3.5;
       w.standby *= 0.25;
       w.guard   *= 0.70;
+    }
+
+    // ── 对手点数减益时进攻机会更大 ───────────────
+    if (snap.playerPtsDebuff > 0) {
+      // 对手攻击点数被压低，守备可扛住同时反打更划算
+      w.attack += 0.8; w.guard -= 0.2;
+    }
+    if (snap.playerDodgeDebuff > 0) {
+      // 对手闪避点数被压低，攻击命中率提高
+      w.attack += 0.6;
     }
 
     // ── 自身血量压力 ─────────────────────────────

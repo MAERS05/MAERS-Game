@@ -9,9 +9,9 @@ import {
 
 // 内部常量：时间轴事件类型
 export const EvtType = Object.freeze({
-  MOUNT_SHIELD: 'MOUNT_SHIELD',   
-  MOUNT_EVASION: 'MOUNT_EVASION',  
-  ATTACK: 'ATTACK',         
+  MOUNT_SHIELD: 'MOUNT_SHIELD',
+  MOUNT_EVASION: 'MOUNT_EVASION',
+  ATTACK: 'ATTACK',
 });
 
 export class JudgeLayer {
@@ -27,7 +27,7 @@ export class JudgeLayer {
       [PlayerId.P1]: { hp: p1State.hp, shields: [], evasions: [], dmgReceived: 0 },
       [PlayerId.P2]: { hp: p2State.hp, shields: [], evasions: [], dmgReceived: 0 },
     };
-    
+
     const log = this._executeTimeline(timeline, bs);
 
     const derived = this._deriveClash(
@@ -44,7 +44,7 @@ export class JudgeLayer {
    * 构造最终回合结算包裹对象
    */
   static buildFinalResult(
-    turn, p1CtxEff, p2CtxEff, p1State, p2State, 
+    turn, p1CtxEff, p2CtxEff, p1State, p2State,
     derived, bothInsighted, p1TriggeredEffects, p2TriggeredEffects,
     p1EntryEffective = 0, p2EntryEffective = 0
   ) {
@@ -56,8 +56,9 @@ export class JudgeLayer {
       );
     }
 
-    const finalDmgP1 = derived.finalDmgP1 + (p1State.directDamage || 0);
-    const finalDmgP2 = derived.finalDmgP2 + (p2State.directDamage || 0);
+    // 命数 hpDebuff：效果设定的本回合结束立刻扣血（与 hpDrain 的下回合行动期扣血机制独立）
+    const finalDmgP1 = derived.finalDmgP1 + (p1State.directDamage || 0) + (p1CtxEff.hpDebuff || 0);
+    const finalDmgP2 = derived.finalDmgP2 + (p2State.directDamage || 0) + (p2CtxEff.hpDebuff || 0);
 
     return this._buildResultObj(
       turn, p1CtxEff, p2CtxEff, p1State, p2State,
@@ -160,44 +161,56 @@ export class JudgeLayer {
     log.push({ kind: 'HIT', attackerId: attack.actorId, targetId: attack.targetId, atkSpeed: attack.speed, atkPts: attack.pts });
   }
 
+  static _getActName(act) {
+    if (act === Action.ATTACK) return '攻击';
+    if (act === Action.GUARD) return '守备';
+    if (act === Action.DODGE) return '闪避';
+    if (act === Action.STANDBY) return '蓄势';
+    return '行动';
+  }
+
+  static _formatAction(ctx, isP1) {
+    const actName = this._getActName(ctx.action);
+    const pronoun = isP1 ? '你' : '敌方';
+    if (ctx.action === Action.STANDBY) {
+      return `${pronoun}执行了${actName}`;
+    }
+    return `${pronoun}执行了${actName}(动速${ctx.speed}，点数${ctx.pts})`;
+  }
+
   static _deriveClash(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2, p1EntryEffective = 0, p2EntryEffective = 0) {
     const p1Act = p1Ctx.action;
     const p2Act = p2Ctx.action;
 
+    const p1Desc = this._formatAction(p1Ctx, true);
+    const p2Desc = this._formatAction(p2Ctx, false);
+    const prefix = `${p2Desc}，${p1Desc}，`;
+
     if (p1Act === Action.STANDBY && p2Act === Action.STANDBY)
-      return this._zero(Clash.MUTUAL_STANDBY, '双方都在蓄积力量，小心观察着对方——什么也没有发生。');
+      return this._zero(Clash.MUTUAL_STANDBY, `${prefix}战场陷入僵持——什么也没有发生。`);
 
     if (p1Act === Action.GUARD && p2Act === Action.GUARD)
-      return this._zero(Clash.ACCUMULATE, `双方同时举起防御（你的动速 ${p1Ctx.speed}、点数 ${p1Ctx.pts}，敌方动速 ${p2Ctx.speed}、点数 ${p2Ctx.pts}），战场陷入僵持——【蓄势】。`);
+      return this._zero(Clash.ACCUMULATE, `${prefix}战场陷入僵持。`);
 
     if (p1Act === Action.DODGE && p2Act === Action.DODGE)
-      return this._zero(Clash.RETREAT, `双方同时撤招，你动速 ${p1Ctx.speed}、点数 ${p1Ctx.pts}，敌方动速 ${p2Ctx.speed}、点数 ${p2Ctx.pts}——点数相同，互相后撤。`);
+      return this._zero(Clash.RETREAT, `${prefix}互相后撤。`);
 
     if ((p1Act === Action.DODGE && p2Act === Action.GUARD) || (p1Act === Action.GUARD && p2Act === Action.DODGE)) {
-      const isP1Dodge = p1Act === Action.DODGE;
-      const dodgePts = isP1Dodge ? p1Ctx.pts : p2Ctx.pts;
-      const guardPts = isP1Dodge ? p2Ctx.pts : p1Ctx.pts;
-      const dodgerName = isP1Dodge ? '你' : '敌方';
-      const guarderName = isP1Dodge ? '敌方' : '你';
-      const dodgeSpeed = isP1Dodge ? p1Ctx.speed : p2Ctx.speed;
-      const guardSpeed = isP1Dodge ? p2Ctx.speed : p1Ctx.speed;
-      return this._zero(Clash.PROBE, `${dodgerName}试图以动速 ${dodgeSpeed}、点数 ${dodgePts} 闪躲，但${guarderName}守备动速 ${guardSpeed}、点数 ${guardPts} 点的空档下，双方仅是一次无果的试探。【试探】`);
+      return this._zero(Clash.PROBE, `${prefix}双方仅是一次无果的试探。【试探】`);
     }
 
     if (p1Act === Action.ATTACK && p2Act === Action.STANDBY)
-      return this._withExecute(Clash.ONE_SIDE_ATTACK, `你趁敌方待命，以 ${p1Ctx.speed} 的动速发动攻击（点数 ${p1Ctx.pts}）——命中！`, rawDmgP1, rawDmgP2, p1State, p2State, p1EntryEffective, p2EntryEffective);
+      return this._withExecute(Clash.ONE_SIDE_ATTACK, `${prefix}你的攻击成功命中！`, rawDmgP1, rawDmgP2, p1State, p2State, p1EntryEffective, p2EntryEffective);
 
     if (p2Act === Action.ATTACK && p1Act === Action.STANDBY)
-      return this._withExecute(Clash.ONE_SIDE_ATTACK, `敌方趁你待命，以 ${p2Ctx.speed} 的动速发动攻击（点数 ${p2Ctx.pts}）——命中！`, rawDmgP1, rawDmgP2, p1State, p2State, p1EntryEffective, p2EntryEffective);
+      return this._withExecute(Clash.ONE_SIDE_ATTACK, `${prefix}敌方的攻击成功命中！`, rawDmgP1, rawDmgP2, p1State, p2State, p1EntryEffective, p2EntryEffective);
 
     if (p1Act !== Action.ATTACK && p2Act === Action.STANDBY) {
-      const actName = p1Act === Action.GUARD ? '守备' : '闪避';
-      return this._zero(Clash.WASTED_ACTION, `你发动了${actName}（动速 ${p1Ctx.speed}、点数 ${p1Ctx.pts}），而敌方处于待命状态——行动毫无意义。`);
+      return this._zero(Clash.WASTED_ACTION, `${prefix}行动毫无意义。`);
     }
 
     if (p2Act !== Action.ATTACK && p1Act === Action.STANDBY) {
-      const actName = p2Act === Action.GUARD ? '守备' : '闪避';
-      return this._zero(Clash.WASTED_ACTION, `敌方发动了${actName}（动速 ${p2Ctx.speed}、点数 ${p2Ctx.pts}），而你处于待命状态——行动毫无意义。`);
+      return this._zero(Clash.WASTED_ACTION, `${prefix}行动毫无意义。`);
     }
 
     return this._deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2, p1EntryEffective, p2EntryEffective);
@@ -221,13 +234,13 @@ export class JudgeLayer {
       executeP1 = true;
       finalDmgP1 = p1State.hp;
       clash = Clash.EXECUTE;
-      clashDesc = '你已精力耗尽——敌方的攻击将彻底终结这场战斗！【处决】';
+      clashDesc += ' 你已精力耗尽——敌方的攻击彻底终结了这场战斗！【处决】';
     }
     if (rawDmgP2 > 0 && p2EntryEffective <= 0) {
       executeP2 = true;
       finalDmgP2 = p2State.hp;
       clash = Clash.EXECUTE;
-      clashDesc = '敌方已精力耗尽——你的攻击将彻底终结这场战斗！【处决】';
+      clashDesc += ' 敌方已精力耗尽——你的攻击彻底终结了这场战斗！【处决】';
     }
 
     return { clash, clashDesc, executeP1, executeP2, finalDmgP1, finalDmgP2 };
@@ -244,58 +257,60 @@ export class JudgeLayer {
     const attackOverpowers = log.find(e => e.kind === 'ATTACK_OVERPOWERS');
     const mutualHit = log.find(e => e.kind === 'MUTUAL_HIT');
 
+    const p1Desc = this._formatAction(p1Ctx, true);
+    const p2Desc = this._formatAction(p2Ctx, false);
+    const prefix = `${p2Desc}，${p1Desc}，`;
+
     let clash, clashDesc;
 
     if (confront) {
       clash = Clash.CONFRONT;
-      clashDesc = `双方动速相同（${confront.speed}）且点数相当（${confront.pts}），攻势彼此抵消——无人受伤。【对峙】`;
+      clashDesc = `${prefix}攻势彼此抵消——无人受伤。【对峙】`;
     } else if (suppress) {
       const winIsP1 = suppress.winnerId === PlayerId.P1;
       clash = Clash.SUPPRESS;
       clashDesc = winIsP1
-        ? `双方动速相同（${suppress.speed}），但你的攻击点数（${suppress.winPts}）压制了敌方的攻击点数（${suppress.losePts}）——单方命中！【压制】`
-        : `双方动速相同（${suppress.speed}），但敌方的攻击点数（${suppress.winPts}）压制了你的攻击点数（${suppress.losePts}）——单方命中！【压制】`;
+        ? `${prefix}你的攻击点数压制了敌方——单方命中！【压制】`
+        : `${prefix}敌方的攻击点数压制了你——单方命中！【压制】`;
     } else if (hits.length >= 2) {
       const firstIsP1 = hits[0].attackerId === PlayerId.P1;
-      const fastSpeed = firstIsP1 ? p1Ctx.speed : p2Ctx.speed;
-      const slowSpeed = firstIsP1 ? p2Ctx.speed : p1Ctx.speed;
       clash = Clash.PREEMPT;
       clashDesc = firstIsP1
-        ? `你动速（${fastSpeed}）较快，攻击（点数 ${p1Ctx.pts}）率先命中；随后敌方以动速（${slowSpeed}）反击（点数 ${p2Ctx.pts}）也命中了你。【抢攻】`
-        : `敌方动速（${fastSpeed}）较快，攻击（点数 ${p2Ctx.pts}）率先命中；随后你以动速（${slowSpeed}）反击（点数 ${p1Ctx.pts}）也命中了敌方。【抢攻】`;
+        ? `${prefix}你抢先命中，随后敌方的反击也命中了你。【抢攻】`
+        : `${prefix}敌方抢先命中，随后你的反击也命中了敌方。【抢攻】`;
     } else if (evade) {
       const atkIsP1 = evade.attackerId === PlayerId.P1;
       clash = Clash.EVADE;
       clashDesc = atkIsP1
-        ? `敌方的闪避动速（${evade.dodgeSpeed}）比你的攻击动速（${evade.atkSpeed}）更快，轻易躲开了你的攻击（点数 ${evade.atkPts}）。【规避】`
-        : `你的闪避动速（${evade.dodgeSpeed}）比敌方的攻击动速（${evade.atkSpeed}）更快，轻易躲开了敌方的攻击（点数 ${evade.atkPts}）。【规避】`;
+        ? `${prefix}敌方躲开了你的攻击。【规避】`
+        : `${prefix}你躲开了敌方的攻击。【规避】`;
     } else if (dodgeOutmaneuvered) {
       const atkIsP1 = dodgeOutmaneuvered.attackerId === PlayerId.P1;
       clash = Clash.DODGE_OUTMANEUVERED;
       clashDesc = atkIsP1
-        ? `双方动速相同（${dodgeOutmaneuvered.speed}），敌方闪避点数（${dodgeOutmaneuvered.dodgePts}）超过你的攻击点数（${dodgeOutmaneuvered.atkPts}），闪身躲开。【虚步】`
-        : `双方动速相同（${dodgeOutmaneuvered.speed}），你闪避点数（${dodgeOutmaneuvered.dodgePts}）超过敌方的攻击点数（${dodgeOutmaneuvered.atkPts}），闪身躲开。【虚步】`;
+        ? `${prefix}敌方虚步躲开了你的攻击。【虚步】`
+        : `${prefix}你虚步躲开了敌方的攻击。【虚步】`;
     } else if (attackOverpowers) {
       const atkIsP1 = attackOverpowers.attackerId === PlayerId.P1;
       clash = Clash.ATTACK_OVERPOWERS;
       clashDesc = atkIsP1
-        ? `双方动速相同（${attackOverpowers.speed}），你的攻击点数（${attackOverpowers.atkPts}）压过了敌方的闪避点数（${attackOverpowers.dodgePts}）——强行命中！【强突】`
-        : `双方动速相同（${attackOverpowers.speed}），敌方的攻击点数（${attackOverpowers.atkPts}）压过了你的闪避点数（${attackOverpowers.dodgePts}）——强行命中！【强突】`;
+        ? `${prefix}你的攻击压过了敌方的闪避——成功命中！【强突】`
+        : `${prefix}敌方的攻击压过了你的闪避——成功命中！【强突】`;
     } else if (mutualHit) {
       clash = Clash.MUTUAL_HIT;
-      clashDesc = `双方动速相同（${mutualHit.speed}）且点数相当（攻击 ${mutualHit.atkPts} vs 闪避 ${mutualHit.dodgePts}）——擦肩而过，互生侥幸。【侥幸】`;
+      clashDesc = `${prefix}擦肩而过，无事发生。【侥幸】`;
     } else if (fortify) {
       const atkIsP1 = fortify.attackerId === PlayerId.P1;
       clash = Clash.FORTIFY;
       const isFaster = fortify.shieldSpeed > fortify.atkSpeed;
       if (atkIsP1) {
         clashDesc = isFaster
-          ? `敌方抢先（动速 ${fortify.shieldSpeed}，你的攻击动速 ${fortify.atkSpeed}）举起守备（点数 ${fortify.shieldPts}），稳稳挡下了你的攻击（点数 ${fortify.atkPts}）。【坚固】`
-          : `敌方同时（双方动速 ${fortify.shieldSpeed}）举起守备（点数 ${fortify.shieldPts}），稳稳挡下了你的攻击（点数 ${fortify.atkPts}）。【坚固】`;
+          ? `${prefix}敌方抢在你的攻击前守备并成功挡下你的攻击。【坚固】`
+          : `${prefix}敌方及时守备并成功挡下你的攻击。【坚固】`;
       } else {
         clashDesc = isFaster
-          ? `你抢先（动速 ${fortify.shieldSpeed}，敌方的攻击动速 ${fortify.atkSpeed}）举起守备（点数 ${fortify.shieldPts}），稳稳挡下了敌方的攻击（点数 ${fortify.atkPts}）。【坚固】`
-          : `你同时（双方动速 ${fortify.shieldSpeed}）举起守备（点数 ${fortify.shieldPts}），稳稳挡下了敌方的攻击（点数 ${fortify.atkPts}）。【坚固】`;
+          ? `${prefix}你抢在敌方攻击前守备并成功挡下敌方的攻击。【坚固】`
+          : `${prefix}你及时守备并成功挡下敌方的攻击。【坚固】`;
       }
     } else if (breakEvt) {
       const atkIsP1 = breakEvt.attackerId === PlayerId.P1;
@@ -303,12 +318,12 @@ export class JudgeLayer {
       const isFaster = breakEvt.shieldSpeed > breakEvt.atkSpeed;
       if (atkIsP1) {
         clashDesc = isFaster
-          ? `敌方虽抢先（动速 ${breakEvt.shieldSpeed}，你的攻击动速 ${breakEvt.atkSpeed}）举起守备（点数 ${breakEvt.shieldPts}），但仍被你的攻击（点数 ${breakEvt.atkPts}）无情击穿！【破势】`
-          : `敌方同时（双方动速 ${breakEvt.shieldSpeed}）举起守备（点数 ${breakEvt.shieldPts}），但仍被你的攻击（点数 ${breakEvt.atkPts}）无情击穿！【破势】`;
+          ? `${prefix}敌方虽抢先守备，仍被你的攻击无情击穿！【破势】`
+          : `${prefix}敌方虽及时守备，仍被你的攻击无情击穿！【破势】`;
       } else {
         clashDesc = isFaster
-          ? `你虽抢先（动速 ${breakEvt.shieldSpeed}，敌方的攻击动速 ${breakEvt.atkSpeed}）举起守备（点数 ${breakEvt.shieldPts}），但仍被敌方的攻击（点数 ${breakEvt.atkPts}）无情击穿！【破势】`
-          : `你同时（双方动速 ${breakEvt.shieldSpeed}）举起守备（点数 ${breakEvt.shieldPts}），但仍被敌方的攻击（点数 ${breakEvt.atkPts}）无情击穿！【破势】`;
+          ? `${prefix}你虽抢先守备，仍被敌方的攻击无情击穿！【破势】`
+          : `${prefix}你虽及时守备，仍被敌方的攻击无情击穿！【破势】`;
       }
     } else if (hits.length === 1) {
       const hit = hits[0];
@@ -317,31 +332,78 @@ export class JudgeLayer {
       if (targetCtx.action === Action.GUARD) {
         clash = Clash.RAID;
         clashDesc = atkIsP1
-          ? `你的攻击（动速 ${hit.atkSpeed}、点数 ${hit.atkPts}）抢在敌方拉起防御（动速 ${targetCtx.speed}）前命中目标！【袭击】`
-          : `敌方的攻击（动速 ${hit.atkSpeed}、点数 ${hit.atkPts}）抢在你拉起防御（动速 ${targetCtx.speed}）前命中目标！【袭击】`;
+          ? `${prefix}你抢在敌方守备前完成命中！【袭击】`
+          : `${prefix}敌方抢在你守备前完成命中！【袭击】`;
       } else if (targetCtx.action === Action.DODGE) {
         clash = Clash.SWIFT_STRIKE;
         clashDesc = atkIsP1
-          ? `你的攻击（动速 ${hit.atkSpeed}、点数 ${hit.atkPts}）抢在敌方准备闪躲（动速 ${targetCtx.speed}）前命中目标！【迅攻】`
-          : `敌方的攻击（动速 ${hit.atkSpeed}、点数 ${hit.atkPts}）抢在你准备闪躲（动速 ${targetCtx.speed}）前命中目标！【迅攻】`;
+          ? `${prefix}你抢在敌方闪开前完成命中！【迅攻】`
+          : `${prefix}敌方抢在你闪开前完成命中！【迅攻】`;
       } else if (targetCtx.action === Action.ATTACK) {
         clash = Clash.INTERRUPT;
-        const tSpeed = targetCtx.speed;
         clashDesc = atkIsP1
-          ? `你动速（${hit.atkSpeed}）较快，抢在敌方（动速 ${tSpeed}）出手前便将其击倒！【截杀】`
-          : `敌方动速（${hit.atkSpeed}）较快，抢在你（动速 ${tSpeed}）出手前便将你击倒！【截杀】`;
+          ? `${prefix}你抢先将敌方击倒！【截杀】`
+          : `${prefix}敌方抢先将你击倒！【截杀】`;
       } else {
         clash = Clash.ONE_SIDE_ATTACK;
         clashDesc = atkIsP1
-          ? `你的攻击（动速 ${hit.atkSpeed}、点数 ${hit.atkPts}）直接命中了未作防备的敌方。【命中】`
-          : `敌方攻击（动速 ${hit.atkSpeed}、点数 ${hit.atkPts}）直接命中了未作防备的你。【命中】`;
+          ? `${prefix}你的攻击命中！【命中】`
+          : `${prefix}敌方的攻击命中！【命中】`;
       }
     } else {
       clash = Clash.WASTED_ACTION;
-      clashDesc = '发生了不在预期内的交锋结果。';
+      clashDesc = `${prefix}发生了不在预期内的交锋结果。`;
     }
 
     return this._withExecute(clash, clashDesc, rawDmgP1, rawDmgP2, p1State, p2State, p1EntryEffective, p2EntryEffective);
+  }
+
+  /** 构建单侧玩家的 newState 对象（提取以消除 p1/p2 重复代码） */
+  static _buildPlayerNewState(state, newHp, newStamina, staminaBonusOverflow = 0, hpOverkill = 0, hpHealOverflow = 0) {
+    const copySlots = (src) => src ? {
+      [Action.ATTACK]: [...(src[Action.ATTACK] || [false, false, false])],
+      [Action.GUARD]: [...(src[Action.GUARD] || [false, false, false])],
+      [Action.DODGE]: [...(src[Action.DODGE] || [false, false, false])],
+    } : {
+      [Action.ATTACK]: [false, false, false],
+      [Action.GUARD]: [false, false, false],
+      [Action.DODGE]: [false, false, false],
+    };
+    return {
+      hp: newHp, stamina: newStamina,
+      chargeBoost: state.chargeBoost || 0,
+      ptsDebuff: state.ptsDebuff || 0,
+      guardBoost: state.guardBoost || 0,
+      guardDebuff: state.guardDebuff || 0,
+      dodgeBoost: state.dodgeBoost || 0,
+      dodgeDebuff: state.dodgeDebuff || 0,
+      agilityBoost: state.agilityBoost || 0,
+      agilityDebuff: state.agilityDebuff || 0,
+      staminaPenalty: state.staminaPenalty || 0,
+      staminaDiscount: state.staminaDiscount || 0,
+      // 溢出字段每回合重置（加上本回合 staminaBonus 溢出）
+      staminaOverflow: staminaBonusOverflow,
+      staminaDebuff: 0,
+      // 命数溢出字段
+      hpBonusNextTurn: (state.hpBonusNextTurn || 0) + hpHealOverflow, // 正溢出进下回合
+      hpDrain: (state.hpDrain || 0) + hpOverkill,              // 象鼻负溢出进持续伤害池
+      hpDebuff: 0,  // 每回合重置（由效果层重新设定）
+      insightDebuff: state.insightDebuff || 0,
+      restRecoverBonus: state.restRecoverBonus || 0,
+      restRecoverPenalty: state.restRecoverPenalty || 0,
+      insightBlocked: state.insightBlocked || false,
+      insightBlockNextTurn: state.insightBlockNextTurn || false,
+      redecideBlocked: state.redecideBlocked || false,
+      redecideBlockNextTurn: state.redecideBlockNextTurn || false,
+      speedAdjustBlocked: state.speedAdjustBlocked || false,
+      speedAdjustBlockNextTurn: state.speedAdjustBlockNextTurn || false,
+      actionBlocked: Array.isArray(state.actionBlocked) ? [...state.actionBlocked] : [],
+      actionBlockNextTurn: Array.isArray(state.actionBlockNextTurn) ? [...state.actionBlockNextTurn] : [],
+      slotBlocked: copySlots(state.slotBlocked),
+      slotBlockNextTurn: copySlots(state.slotBlockNextTurn),
+      // 效果队列：必须传递，否则 onPost 里 queueEffect 写入的效果在结算后全部丢失
+      pendingEffects: Array.isArray(state.pendingEffects) ? [...state.pendingEffects] : [],
+    };
   }
 
   static _buildResultObj(
@@ -349,15 +411,30 @@ export class JudgeLayer {
     clash, clashDesc, damageToP1, damageToP2, executeP1, executeP2,
     p1ExposedEffects, p2ExposedEffects
   ) {
-    const newP1Hp = Math.max(0, p1State.hp - damageToP1);
-    const newP2Hp = Math.max(0, p2State.hp - damageToP2);
+    // 命数结算：检测 HP 青溢出和象鼻负溢出
+    const rawP1Hp = p1State.hp - damageToP1;
+    const rawP2Hp = p2State.hp - damageToP2;
+    const newP1Hp = Math.max(0, rawP1Hp);
+    const newP2Hp = Math.max(0, rawP2Hp);
+    // 命数负溢出：象鼻伤害超过剩余命数时，过额部分转入 hpDrain，在下回合行动期开始时（类似创伤）额外扣除
+    const p1HpOverkill = rawP1Hp < 0 ? -rawP1Hp : 0;
+    const p2HpOverkill = rawP2Hp < 0 ? -rawP2Hp : 0;
 
-    // 精力在操作期即时扣/退；结算层不再做二次扣减。
-    // 仅处理额外奖励（如某些效果给予 staminaBonus）并封顶。
-    const p1Bonus = p1State.staminaBonus || 0;
-    const p2Bonus = p2State.staminaBonus || 0;
-    const newP1Stamina = Math.min(DefaultStats.MAX_STAMINA, Math.max(0, p1State.stamina + p1Bonus));
-    const newP2Stamina = Math.min(DefaultStats.MAX_STAMINA, Math.max(0, p2State.stamina + p2Bonus));
+    // 命数正溢出（回血超上限）：过额部分到下一回合开始时 HP+1
+    const rawP1HealedHp = (rawP1Hp < 0 ? 0 : rawP1Hp) + (p1State.hpBonus || 0);
+    const p1HpOverflow = rawP1HealedHp > DefaultStats.MAX_HP ? rawP1HealedHp - DefaultStats.MAX_HP : 0;
+    const finalP1Hp = Math.min(DefaultStats.MAX_HP, rawP1HealedHp);
+    const rawP2HealedHp = (rawP2Hp < 0 ? 0 : rawP2Hp) + (p2State.hpBonus || 0);
+    const p2HpOverflow = rawP2HealedHp > DefaultStats.MAX_HP ? rawP2HealedHp - DefaultStats.MAX_HP : 0;
+    const finalP2Hp = Math.min(DefaultStats.MAX_HP, rawP2HealedHp);
+
+    // 精力正溢出（staminaBonus 超过上限）：转为本回合行动成本 -1
+    const rawP1Stamina = p1State.stamina + (p1State.staminaBonus || 0);
+    const newP1Stamina = Math.min(DefaultStats.MAX_STAMINA, Math.max(0, rawP1Stamina));
+    const p1StaminaBonusOverflow = rawP1Stamina > DefaultStats.MAX_STAMINA ? rawP1Stamina - DefaultStats.MAX_STAMINA : 0;
+    const rawP2Stamina = p2State.stamina + (p2State.staminaBonus || 0);
+    const newP2Stamina = Math.min(DefaultStats.MAX_STAMINA, Math.max(0, rawP2Stamina));
+    const p2StaminaBonusOverflow = rawP2Stamina > DefaultStats.MAX_STAMINA ? rawP2Stamina - DefaultStats.MAX_STAMINA : 0;
 
     return {
       turn, p1Action: { ...p1Ctx }, p2Action: { ...p2Ctx },
@@ -365,83 +442,9 @@ export class JudgeLayer {
       damageToP1, damageToP2, executeP1, executeP2,
       p1ExposedEffects, p2ExposedEffects,
       newState: {
-        p1: {
-          hp: newP1Hp, stamina: newP1Stamina,
-          chargeBoost: p1State.chargeBoost || 0, ptsDebuff: p1State.ptsDebuff || 0,
-          guardBoost: p1State.guardBoost || 0, guardDebuff: p1State.guardDebuff || 0,
-          dodgeBoost: p1State.dodgeBoost || 0, dodgeDebuff: p1State.dodgeDebuff || 0,
-          agilityBoost: p1State.agilityBoost || 0, agilityDebuff: p1State.agilityDebuff || 0, staminaPenalty: p1State.staminaPenalty || 0,
-          staminaDiscount: p1State.staminaDiscount || 0,
-          insightDebuff: p1State.insightDebuff || 0,
-          restRecoverBonus: p1State.restRecoverBonus || 0,
-          restRecoverPenalty: p1State.restRecoverPenalty || 0,
-          insightBlocked: p1State.insightBlocked || false,
-          insightBlockNextTurn: p1State.insightBlockNextTurn || false,
-          redecideBlocked: p1State.redecideBlocked || false,
-          redecideBlockNextTurn: p1State.redecideBlockNextTurn || false,
-          speedAdjustBlocked: p1State.speedAdjustBlocked || false,
-          speedAdjustBlockNextTurn: p1State.speedAdjustBlockNextTurn || false,
-          actionBlocked: Array.isArray(p1State.actionBlocked) ? [...p1State.actionBlocked] : [],
-          actionBlockNextTurn: Array.isArray(p1State.actionBlockNextTurn) ? [...p1State.actionBlockNextTurn] : [],
-          slotBlocked: p1State.slotBlocked ? {
-            [Action.ATTACK]: [...(p1State.slotBlocked[Action.ATTACK] || [false, false, false])],
-            [Action.GUARD]: [...(p1State.slotBlocked[Action.GUARD] || [false, false, false])],
-            [Action.DODGE]: [...(p1State.slotBlocked[Action.DODGE] || [false, false, false])],
-          } : {
-            [Action.ATTACK]: [false, false, false],
-            [Action.GUARD]: [false, false, false],
-            [Action.DODGE]: [false, false, false],
-          },
-          slotBlockNextTurn: p1State.slotBlockNextTurn ? {
-            [Action.ATTACK]: [...(p1State.slotBlockNextTurn[Action.ATTACK] || [false, false, false])],
-            [Action.GUARD]: [...(p1State.slotBlockNextTurn[Action.GUARD] || [false, false, false])],
-            [Action.DODGE]: [...(p1State.slotBlockNextTurn[Action.DODGE] || [false, false, false])],
-          } : {
-            [Action.ATTACK]: [false, false, false],
-            [Action.GUARD]: [false, false, false],
-            [Action.DODGE]: [false, false, false],
-          },
-          hpDrain: p1State.hpDrain || 0
-        },
-        p2: {
-          hp: newP2Hp, stamina: newP2Stamina,
-          chargeBoost: p2State.chargeBoost || 0, ptsDebuff: p2State.ptsDebuff || 0,
-          guardBoost: p2State.guardBoost || 0, guardDebuff: p2State.guardDebuff || 0,
-          dodgeBoost: p2State.dodgeBoost || 0, dodgeDebuff: p2State.dodgeDebuff || 0,
-          agilityBoost: p2State.agilityBoost || 0, agilityDebuff: p2State.agilityDebuff || 0, staminaPenalty: p2State.staminaPenalty || 0,
-          staminaDiscount: p2State.staminaDiscount || 0,
-          insightDebuff: p2State.insightDebuff || 0,
-          restRecoverBonus: p2State.restRecoverBonus || 0,
-          restRecoverPenalty: p2State.restRecoverPenalty || 0,
-          insightBlocked: p2State.insightBlocked || false,
-          insightBlockNextTurn: p2State.insightBlockNextTurn || false,
-          redecideBlocked: p2State.redecideBlocked || false,
-          redecideBlockNextTurn: p2State.redecideBlockNextTurn || false,
-          speedAdjustBlocked: p2State.speedAdjustBlocked || false,
-          speedAdjustBlockNextTurn: p2State.speedAdjustBlockNextTurn || false,
-          actionBlocked: Array.isArray(p2State.actionBlocked) ? [...p2State.actionBlocked] : [],
-          actionBlockNextTurn: Array.isArray(p2State.actionBlockNextTurn) ? [...p2State.actionBlockNextTurn] : [],
-          slotBlocked: p2State.slotBlocked ? {
-            [Action.ATTACK]: [...(p2State.slotBlocked[Action.ATTACK] || [false, false, false])],
-            [Action.GUARD]: [...(p2State.slotBlocked[Action.GUARD] || [false, false, false])],
-            [Action.DODGE]: [...(p2State.slotBlocked[Action.DODGE] || [false, false, false])],
-          } : {
-            [Action.ATTACK]: [false, false, false],
-            [Action.GUARD]: [false, false, false],
-            [Action.DODGE]: [false, false, false],
-          },
-          slotBlockNextTurn: p2State.slotBlockNextTurn ? {
-            [Action.ATTACK]: [...(p2State.slotBlockNextTurn[Action.ATTACK] || [false, false, false])],
-            [Action.GUARD]: [...(p2State.slotBlockNextTurn[Action.GUARD] || [false, false, false])],
-            [Action.DODGE]: [...(p2State.slotBlockNextTurn[Action.DODGE] || [false, false, false])],
-          } : {
-            [Action.ATTACK]: [false, false, false],
-            [Action.GUARD]: [false, false, false],
-            [Action.DODGE]: [false, false, false],
-          },
-          hpDrain: p2State.hpDrain || 0
-        },
-      }
+        p1: this._buildPlayerNewState(p1State, finalP1Hp, newP1Stamina, p1StaminaBonusOverflow, p1HpOverkill, p1HpOverflow),
+        p2: this._buildPlayerNewState(p2State, finalP2Hp, newP2Stamina, p2StaminaBonusOverflow, p2HpOverkill, p2HpOverflow),
+      },
     };
   }
 }

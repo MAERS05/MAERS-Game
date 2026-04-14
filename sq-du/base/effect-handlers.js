@@ -6,36 +6,51 @@
  * resolver.js 通过此表做动态 hook 分派，不在底层文件里硬编码任何效果逻辑。
  *
  * 新增效果步骤：
- *   1. 在对应行动目录创建效果文件（effect/attack|guard|dodge/xxx.js）
+ *   1. 在对应行动目录创建效果文件（skill/attack|guard|dodge/xxx.js）
  *   2. 在 constants.js EffectId / EffectDefs 注册 ID 和元数据
  *   3. 在此文件 import 并加入 EffectHandlers
  */
 
 import { EffectId } from './constants.js';
+import { SluggishEffect, RejuvenatedEffect, ExhaustedEffect, ExcitedEffect } from '../effect/energy.js';
+import { HeavyEffect, LightEffect, ShackledEffect, InsightfulEffect, DullEffect, BlindedEffect } from '../effect/combat-status.js';
+import { FortifiedEffect, WoundedEffect } from '../effect/combat-identity.js';
+import { PowerEffect, WeakEffect, BrokenBladeEffect, ChainlockEffect } from '../effect/attack-status.js';
+import { SolidEffect, CrackedArmorEffect, BrokenArmorEffect } from '../effect/defense-status.js';
+import { SideStepEffect, ClumsyEffect, ShackledDodgeEffect } from '../effect/dodge-status.js';
 
 // ── 攻击类效果 ──
-import { WoundEffect } from '../effect/attack/wound.js';
-import { BreakQiEffect } from '../effect/attack/break_qi.js';
-import { ChargeEffect } from '../effect/attack/charge.js';
-import { PounceEffect } from '../effect/attack/pounce.js';
-import { RecklessEffect } from '../effect/attack/reckless.js';
-import { EnergizeEffect } from '../effect/attack/energize.js';
+import { WoundEffect } from '../skill/attack/wound.js';
+import { BreakQiEffect } from '../skill/attack/break_qi.js';
+import { ChargeEffect } from '../skill/attack/charge.js';
+import { PounceEffect } from '../skill/attack/pounce.js';
+import { RecklessEffect } from '../skill/attack/reckless.js';
+import { EnergizeEffect } from '../skill/attack/energize.js';
+import { Absorb } from '../skill/attack/absorb.js';
+import { ChainLock } from '../skill/attack/chainlock.js';
+import { Monblinding } from '../skill/attack/monblinding.js';
 
 // ── 守备类效果 ──
-import { AuraShieldEffect } from '../effect/guard/aura_shield.js';
-import { DeflectEffect } from '../effect/guard/deflect.js';
-import { EntrenchEffect } from '../effect/guard/entrench.js';
-import { IronWallEffect } from '../effect/guard/iron_wall.js';
-import { PhalanxEffect } from '../effect/guard/phalanx.js';
-import { InspireEffect } from '../effect/guard/inspire.js';
+import { AuraShieldEffect } from '../skill/guard/aura_shield.js';
+import { DeflectEffect } from '../skill/guard/deflect.js';
+import { EntrenchEffect } from '../skill/guard/entrench.js';
+import { IronWallEffect } from '../skill/guard/iron_wall.js';
+import { PhalanxEffect } from '../skill/guard/phalanx.js';
+import { InspireEffect } from '../skill/guard/inspire.js';
+import { Paralysis } from '../skill/guard/paralysis.js';
+import { Restore } from '../skill/guard/restore.js';
+import { Shatter } from '../skill/guard/shatter.js';
 
 // ── 闪避类效果 ──
-import { AgilityEffect } from '../effect/dodge/agility.js';
-import { AfterimageEffect } from '../effect/dodge/afterimage.js';
-import { MomentumEffect } from '../effect/dodge/momentum.js';
-import { SideStepEffect } from '../effect/dodge/side_step.js';
-import { DisarmEffect } from '../effect/dodge/disarm.js';
-import { DepressEffect } from '../effect/dodge/depress.js';
+import { AgilityEffect } from '../skill/dodge/agility.js';
+import { AfterimageEffect } from '../skill/dodge/afterimage.js';
+import { MomentumEffect } from '../skill/dodge/momentum.js';
+import { SideStepEffect as SideStepSkillEffect } from '../skill/dodge/side_step.js';
+import { DisarmEffect } from '../skill/dodge/disarm.js';
+import { DepressEffect } from '../skill/dodge/depress.js';
+import { Hide } from '../skill/dodge/hide.js';
+import { Lure } from '../skill/dodge/lure.js';
+import { SeeThrough } from '../skill/dodge/see-through.js';
 
 /**
  * 效果处理器映射表（EffectId → handler）
@@ -55,7 +70,7 @@ const RawEffectHandlers = {
   [EffectId.AGILITY]:     AgilityEffect,
   [EffectId.AFTERIMAGE]:  AfterimageEffect,
   [EffectId.MOMENTUM]:    MomentumEffect,
-  [EffectId.SIDE_STEP]:   SideStepEffect,
+  [EffectId.SIDE_STEP]:   SideStepSkillEffect,
   [EffectId.DISARM]:      DisarmEffect,
   [EffectId.IRON_WALL]:   IronWallEffect,
   [EffectId.PHALANX]:     PhalanxEffect,
@@ -64,6 +79,37 @@ const RawEffectHandlers = {
   [EffectId.INSPIRE]:     InspireEffect,
   [EffectId.DEPRESS]:     DepressEffect,
   [EffectId.ENERGIZE]:    EnergizeEffect,
+  [EffectId.ABSORB]:      Absorb,
+  [EffectId.CHAINLOCK]:   ChainLock,
+  [EffectId.MONBLINDING]: Monblinding,
+  [EffectId.PARALYSIS]:   Paralysis,
+  [EffectId.RESTORE]:     Restore,
+  [EffectId.SHATTER]:     Shatter,
+  [EffectId.HIDE]:        Hide,
+  [EffectId.LURE]:        Lure,
+  [EffectId.SEE_THROUGH]: SeeThrough,
+  sluggish: SluggishEffect,
+  rejuvenated: RejuvenatedEffect,
+  exhausted: ExhaustedEffect,
+  excited: ExcitedEffect,
+  heavy: HeavyEffect,
+  light: LightEffect,
+  shackled: ShackledEffect,
+  insightful: InsightfulEffect,
+  dull: DullEffect,
+  blinded: BlindedEffect,
+  fortified: FortifiedEffect,
+  wounded: WoundedEffect,
+  weak: WeakEffect,
+  power: PowerEffect,
+  broken_blade: BrokenBladeEffect,
+  chainlock_state: ChainlockEffect,
+  solid: SolidEffect,
+  cracked_armor: CrackedArmorEffect,
+  broken_armor: BrokenArmorEffect,
+  side_step: SideStepEffect,
+  clumsy: ClumsyEffect,
+  shackled_dodge: ShackledDodgeEffect,
 };
 
 /**

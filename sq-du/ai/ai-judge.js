@@ -16,7 +16,7 @@ import { Action, DefaultStats } from '../base/constants.js';
 import { AIBaseLogic } from './ai-base.js';
 import { AIExtraLayer } from './ai-extra.js';
 import { AIStrategyLayer } from './ai-strategy.js';
-import { AIEnhaceLayer } from './ai-enhace.js';
+import { AIEnhanceLayer } from './ai-enhance.js';
 
 export class AIJudgeLayer {
   /**
@@ -37,7 +37,7 @@ export class AIJudgeLayer {
     const { speed, enhance } = this.validateBudget(ai, action, speedRaw, enhanceRaw);
     const effects = AIExtraLayer.pickEffects(action, enhance, ai, { player, isRedecide: false });
 
-    return AIEnhaceLayer.constrainDecision(
+    return AIEnhanceLayer.constrainDecision(
       { action, enhance, speed, effects },
       { ai, player, history, revealedAction: null, isRedecide: false }
     );
@@ -67,7 +67,7 @@ export class AIJudgeLayer {
       player, revealedAction, isRedecide: true
     });
 
-    return AIEnhaceLayer.constrainDecision(
+    return AIEnhanceLayer.constrainDecision(
       { action, enhance, speed, effects },
       { ai, player, history, revealedAction, isRedecide: true }
     );

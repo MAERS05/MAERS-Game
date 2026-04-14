@@ -132,6 +132,10 @@ function createPlayerState(id, overrides = {}) {
     speedDiscountSpent: 0,                        // 本回合因提速消耗的 discount 计数（用于精确归还）
     actionDiscountSpent: 0,                       // 本回合因行动成本消耗的 discount 计数（用于精确归还）
     insightDebuff: 0,                             // 洞察减益（洞察成本额外 +X）
+    staminaOverflow: 0,                           // 精力正溢出：下回合精力消耗 -X
+    staminaDebuff: 0,                             // 精力负溢出：下回合精力消耗 +X
+    hpOverflow: 0,                                // 命数正溢出：下回合开始命数 +X
+    hpDebuff: 0,                                  // 命数负溢出：本回合行动期结束命数 -X
     restRecoverBonus: 0,                          // 蓄气恢复加值（下回合在 ACTION_START 生效）
     restRecoverPenalty: 0,                        // 蓄气恢复减值（下回合在 ACTION_START 生效）
     agilityDebuff: 0,                             // 动速减益（负溢出递延）
@@ -389,8 +393,11 @@ export class BattleEngine {
       if ((p.speedDiscountSpent || 0) > 0) {
         p.speedDiscountSpent--;
         p.staminaDiscount = (p.staminaDiscount || 0) + 1;
+      } else if (p.stamina < DefaultStats.MAX_STAMINA) {
+        p.stamina++;
       } else {
-        p.stamina = Math.min(DefaultStats.MAX_STAMINA, p.stamina + 1);
+        // 精力正溢出：降速退款超过上限，转为本回合行动成本 -1
+        p.staminaOverflow = (p.staminaOverflow || 0) + 1;
       }
     }
 
@@ -609,14 +616,34 @@ export class BattleEngine {
     this.startGame();
   }
 
-  /** 获取双方当前状态快照（只读副本） */
+  /** 获取双方当前状态快照（深拷贝关键嵌套字段，防止外部意外污染引擎状态） */
   getSnapshot() {
+    const clonePlayer = (p) => {
+      const copyActionSlots = (src) => src ? {
+        [Action.ATTACK]: [...(src[Action.ATTACK] || [])],
+        [Action.GUARD]:  [...(src[Action.GUARD]  || [])],
+        [Action.DODGE]:  [...(src[Action.DODGE]  || [])],
+      } : undefined;
+      return {
+        ...p,
+        equippedEffects:    copyActionSlots(p.equippedEffects),
+        effectInventory:    copyActionSlots(p.effectInventory),
+        effectIntel:        [...(p.effectIntel        || [])],
+        slotBlocked:        copyActionSlots(p.slotBlocked),
+        slotBlockNextTurn:  copyActionSlots(p.slotBlockNextTurn),
+        actionBlocked:      [...(p.actionBlocked      || [])],
+        actionBlockNextTurn:[...(p.actionBlockNextTurn || [])],
+        actionCtx: p.actionCtx
+          ? { ...p.actionCtx, effects: [...(p.actionCtx.effects || [])] }
+          : null,
+      };
+    };
     return {
       state: this._state,
       turn: this._turn,
       players: {
-        [PlayerId.P1]: { ...this._players[PlayerId.P1] },
-        [PlayerId.P2]: { ...this._players[PlayerId.P2] },
+        [PlayerId.P1]: clonePlayer(this._players[PlayerId.P1]),
+        [PlayerId.P2]: clonePlayer(this._players[PlayerId.P2]),
       },
     };
   }
@@ -670,6 +697,15 @@ export class BattleEngine {
         };
         p.speed = DefaultStats.BASE_SPEED;
         p.actionCtx = createActionCtx(Action.STANDBY);
+
+        // 命数正溢出：将上一回合因回血超过上限而预存的觔加命数应用到本回合开始
+        if (p.hpBonusNextTurn > 0) {
+          p.hp = Math.min(DefaultStats.MAX_HP, (p.hp || 0) + p.hpBonusNextTurn);
+          p.hpBonusNextTurn = 0;
+        }
+        // 精力溢出字段每回合开始重置（应由本回合事件重新填充）
+        p.staminaOverflow = 0;
+        p.staminaDebuff   = 0;
       });
 
       this._emitPhaseEffectEvent(EngineEvent.TURN_START_PHASE, {});
@@ -694,18 +730,16 @@ export class BattleEngine {
     }
   }
 
-  _triggerResolve() {
+  /** 公共结算流水线（识破战和普通结算共用，避免代码重复） */
+  _doResolveFlow(bothInsighted) {
     this._timer.stop();
-
-    // 双方最终进入行动/结算：补齐暴露期结束（若有）
+    // 补齐决策/暴露边界（幂等，安全重复调用）
+    this._emitDecisionEndOnce(PlayerId.P1);
+    this._emitDecisionEndOnce(PlayerId.P2);
     this._emitExposeEndOnce(PlayerId.P1);
     this._emitExposeEndOnce(PlayerId.P2);
 
     this._setState(EngineState.RESOLVING);
-
-    // 即时扣费模式：行动可执行性已在操作阶段确定，结算前不再二次改写 actionCtx。
-
-    // 行动期开始：交由效果层按阶段接口执行具体效果
     this._emitPhaseEffectEvent(EngineEvent.ACTION_START, {
       p1Action: this._players[PlayerId.P1].actionCtx ? { ...this._players[PlayerId.P1].actionCtx } : null,
       p2Action: this._players[PlayerId.P2].actionCtx ? { ...this._players[PlayerId.P2].actionCtx } : null,
@@ -713,21 +747,15 @@ export class BattleEngine {
 
     const p1 = this._players[PlayerId.P1];
     const p2 = this._players[PlayerId.P2];
-
-    const bothInsighted = p1.wasInsighted && p2.wasInsighted;
-
     const result = resolve(
       p1.actionCtx ?? createActionCtx(),
       p2.actionCtx ?? createActionCtx(),
-      { ...p1 },
-      { ...p2 },
+      { ...p1 }, { ...p2 },
       bothInsighted,
       this._turn
     );
 
-    // 将结算结果应用到状态
     this._applyResolveResult(result);
-
     this._bus.emit(EngineEvent.ACTION_PHASE_START, {});
 
     setTimeout(() => {
@@ -735,18 +763,17 @@ export class BattleEngine {
       this._emitPhaseEffectEvent(EngineEvent.ACTION_END, {});
       this._emitPhaseEffectEvent(EngineEvent.RESOLVE_START, {});
       this._bus.emit(EngineEvent.TURN_RESOLVED, result);
-
-      // 结算期固定 5s：结束后再发 RESOLVE_END
       setTimeout(() => {
         this._emitPhaseEffectEvent(EngineEvent.RESOLVE_END, { result });
       }, 5000);
-
-      // 检查胜负
-      const gameOver = this._checkGameOver(result);
-      if (gameOver) return;
-
-      // 下一回合（UI 播放动画后应调用 engine.acknowledgeResolve()）
+      this._checkGameOver(result);
     }, 3000);
+  }
+
+  _triggerResolve() {
+    const p1 = this._players[PlayerId.P1];
+    const p2 = this._players[PlayerId.P2];
+    this._doResolveFlow(p1.wasInsighted && p2.wasInsighted);
   }
 
   /**
@@ -759,53 +786,7 @@ export class BattleEngine {
   }
 
   _triggerInsightClash() {
-    this._timer.stop();
-
-    // 识破强制结算前，补齐决策/暴露边界
-    this._emitDecisionEndOnce(PlayerId.P1);
-    this._emitDecisionEndOnce(PlayerId.P2);
-    this._emitExposeEndOnce(PlayerId.P1);
-    this._emitExposeEndOnce(PlayerId.P2);
-
-    this._setState(EngineState.RESOLVING);
-
-    // 即时扣费模式：行动可执行性已在操作阶段确定，识破前不再二次改写 actionCtx。
-
-    // 行动期开始：交由效果层按阶段接口执行具体效果
-    this._emitPhaseEffectEvent(EngineEvent.ACTION_START, {
-      p1Action: this._players[PlayerId.P1].actionCtx ? { ...this._players[PlayerId.P1].actionCtx } : null,
-      p2Action: this._players[PlayerId.P2].actionCtx ? { ...this._players[PlayerId.P2].actionCtx } : null,
-    });
-
-    const p1 = this._players[PlayerId.P1];
-    const p2 = this._players[PlayerId.P2];
-
-    const result = resolve(
-      p1.actionCtx ?? createActionCtx(),
-      p2.actionCtx ?? createActionCtx(),
-      { ...p1 },
-      { ...p2 },
-      true, // 强制识破
-      this._turn
-    );
-
-    this._applyResolveResult(result);
-    
-    this._bus.emit(EngineEvent.ACTION_PHASE_START, {});
-
-    setTimeout(() => {
-      if (this._state !== EngineState.RESOLVING) return;
-      this._emitPhaseEffectEvent(EngineEvent.ACTION_END, {});
-      this._emitPhaseEffectEvent(EngineEvent.RESOLVE_START, {});
-      this._bus.emit(EngineEvent.TURN_RESOLVED, result);
-
-      // 结算期固定 5s：结束后再发 RESOLVE_END
-      setTimeout(() => {
-        this._emitPhaseEffectEvent(EngineEvent.RESOLVE_END, { result });
-      }, 5000);
-
-      this._checkGameOver(result);
-    }, 3000);
+    this._doResolveFlow(true);
   }
 
   // ═══════════════════════════════════════════
@@ -821,7 +802,7 @@ export class BattleEngine {
   _onEquipEnd() {
     // 将每个玩家快捷槽里的效果同步到初始配置中
     // （在决策期选眼了行动后，将对应行为的快捷槽和 lastingSlots 坥加入 actionCtx.effects）
-    // 这里只凉异状态，真正合并在 setReady() 的内部实现
+    // 这里只暂存状态，真正合并在 setReady() 的内部实现
     this._emitPhaseEffectEvent(EngineEvent.EQUIP_END, {});
     this._setState(EngineState.TICKING);
     this._bus.emit(EngineEvent.EQUIP_PHASE_END, {});
@@ -963,124 +944,80 @@ export class BattleEngine {
    * @param {import('./constants.js').ResolveResult} result
    */
   _applyResolveResult(result) {
-    const p1 = this._players[PlayerId.P1];
-    const p2 = this._players[PlayerId.P2];
-
-    p1.hp = result.newState.p1.hp;
-    p1.stamina = result.newState.p1.stamina;
-    p1.chargeBoost = result.newState.p1.chargeBoost ?? 0;
-    p1.ptsDebuff = result.newState.p1.ptsDebuff ?? 0;
-    p1.guardBoost = result.newState.p1.guardBoost ?? 0;
-    p1.guardDebuff = result.newState.p1.guardDebuff ?? 0;
-    p1.dodgeBoost = result.newState.p1.dodgeBoost ?? 0;
-    p1.dodgeDebuff = result.newState.p1.dodgeDebuff ?? 0;
-    p1.agilityBoost = result.newState.p1.agilityBoost ?? 0;
-    p1.agilityDebuff = result.newState.p1.agilityDebuff ?? 0;
-    p1.staminaPenalty = result.newState.p1.staminaPenalty ?? 0;
-    p1.staminaDiscount = result.newState.p1.staminaDiscount ?? 0;
-    p1.insightDebuff = result.newState.p1.insightDebuff ?? 0;
-    p1.restRecoverBonus = result.newState.p1.restRecoverBonus ?? 0;
-    p1.restRecoverPenalty = result.newState.p1.restRecoverPenalty ?? 0;
-    p1.insightBlockNextTurn = result.newState.p1.insightBlockNextTurn ?? false;
-    p1.insightBlocked = result.newState.p1.insightBlocked ?? p1.insightBlocked ?? false;
-    p1.redecideBlocked = result.newState.p1.redecideBlocked ?? p1.redecideBlocked ?? false;
-    p1.redecideBlockNextTurn = result.newState.p1.redecideBlockNextTurn ?? false;
-    p1.speedAdjustBlocked = result.newState.p1.speedAdjustBlocked ?? p1.speedAdjustBlocked ?? false;
-    p1.speedAdjustBlockNextTurn = result.newState.p1.speedAdjustBlockNextTurn ?? false;
-    p1.actionBlocked = Array.isArray(result.newState.p1.actionBlocked) ? [...result.newState.p1.actionBlocked] : (p1.actionBlocked || []);
-    p1.actionBlockNextTurn = Array.isArray(result.newState.p1.actionBlockNextTurn) ? [...result.newState.p1.actionBlockNextTurn] : [];
-    p1.slotBlocked = result.newState.p1.slotBlocked ? {
-      [Action.ATTACK]: [...(result.newState.p1.slotBlocked[Action.ATTACK] || [false, false, false])],
-      [Action.GUARD]: [...(result.newState.p1.slotBlocked[Action.GUARD] || [false, false, false])],
-      [Action.DODGE]: [...(result.newState.p1.slotBlocked[Action.DODGE] || [false, false, false])],
-    } : (p1.slotBlocked || {
-      [Action.ATTACK]: [false, false, false],
-      [Action.GUARD]: [false, false, false],
-      [Action.DODGE]: [false, false, false],
-    });
-    p1.slotBlockNextTurn = result.newState.p1.slotBlockNextTurn ? {
-      [Action.ATTACK]: [...(result.newState.p1.slotBlockNextTurn[Action.ATTACK] || [false, false, false])],
-      [Action.GUARD]: [...(result.newState.p1.slotBlockNextTurn[Action.GUARD] || [false, false, false])],
-      [Action.DODGE]: [...(result.newState.p1.slotBlockNextTurn[Action.DODGE] || [false, false, false])],
-    } : (p1.slotBlockNextTurn || {
-      [Action.ATTACK]: [false, false, false],
-      [Action.GUARD]: [false, false, false],
-      [Action.DODGE]: [false, false, false],
-    });
-    p1.hpDrain = result.newState.p1.hpDrain ?? 0;
-
-    p2.hp = result.newState.p2.hp;
-    p2.stamina = result.newState.p2.stamina;
-    p2.chargeBoost = result.newState.p2.chargeBoost ?? 0;
-    p2.ptsDebuff = result.newState.p2.ptsDebuff ?? 0;
-    p2.guardBoost = result.newState.p2.guardBoost ?? 0;
-    p2.guardDebuff = result.newState.p2.guardDebuff ?? 0;
-    p2.dodgeBoost = result.newState.p2.dodgeBoost ?? 0;
-    p2.dodgeDebuff = result.newState.p2.dodgeDebuff ?? 0;
-    p2.agilityBoost = result.newState.p2.agilityBoost ?? 0;
-    p2.agilityDebuff = result.newState.p2.agilityDebuff ?? 0;
-    p2.staminaPenalty = result.newState.p2.staminaPenalty ?? 0;
-    p2.staminaDiscount = result.newState.p2.staminaDiscount ?? 0;
-    p2.insightDebuff = result.newState.p2.insightDebuff ?? 0;
-    p2.restRecoverBonus = result.newState.p2.restRecoverBonus ?? 0;
-    p2.restRecoverPenalty = result.newState.p2.restRecoverPenalty ?? 0;
-    p2.insightBlockNextTurn = result.newState.p2.insightBlockNextTurn ?? false;
-    p2.insightBlocked = result.newState.p2.insightBlocked ?? p2.insightBlocked ?? false;
-    p2.redecideBlocked = result.newState.p2.redecideBlocked ?? p2.redecideBlocked ?? false;
-    p2.redecideBlockNextTurn = result.newState.p2.redecideBlockNextTurn ?? false;
-    p2.speedAdjustBlocked = result.newState.p2.speedAdjustBlocked ?? p2.speedAdjustBlocked ?? false;
-    p2.speedAdjustBlockNextTurn = result.newState.p2.speedAdjustBlockNextTurn ?? false;
-    p2.actionBlocked = Array.isArray(result.newState.p2.actionBlocked) ? [...result.newState.p2.actionBlocked] : (p2.actionBlocked || []);
-    p2.actionBlockNextTurn = Array.isArray(result.newState.p2.actionBlockNextTurn) ? [...result.newState.p2.actionBlockNextTurn] : [];
-    p2.slotBlocked = result.newState.p2.slotBlocked ? {
-      [Action.ATTACK]: [...(result.newState.p2.slotBlocked[Action.ATTACK] || [false, false, false])],
-      [Action.GUARD]: [...(result.newState.p2.slotBlocked[Action.GUARD] || [false, false, false])],
-      [Action.DODGE]: [...(result.newState.p2.slotBlocked[Action.DODGE] || [false, false, false])],
-    } : (p2.slotBlocked || {
-      [Action.ATTACK]: [false, false, false],
-      [Action.GUARD]: [false, false, false],
-      [Action.DODGE]: [false, false, false],
-    });
-    p2.slotBlockNextTurn = result.newState.p2.slotBlockNextTurn ? {
-      [Action.ATTACK]: [...(result.newState.p2.slotBlockNextTurn[Action.ATTACK] || [false, false, false])],
-      [Action.GUARD]: [...(result.newState.p2.slotBlockNextTurn[Action.GUARD] || [false, false, false])],
-      [Action.DODGE]: [...(result.newState.p2.slotBlockNextTurn[Action.DODGE] || [false, false, false])],
-    } : (p2.slotBlockNextTurn || {
-      [Action.ATTACK]: [false, false, false],
-      [Action.GUARD]: [false, false, false],
-      [Action.DODGE]: [false, false, false],
-    });
-    p2.hpDrain = result.newState.p2.hpDrain ?? 0;
+    this._applyPlayerResult(this._players[PlayerId.P1], result.newState.p1);
+    this._applyPlayerResult(this._players[PlayerId.P2], result.newState.p2);
 
     // 回合末动速归 BASE_SPEED（加速为临时性的）
-    // 注意：灵巧（agilityBoost）的动速加成已迁移到 resolver 内统一应用，
-    // 不在此处预设，避免与 _beginTurn 的重置产生双重计算。
-    p1.speed = DefaultStats.BASE_SPEED;
-    p2.speed = DefaultStats.BASE_SPEED;
+    this._players[PlayerId.P1].speed = DefaultStats.BASE_SPEED;
+    this._players[PlayerId.P2].speed = DefaultStats.BASE_SPEED;
 
     // 情报同步：将本回合对方生效的效果追加进己方的 effectIntel（去重）
+    const p1 = this._players[PlayerId.P1];
+    const p2 = this._players[PlayerId.P2];
     if (result.p2ExposedEffects?.length) {
-      for (const eff of result.p2ExposedEffects) {
+      for (const eff of result.p2ExposedEffects)
         if (!p1.effectIntel.includes(eff)) p1.effectIntel.push(eff);
-      }
     }
     if (result.p1ExposedEffects?.length) {
-      for (const eff of result.p1ExposedEffects) {
+      for (const eff of result.p1ExposedEffects)
         if (!p2.effectIntel.includes(eff)) p2.effectIntel.push(eff);
-      }
     }
 
     // PVE 模式：记录 P1（玩家）本回合的属性快照，供下回合 AI 分析
     if (this._mode === EngineMode.PVE && result.p1Action) {
       this._aiHistory.push({
-        opponentAction: result.p1Action.action,
-        opponentSpeed: result.p1Action.speed ?? DefaultStats.BASE_SPEED,
-        opponentEnhance: result.p1Action.enhance ?? 0,
+        opponentAction:  result.p1Action.action,
+        opponentSpeed:   result.p1Action.speed   ?? DefaultStats.BASE_SPEED,
+        opponentEnhance: result.p1Action.enhance  ?? 0,
         opponentStamina: result.newState.p1.stamina,
       });
       if (this._aiHistory.length > 5) this._aiHistory.shift();
     }
   }
+
+  /** 将单侧结算 newState 写回对应玩家对象（消除 p1/p2 逐字段重复代码） */
+  _applyPlayerResult(player, ns) {
+    const copySlots = (src, fallback) => src ? {
+      [Action.ATTACK]: [...(src[Action.ATTACK] || [false, false, false])],
+      [Action.GUARD]:  [...(src[Action.GUARD]  || [false, false, false])],
+      [Action.DODGE]:  [...(src[Action.DODGE]  || [false, false, false])],
+    } : fallback;
+    const emptySlots = { [Action.ATTACK]: [false,false,false], [Action.GUARD]: [false,false,false], [Action.DODGE]: [false,false,false] };
+
+    player.hp              = ns.hp;
+    player.stamina         = ns.stamina;
+    player.chargeBoost     = ns.chargeBoost     ?? 0;
+    player.ptsDebuff       = ns.ptsDebuff       ?? 0;
+    player.guardBoost      = ns.guardBoost      ?? 0;
+    player.guardDebuff     = ns.guardDebuff     ?? 0;
+    player.dodgeBoost      = ns.dodgeBoost      ?? 0;
+    player.dodgeDebuff     = ns.dodgeDebuff     ?? 0;
+    player.agilityBoost    = ns.agilityBoost    ?? 0;
+    player.agilityDebuff   = ns.agilityDebuff   ?? 0;
+    player.staminaPenalty  = ns.staminaPenalty  ?? 0;
+    player.staminaDiscount = ns.staminaDiscount ?? 0;
+    player.insightDebuff   = ns.insightDebuff   ?? 0;
+    player.restRecoverBonus    = ns.restRecoverBonus    ?? 0;
+    player.restRecoverPenalty  = ns.restRecoverPenalty  ?? 0;
+    player.insightBlockNextTurn    = ns.insightBlockNextTurn    ?? false;
+    player.insightBlocked          = ns.insightBlocked          ?? player.insightBlocked ?? false;
+    player.redecideBlocked         = ns.redecideBlocked         ?? player.redecideBlocked ?? false;
+    player.redecideBlockNextTurn   = ns.redecideBlockNextTurn   ?? false;
+    player.speedAdjustBlocked      = ns.speedAdjustBlocked      ?? player.speedAdjustBlocked ?? false;
+    player.speedAdjustBlockNextTurn = ns.speedAdjustBlockNextTurn ?? false;
+    player.actionBlocked      = Array.isArray(ns.actionBlocked)      ? [...ns.actionBlocked]      : (player.actionBlocked || []);
+    player.actionBlockNextTurn = Array.isArray(ns.actionBlockNextTurn) ? [...ns.actionBlockNextTurn] : [];
+    player.slotBlocked        = copySlots(ns.slotBlocked,     player.slotBlocked     || emptySlots);
+    player.slotBlockNextTurn  = copySlots(ns.slotBlockNextTurn, player.slotBlockNextTurn || emptySlots);
+    player.hpDrain          = ns.hpDrain          ?? 0;
+    player.hpBonusNextTurn   = ns.hpBonusNextTurn  ?? 0;
+    player.hpDebuff          = ns.hpDebuff          ?? 0;
+    player.staminaOverflow   = ns.staminaOverflow   ?? 0;
+    player.staminaDebuff     = ns.staminaDebuff     ?? 0;
+    // 效果队列：从结算包裹写回真实玩家对象，确保 onPost 排队的效果不丢失
+    player.pendingEffects    = Array.isArray(ns.pendingEffects) ? [...ns.pendingEffects] : (player.pendingEffects || []);
+  }
+
 
   /**
    * 胜负检查
@@ -1148,27 +1085,41 @@ export class BattleEngine {
   _reconcileActionCostDelta(player, prevCtx, nextCtx) {
     if (!player) return;
 
-    const prevCost = calcActionCost(prevCtx || createActionCtx(Action.STANDBY), player);
-    const nextCost = calcActionCost(nextCtx || createActionCtx(Action.STANDBY), player);
-    const deltaCost = nextCost - prevCost;
+    // 计算不含折扣修正的"毛成本"（用于追踪折扣消耗量）
+    const calcGrossCost = (ctx) => {
+      if (!ctx || (ctx.action === Action.STANDBY && !ctx.isCharge)) return 0;
+      return 1 + (ctx.enhance || 0) + (player.staminaPenalty || 0);
+    };
 
-    if (deltaCost > 0) {
-      for (let i = 0; i < deltaCost; i++) {
+    const prevGross = calcGrossCost(prevCtx || createActionCtx(Action.STANDBY));
+    const nextGross = calcGrossCost(nextCtx || createActionCtx(Action.STANDBY));
+    const grossDelta = nextGross - prevGross;
+
+    if (grossDelta > 0) {
+      // 需要额外支付 grossDelta 点，先用折扣抵，再扣 stamina
+      for (let i = 0; i < grossDelta; i++) {
         if ((player.staminaDiscount || 0) > 0) {
           player.staminaDiscount--;
           player.actionDiscountSpent = (player.actionDiscountSpent || 0) + 1;
+        } else if ((player.stamina || 0) > 0) {
+          player.stamina--;
         } else {
-          player.stamina = Math.max(0, (player.stamina || 0) - 1);
+          // 精力负溢出：无法支付行动成本，转为本回合行动成本 +1
+          player.staminaDebuff = (player.staminaDebuff || 0) + 1;
         }
       }
-    } else if (deltaCost < 0) {
-      const refund = Math.abs(deltaCost);
+    } else if (grossDelta < 0) {
+      // 需要退还 |grossDelta| 点，优先归还折扣凭证，再归还 stamina
+      const refund = Math.abs(grossDelta);
       for (let i = 0; i < refund; i++) {
         if ((player.actionDiscountSpent || 0) > 0) {
           player.actionDiscountSpent--;
           player.staminaDiscount = (player.staminaDiscount || 0) + 1;
+        } else if ((player.stamina || 0) < DefaultStats.MAX_STAMINA) {
+          player.stamina++;
         } else {
-          player.stamina = Math.min(DefaultStats.MAX_STAMINA, (player.stamina || 0) + 1);
+          // 精力正溢出：退款超过上限，转为本回合行动成本 -1
+          player.staminaOverflow = (player.staminaOverflow || 0) + 1;
         }
       }
     }
@@ -1223,6 +1174,9 @@ export class BattleEngine {
     return 1 + (ctx.enhance || 0);
   }
   // _calcCost 已移至 constants.js 的 calcActionCost 导出函数，engine 直接 import 使用
+
+  /** 当前回合数（供 EffectTimingLayer 等外部模块读取） */
+  get turn() { return this._turn; }
 }
 
 

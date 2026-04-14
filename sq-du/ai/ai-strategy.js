@@ -137,9 +137,7 @@ export class AIStrategyLayer {
     // 攻击 vs 对手闪避：动速必须严格超过闪避动速
     if (revealedAct === Action.DODGE && action === Action.ATTACK) {
       if (!canBoost) return BASE; // 无法加速时攻击很可能被闪开（由_pickAction层面已考虑）
-      // 对手加速闪避：必须超过，否则被闪
-      if (revealedSpd >= BASE + 1) return BASE + 1;
-      // 对手基础速闪避：加速可确保命中
+      // 无论对手闪避速度高低，加速至 BASE+1 均可超越或同速凭点数胜出
       return BASE + 1;
     }
 

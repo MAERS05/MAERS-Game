@@ -310,12 +310,26 @@
       box-shadow: 0 -2px 8px rgba(56, 189, 248, 0.5);
       transition: all 0.3s;
       margin-top: 5px;
+      position: relative;
     }
 
     .stamina-pip.spent {
       background: #1e1e24;
       box-shadow: none;
       opacity: 0.4;
+    }
+
+    .stamina-pip.penalty {
+      background: #7f1d1d;
+      box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.5);
+      opacity: 0.8;
+      border-bottom-color: rgba(239, 68, 68, 0.5);
+    }
+
+    .stamina-pip.discount {
+      box-shadow: 0 -2px 12px rgba(167, 243, 208, 0.9), inset 0 0 6px #fff;
+      background: #34d399;
+      /* 稍微偏绿的光泽 */
     }
 
     /* 动速调节行 */
@@ -645,16 +659,19 @@
       font-size: 1.2rem;
       font-weight: bold;
       letter-spacing: 8px;
-      text-indent: 8px; /* 居中对齐文字，因为有横向间距 */
+      text-indent: 8px;
+      /* 居中对齐文字，因为有横向间距 */
       backdrop-filter: blur(12px);
-      box-shadow: 0 0 40px rgba(0,0,0,0.8);
+      box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
       z-index: 500;
     }
+
     #restartBtn:hover {
       background: rgba(15, 20, 35, 0.95);
       border-color: rgba(255, 255, 255, 0.4);
       transform: translate(-50%, -50%) scale(1.05);
     }
+
     #restartBtn.show {
       opacity: 1;
       transform: translate(-50%, -50%) scale(1);
@@ -704,7 +721,7 @@
       width: 108px;
       height: 108px;
       background: var(--panel-bg);
-      border: 2px solid var(--border);
+      border: none;
       color: var(--text-main);
       font-size: 1rem;
       font-weight: bold;
@@ -720,23 +737,25 @@
       box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
     }
 
-    .act-btn:disabled {
-      opacity: 0.35;
+    .act-btn:disabled,
+    .act-btn[disabled] {
+      opacity: 0.45;
       cursor: not-allowed;
       transform: none !important;
+      filter: grayscale(1);
+      pointer-events: none;
+      /* 彻底阻止点击 */
     }
 
     /* 删掉 hover 放大的同时，增加仅高亮的纯光效，使用 hover:hover 防止移动端残留 */
     @media (hover: hover) {
       .act-btn.dodge:hover:not(:disabled):not(.selected) {
-        border-color: rgba(20, 184, 166, 0.65);
         box-shadow: 0 0 18px rgba(20, 184, 166, 0.25);
         color: var(--color-dod);
         transform: none;
       }
 
       .act-btn.guard:hover:not(:disabled):not(.selected) {
-        border-color: rgba(100, 116, 139, 0.75);
         box-shadow: 0 0 18px rgba(100, 116, 139, 0.25);
         color: var(--color-def);
         transform: none;
@@ -785,13 +804,11 @@
     }
 
     .act-btn.selected.guard {
-      border-color: var(--color-def);
       box-shadow: 0 10px 36px rgba(100, 116, 139, 0.5), inset 0 0 14px rgba(100, 116, 139, 0.3);
       color: var(--color-def);
     }
 
     .act-btn.selected.dodge {
-      border-color: var(--color-dod);
       box-shadow: 0 10px 36px rgba(20, 184, 166, 0.3), inset 0 0 14px rgba(20, 184, 166, 0.2);
       color: var(--color-dod);
     }
@@ -836,6 +853,39 @@
     .insight-btn:disabled {
       opacity: 0.3;
       cursor: not-allowed;
+    }
+
+    /* 行动区底部洞察+取消行的容器 */
+    .insight-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* 取消行动按钮 */
+    .cancel-action-btn {
+      padding: 6px 14px;
+      background: rgba(30, 30, 30, 0.75);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(150, 150, 160, 0.4);
+      color: rgba(180, 180, 190, 0.85);
+      border-radius: 20px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: none;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .cancel-action-btn.visible {
+      display: inline-flex;
+    }
+
+    .cancel-action-btn:hover {
+      background: rgba(80, 30, 30, 0.85);
+      border-color: rgba(220, 80, 80, 0.5);
+      color: #f87171;
     }
 
     /* 确认就绪 / 蓄气按钮 */
@@ -1664,9 +1714,11 @@
 
   <!-- ═══ 情报框（常驻于 P2 / 敌方卡下方）═══ -->
   <div class="intel-box" id="intelBox">
-    <div class="intel-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+    <div class="intel-header"
+      style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
       <div class="intel-title" style="margin-bottom:0;">已获取敌方情报</div>
-      <button class="intel-close" id="intelClose" style="background:none; border:none; color:var(--text-muted); font-size:1.1rem; cursor:pointer; padding:2px 6px; line-height:1; font-family:sans-serif;">✕</button>
+      <button class="intel-close" id="intelClose"
+        style="background:none; border:none; color:var(--text-muted); font-size:1.1rem; cursor:pointer; padding:2px 6px; line-height:1; font-family:sans-serif;">✕</button>
     </div>
     <div class="intel-list" id="intelList">
       <span class="intel-empty">尚未获取任何情报</span>
@@ -1679,17 +1731,25 @@
     <div class="insight-notice" id="insightNotice"></div>
 
     <!-- 行动期提示 -->
-    <div class="insight-notice" id="actionNotice" style="pointer-events: none; z-index: 100; font-size: 24px; letter-spacing: 4px; padding: 12px 32px; background: rgba(185, 28, 28, 0.85); border: 2px solid #ef4444; text-shadow: 0 0 10px rgba(0,0,0,0.8);">双方行动中: 3s</div>
+    <div class="insight-notice" id="actionNotice"
+      style="pointer-events: none; z-index: 100; font-size: 24px; letter-spacing: 4px; padding: 12px 32px; background: rgba(185, 28, 28, 0.85); border: 2px solid #ef4444; text-shadow: 0 0 10px rgba(0,0,0,0.8);">
+      双方行动中: 3s</div>
 
     <!-- 回合开始提示 -->
-    <div class="insight-notice" id="roundStartNotice" style="pointer-events: none; z-index: 100; padding: 24px 48px; background: rgba(5, 7, 18, 0.95); border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 0 40px rgba(0,0,0,0.8); display: flex; flex-direction: column; align-items: center; gap: 12px;">
-      <div style="font-size: 28px; letter-spacing: 12px; color: var(--text-main); font-weight: bold; text-indent: 12px;">回合开始</div>
+    <div class="insight-notice" id="roundStartNotice"
+      style="pointer-events: none; z-index: 100; padding: 24px 48px; background: rgba(5, 7, 18, 0.95); border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 0 40px rgba(0,0,0,0.8); display: flex; flex-direction: column; align-items: center; gap: 12px;">
+      <div
+        style="font-size: 28px; letter-spacing: 12px; color: var(--text-main); font-weight: bold; text-indent: 12px;">
+        回合开始</div>
       <div id="roundStartCountdownHint" style="font-size: 14px; color: var(--text-muted); opacity: 0.8;">1s 后自动关闭</div>
     </div>
 
     <!-- 回合结束提示 -->
-    <div class="insight-notice" id="turnEndNotice" style="pointer-events: none; z-index: 100; padding: 24px 48px; background: rgba(5, 7, 18, 0.95); border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 0 40px rgba(0,0,0,0.8); display: flex; flex-direction: column; align-items: center; gap: 12px;">
-      <div style="font-size: 28px; letter-spacing: 12px; color: var(--text-main); font-weight: bold; text-indent: 12px;">回合结束</div>
+    <div class="insight-notice" id="turnEndNotice"
+      style="pointer-events: none; z-index: 100; padding: 24px 48px; background: rgba(5, 7, 18, 0.95); border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 0 40px rgba(0,0,0,0.8); display: flex; flex-direction: column; align-items: center; gap: 12px;">
+      <div
+        style="font-size: 28px; letter-spacing: 12px; color: var(--text-main); font-weight: bold; text-indent: 12px;">
+        回合结束</div>
       <div id="turnEndCountdownHint" style="font-size: 14px; color: var(--text-muted); opacity: 0.8;">1s 后自动关闭</div>
     </div>
 
@@ -1745,7 +1805,7 @@
     <!-- 效果库弹窗 -->
     <div class="effect-picker" id="effectPicker">
       <div class="effect-picker-header">
-        <span class="effect-picker-title">选择效果</span>
+        <span class="effect-picker-title">选择技能</span>
         <button class="effect-picker-close" id="effectPickerClose">✕</button>
       </div>
       <div class="effect-picker-list" id="effectPickerList"></div>
@@ -1755,18 +1815,21 @@
   <!-- ═══ 指令区 ═══ -->
   <div class="commit-area" id="commitArea">
     <div style="display: flex; gap: 12px; align-items: center;">
-      <button class="commit-btn" id="standbyBtn" title="跳过回合恢复1点精力">蓄气</button>
+      <button class="commit-btn" id="standbyBtn" title="跳过回合恢复1点精力">蓄势</button>
       <button class="commit-btn" id="readyBtn">就绪</button>
       <button class="redecide-btn" id="redecideBtn">重新决策</button>
       <button class="decline-btn" id="declineRedecideBtn">放弃</button>
     </div>
     <span class="waiting-label" id="waitingLabel">等待对方就绪…</span>
 
-    <!-- 主动洞察 -->
-    <button class="insight-btn" id="insightBtn">
-      <img src="sq-du/effect/eye.svg" style="width: 1.2em; height: 1.2em;">
-      洞察对方（消耗 1 精力）
-    </button>
+    <!-- 主动洞察 + 取消行动 -->
+    <div class="insight-row">
+      <button class="insight-btn" id="insightBtn">
+        <img src="sq-du/effect/eye.svg" style="width: 1.2em; height: 1.2em;">
+        洞察对方
+      </button>
+      <button class="cancel-action-btn" id="cancelActionBtn">✕ 取消行动</button>
+    </div>
   </div>
 
   <!-- ═══ 行动配置侧边栏（框架） ═══ -->
@@ -1784,7 +1847,7 @@
     </div>
 
     <!-- 效果注入区（框架，内容由递辑层填充） -->
-    <div class="effect-section-title">生效效果（由点数决定上限 <span id="maxEffectSlots"
+    <div class="effect-section-title">生效技能（由点数决定上限 <span id="maxEffectSlots"
         style="color:#60a5fa;font-weight:bold">0</span> 个）</div>
     <div class="effect-list" id="effectList">
       <!-- 效果项预留，由邂辑层动态注入 -->
@@ -1852,20 +1915,24 @@
       -webkit-backdrop-filter: blur(8px);
       border: 1px solid #000;
       border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
       cursor: pointer;
       transition: all 0.2s ease;
       user-select: none;
       font-family: system-ui, -apple-system, sans-serif;
     }
+
     #globalPauseBtn:hover {
       background: rgba(40, 40, 40, 0.6);
       color: #fff;
     }
+
     #pauseOverlay {
       position: fixed;
-      top: 0; left: 0;
-      width: 100vw; height: 100vh;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
       background: rgba(0, 0, 0, 0.4);
       z-index: 9998;
       display: flex;
@@ -1877,25 +1944,29 @@
       backdrop-filter: blur(4px);
       -webkit-backdrop-filter: blur(4px);
     }
+
     #pauseOverlay.active {
       opacity: 1;
-      pointer-events: auto; /* 阻挡下方所有点击 */
+      pointer-events: auto;
+      /* 阻挡下方所有点击 */
     }
+
     #pauseOverlay .pause-text {
       color: #fff;
       font-size: 48px;
       font-weight: bold;
       letter-spacing: 12px;
-      margin-left: 12px; /* 补偿 spacing 导致的视觉偏移 */
-      text-shadow: 0 4px 12px rgba(0,0,0,0.8);
+      margin-left: 12px;
+      /* 补偿 spacing 导致的视觉偏移 */
+      text-shadow: 0 4px 12px rgba(0, 0, 0, 0.8);
       font-family: var(--font-number);
     }
   </style>
-  
+
   <div id="pauseOverlay">
     <div class="pause-text">已暂停</div>
   </div>
-  
+
   <!-- 全局暂停按钮 -->
   <button id="globalPauseBtn">⏸︎</button>
 

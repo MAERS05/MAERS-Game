@@ -299,30 +299,59 @@ export const EngineEvent = Object.freeze({
 
 /**
  * 效果 ID 枚举（全量）
- * 具体行为定义见 sq-du/effect/ 各子目录
+ * 具体行为定义见 sq-du/skill/ 各子目录
  */
 export const EffectId = Object.freeze({
-  // ── 攻击类效果 ──
+  // ── 通用状态效果 ──
+  SLUGGISH: 'sluggish',
+  REJUVENATED: 'rejuvenated',
+  EXHAUSTED: 'exhausted',
+  EXCITED: 'excited',
+  HEAVY: 'heavy',
+  LIGHT: 'light',
+  SHACKLED: 'shackled',
+  INSIGHTFUL: 'insightful',
+  DULL: 'dull',
+  BLINDED: 'blinded',
+  FORTIFIED: 'fortified',
+  WOUNDED: 'wounded',
+  POWER: 'power',
+  WEAK: 'weak',
+  BROKEN_BLADE: 'broken_blade',
+  SOLID: 'solid',
+  CRACKED_ARMOR: 'cracked_armor',
+  BROKEN_ARMOR: 'broken_armor',
+  SIDE_STEP_STATE: 'side_step',
+  CLUMSY: 'clumsy',
+  SHACKLED_DODGE: 'shackled_dodge',
+  // ── 既有效果 ──
   WOUND: 'wound',
   BREAK_QI: 'break_qi',
   CHARGE: 'charge',
   POUNCE: 'pounce',
   RECKLESS: 'reckless',
   ENERGIZE: 'energize',
-  // ── 守备类效果 ──
+  ABSORB: 'absorb',
+  CHAINLOCK: 'chainlock',
+  MONBLINDING: 'monblinding',
   AURA_SHIELD: 'aura_shield',
   DEFLECT: 'deflect',
   ENTRENCH: 'entrench',
   IRON_WALL: 'iron_wall',
   PHALANX: 'phalanx',
   INSPIRE: 'inspire',
-  // ── 闪避类效果 ──
+  PARALYSIS: 'paralysis',
+  RESTORE: 'restore',
+  SHATTER: 'shatter',
   AGILITY: 'agility',
   AFTERIMAGE: 'afterimage',
   MOMENTUM: 'momentum',
   SIDE_STEP: 'side_step',
   DISARM: 'disarm',
   DEPRESS: 'depress',
+  HIDE: 'hide',
+  LURE: 'lure',
+  SEE_THROUGH: 'see-through',
 });
 
 
@@ -416,6 +445,42 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.DEPRESS]: {
     id: EffectId.DEPRESS, name: '低落',
+    applicableTo: [Action.DODGE],
+  },
+  [EffectId.ABSORB]: {
+    id: EffectId.ABSORB, name: '吸收',
+    applicableTo: [Action.ATTACK],
+  },
+  [EffectId.CHAINLOCK]: {
+    id: EffectId.CHAINLOCK, name: '锁链',
+    applicableTo: [Action.ATTACK],
+  },
+  [EffectId.MONBLINDING]: {
+    id: EffectId.MONBLINDING, name: '蒙蔽',
+    applicableTo: [Action.ATTACK],
+  },
+  [EffectId.PARALYSIS]: {
+    id: EffectId.PARALYSIS, name: '麻痹',
+    applicableTo: [Action.GUARD],
+  },
+  [EffectId.RESTORE]: {
+    id: EffectId.RESTORE, name: '恢复',
+    applicableTo: [Action.GUARD],
+  },
+  [EffectId.SHATTER]: {
+    id: EffectId.SHATTER, name: '震碎',
+    applicableTo: [Action.GUARD],
+  },
+  [EffectId.HIDE]: {
+    id: EffectId.HIDE, name: '隐匿',
+    applicableTo: [Action.DODGE],
+  },
+  [EffectId.LURE]: {
+    id: EffectId.LURE, name: '引诱',
+    applicableTo: [Action.DODGE],
+  },
+  [EffectId.SEE_THROUGH]: {
+    id: EffectId.SEE_THROUGH, name: '看破',
     applicableTo: [Action.DODGE],
   },
 });
