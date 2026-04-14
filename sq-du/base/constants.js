@@ -321,7 +321,8 @@ export const EffectId = Object.freeze({
   SOLID: 'solid',
   CRACKED_ARMOR: 'cracked_armor',
   BROKEN_ARMOR: 'broken_armor',
-  SIDE_STEP_STATE: 'side_step',
+  SIDE_STEP: 'side_step',
+  BODY_SIDE: 'body-side',
   CLUMSY: 'clumsy',
   SHACKLED_DODGE: 'shackled_dodge',
   // ── 既有效果 ──
@@ -435,8 +436,8 @@ export const EffectDefs = Object.freeze({
     id: EffectId.MOMENTUM, name: '借势',
     applicableTo: [Action.DODGE],
   },
-  [EffectId.SIDE_STEP]: {
-    id: EffectId.SIDE_STEP, name: '侧步',
+  [EffectId.BODY_SIDE]: {
+    id: EffectId.BODY_SIDE, name: '倾身',
     applicableTo: [Action.DODGE],
   },
   [EffectId.DISARM]: {
@@ -510,8 +511,8 @@ export function calcActionCost(ctx, playerState) {
   if (ctx.action === Action.STANDBY && !ctx.isCharge) return 0;
   // 蓄力 / 普通行动：按 1 + enhance 基础计算，再加 penalty 减 discount
   const base = 1 + (ctx.enhance || 0);
-  const pen  = playerState?.staminaPenalty  || 0;
-  const dis  = playerState?.staminaDiscount || 0;
+  const pen = playerState?.staminaPenalty || 0;
+  const dis = playerState?.staminaDiscount || 0;
   return Math.max(0, base + pen - dis);
 }
 

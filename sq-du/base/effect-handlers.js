@@ -45,7 +45,7 @@ import { Shatter } from '../skill/guard/shatter.js';
 import { AgilityEffect } from '../skill/dodge/agility.js';
 import { AfterimageEffect } from '../skill/dodge/afterimage.js';
 import { MomentumEffect } from '../skill/dodge/momentum.js';
-import { SideStepEffect as SideStepSkillEffect } from '../skill/dodge/side_step.js';
+import { SideStepEffect as BodySideEffect } from '../skill/dodge/body-side.js';
 import { DisarmEffect } from '../skill/dodge/disarm.js';
 import { DepressEffect } from '../skill/dodge/depress.js';
 import { Hide } from '../skill/dodge/hide.js';
@@ -61,32 +61,32 @@ import { SeeThrough } from '../skill/dodge/see-through.js';
  *   onPhase(args)                              → void（阶段接口触发时机）
  */
 const RawEffectHandlers = {
-  [EffectId.WOUND]:       WoundEffect,
-  [EffectId.BREAK_QI]:    BreakQiEffect,
-  [EffectId.CHARGE]:      ChargeEffect,
+  [EffectId.WOUND]: WoundEffect,
+  [EffectId.BREAK_QI]: BreakQiEffect,
+  [EffectId.CHARGE]: ChargeEffect,
   [EffectId.AURA_SHIELD]: AuraShieldEffect,
-  [EffectId.DEFLECT]:     DeflectEffect,
-  [EffectId.ENTRENCH]:    EntrenchEffect,
-  [EffectId.AGILITY]:     AgilityEffect,
-  [EffectId.AFTERIMAGE]:  AfterimageEffect,
-  [EffectId.MOMENTUM]:    MomentumEffect,
-  [EffectId.SIDE_STEP]:   SideStepSkillEffect,
-  [EffectId.DISARM]:      DisarmEffect,
-  [EffectId.IRON_WALL]:   IronWallEffect,
-  [EffectId.PHALANX]:     PhalanxEffect,
-  [EffectId.POUNCE]:      PounceEffect,
-  [EffectId.RECKLESS]:    RecklessEffect,
-  [EffectId.INSPIRE]:     InspireEffect,
-  [EffectId.DEPRESS]:     DepressEffect,
-  [EffectId.ENERGIZE]:    EnergizeEffect,
-  [EffectId.ABSORB]:      Absorb,
-  [EffectId.CHAINLOCK]:   ChainLock,
+  [EffectId.DEFLECT]: DeflectEffect,
+  [EffectId.ENTRENCH]: EntrenchEffect,
+  [EffectId.AGILITY]: AgilityEffect,
+  [EffectId.AFTERIMAGE]: AfterimageEffect,
+  [EffectId.MOMENTUM]: MomentumEffect,
+  [EffectId.BODY_SIDE]: BodySideEffect,
+  [EffectId.DISARM]: DisarmEffect,
+  [EffectId.IRON_WALL]: IronWallEffect,
+  [EffectId.PHALANX]: PhalanxEffect,
+  [EffectId.POUNCE]: PounceEffect,
+  [EffectId.RECKLESS]: RecklessEffect,
+  [EffectId.INSPIRE]: InspireEffect,
+  [EffectId.DEPRESS]: DepressEffect,
+  [EffectId.ENERGIZE]: EnergizeEffect,
+  [EffectId.ABSORB]: Absorb,
+  [EffectId.CHAINLOCK]: ChainLock,
   [EffectId.MONBLINDING]: Monblinding,
-  [EffectId.PARALYSIS]:   Paralysis,
-  [EffectId.RESTORE]:     Restore,
-  [EffectId.SHATTER]:     Shatter,
-  [EffectId.HIDE]:        Hide,
-  [EffectId.LURE]:        Lure,
+  [EffectId.PARALYSIS]: Paralysis,
+  [EffectId.RESTORE]: Restore,
+  [EffectId.SHATTER]: Shatter,
+  [EffectId.HIDE]: Hide,
+  [EffectId.LURE]: Lure,
   [EffectId.SEE_THROUGH]: SeeThrough,
   sluggish: SluggishEffect,
   rejuvenated: RejuvenatedEffect,
@@ -121,7 +121,7 @@ export const EffectHandlers = Object.freeze(
       id,
       Object.freeze({
         ...handler,
-        onPhase: handler?.onPhase || (() => {}),
+        onPhase: handler?.onPhase || (() => { }),
       }),
     ])
   )

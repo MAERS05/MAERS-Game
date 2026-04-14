@@ -237,9 +237,9 @@ function refreshPoints() {
   const snap = engine.getSnapshot();
   const p1 = snap.players[PlayerId.P1];
 
-  let atkPt = 1 + (selectedAction === 'attack' ? localEnhance : 0) + (p1.chargeBoost || 0) - (p1.ptsDebuff || 0);
-  let grdPt = 1 + (selectedAction === 'guard' ? localEnhance : 0) + (p1.guardBoost || 0) - (p1.guardDebuff || 0);
-  let dgePt = 1 + (selectedAction === 'dodge' ? localEnhance : 0) + (p1.dodgeBoost || 0) - (p1.dodgeDebuff || 0);
+  let atkPt = 1 + (selectedAction === 'attack' ? localEnhance : 0);
+  let grdPt = 1 + (selectedAction === 'guard' ? localEnhance : 0);
+  let dgePt = 1 + (selectedAction === 'dodge' ? localEnhance : 0);
 
   ui.ptAttack.textContent = Math.max(0, atkPt);
   ui.ptGuard.textContent = Math.max(0, grdPt);
