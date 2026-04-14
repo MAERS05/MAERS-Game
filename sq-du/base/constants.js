@@ -48,7 +48,7 @@ export const Action = Object.freeze({
 export const ActionBasePts = Object.freeze({
   [Action.ATTACK]: 1,
   [Action.GUARD]: 1,
-  [Action.DODGE]: 1, // 闪避幅度独立，基础点数为 1，可通过强化提升
+  [Action.DODGE]: 1, // 闪避点数独立，基础点数为 1，可通过强化提升
   [Action.STANDBY]: 0,
 });
 
@@ -70,11 +70,11 @@ export const Clash = Object.freeze({
   MUTUAL_STANDBY: 'MUTUAL_STANDBY',
   /** 一方攻击另一方待命 */
   ONE_SIDE_ATTACK: 'ONE_SIDE_ATTACK',
-  /** 双方攻击，速度、点数均相同 */
+  /** 双方攻击，动速、点数均相同 */
   CONFRONT: 'CONFRONT',      // 对峙
-  /** 双方攻击，速度不同 */
+  /** 双方攻击，动速不同 */
   PREEMPT: 'PREEMPT',       // 抢攻
-  /** 双方攻击，速度相同，点数不同 */
+  /** 双方攻击，动速相同，点数不同 */
   SUPPRESS: 'SUPPRESS',      // 压制
   /** 攻击方攻击，目标精力为 0 */
   EXECUTE: 'EXECUTE',       // 处决
@@ -86,21 +86,21 @@ export const Clash = Object.freeze({
   RETREAT: 'RETREAT',      // 退让
   /** 一方闪避，一方守备 */
   PROBE: 'PROBE',        // 试探
-  /** 攻方速度高于守方速度 */
+  /** 攻方动速高于守方动速 */
   RAID: 'RAID',         // 突袭
-  /** 守方速度≥攻方速度，守方点数≥攻方点数 */
+  /** 守方动速≥攻方动速，守方点数≥攻方点数 */
   FORTIFY: 'FORTIFY',      // 坚固
-  /** 守方速度≥攻方速度，守方点数<攻方点数 */
+  /** 守方动速≥攻方动速，守方点数<攻方点数 */
   BREAK: 'BREAK',        // 破势
-  /** 攻方速度高于闪方速度 */
+  /** 攻方动速高于闪方动速 */
   SWIFT_STRIKE: 'SWIFT_STRIKE', // 迅攻
-  /** 闪方速度大于攻方速度 */
+  /** 闪方动速大于攻方动速 */
   EVADE: 'EVADE',        // 规避
-  /** 同速，闪避幅度 > 攻击点数 */
+  /** 同速，闪避点数 > 攻击点数 */
   DODGE_OUTMANEUVERED: 'DODGE_OUTMANEUVERED', // 虚步
-  /** 同速，闪避幅度 < 攻击点数 */
+  /** 同速，闪避点数 < 攻击点数 */
   ATTACK_OVERPOWERS: 'ATTACK_OVERPOWERS',   // 强突
-  /** 同速，闪避幅度 = 攻击点数，双方互中 */
+  /** 同速，闪避点数 = 攻击点数，双方互中 */
   MUTUAL_HIT: 'MUTUAL_HIT',          // 侥幸
   /** 无法归入常规情形的特殊操作（如蓄力等未执行常规攻击的场合） */
   OTHER: 'OTHER',                    // 其它
@@ -167,21 +167,21 @@ export const EngineState = Object.freeze({
 /** 回合时间设定（单位：秒） */
 export const TimerConfig = Object.freeze({
   /** 每回合前置装备期时长（双方公共倒计时） */
-  EQUIP_TIME: 10,
+  EQUIP_TIME: 15,
   /** 决策期总时限（独立倒计时，就绪则暂停该方） */
-  DECISION_TIME: 50,
+  DECISION_TIME: 35,
   /** 向后兼容：TOTAL 指向决策期时长 */
   get TOTAL() { return this.DECISION_TIME; },
-  /** 决策期上限（超过此值进入洞察期） */
-  DECISION_LIMIT: 30,
+  /** 决策期上限（超过此值进入洞察期/暴露期） */
+  DECISION_LIMIT: 25,
   /** 倒计时 tick 间隔（毫秒） */
   TICK_MS: 1000,
 });
 
 /** 回合阶段枚举 */
 export const Phase = Object.freeze({
-  DECISION: 'DECISION', // 0 ~ 30s
-  INSIGHT: 'INSIGHT',  // 30 ~ 50s
+  DECISION: 'DECISION', // 0 ~ 25s
+  INSIGHT: 'INSIGHT',  // 25 ~ 35s
 });
 
 // ─────────────────────────────────────────────
@@ -190,9 +190,9 @@ export const Phase = Object.freeze({
 
 /** 玩家初始属性 */
 export const DefaultStats = Object.freeze({
-  MAX_HP: 3, // 气数上限
+  MAX_HP: 3, // 命数上限
   MAX_STAMINA: 3, // 精力上限
-  BASE_SPEED: 1, // 基础速度
+  BASE_SPEED: 1, // 基础动速
 });
 
 // ─────────────────────────────────────────────
@@ -241,8 +241,17 @@ export const EngineEvent = Object.freeze({
   /** 效果槽位更新 payload: { playerId, action, slot, effectId } */
   EFFECT_SLOT_UPDATED: 'effect_slot_updated',
 
-  /** 回合结算完成 payload: ResolveResult */
+  /** 双方就绪开始行动（3s动画时间） payload: {} */
+  ACTION_PHASE_START: 'action_phase_start',
+
+  /** 回合结算完成（显示战报） payload: ResolveResult */
   TURN_RESOLVED: 'turn_resolved',
+
+  /** 回合结束期（1s） payload: {} */
+  TURN_END_PHASE: 'turn_end_phase',
+
+  /** 回合开始期（1s） payload: {} */
+  TURN_START_PHASE: 'turn_start_phase',
 
   /** 游戏结束 payload: { winner: PlayerId | null, reason: String } */
   GAME_OVER: 'game_over',
@@ -259,21 +268,21 @@ export const EngineEvent = Object.freeze({
 export const EffectId = Object.freeze({
   // ── 攻击类效果 ──
   WOUND: 'wound',       // 创伤：命中后为目标附加伤口（下回合行动额外消耗 1 精力）
-  BREAK_QI: 'break_qi',    // 破气：消耗自身 1 点气数，本回合攻击 +1 点数
+  BREAK_QI: 'break_qi',    // 泣命：消耗自身 1 点命数，本回合行动期开始攻击点数 +1
   CHARGE: 'charge',      // 蓄力：本回合攻击不执行，下回合攻击 +1 点数
   POUNCE: 'pounce',      // 猛扑：下回合最终闪避威力-1，本回合攻击威力+1
   RECKLESS: 'reckless',    // 舍身：下回合最终守备威力-1，本回合攻击威力+1
-  ENERGIZE: 'energize',    // 蓄能：攻击成功下回合闪避最终点数+1
+  ENERGIZE: 'energize',    // 蓄能：攻击成功下回合闪避点数+1
   // ── 守备类效果 ──
-  AURA_SHIELD: 'aura_shield', // 御气：消耗自身 1 点气数，本回合守备 +1 点数
+  AURA_SHIELD: 'aura_shield', // 御气：消耗自身 1 点命数，本回合行动期开始攻击点数 +1
   DEFLECT: 'deflect',     // 卸力：守备成功防挡时，对手下回合攻击 -1 点数
   ENTRENCH: 'entrench',    // 固守：本回合未受到伤害，下回合守备 +1 点数
   IRON_WALL: 'iron_wall',   // 铁壁：下回合最终攻击威力-1，本回合守备威力+1
   PHALANX: 'phalanx',     // 步阵：下回合最终闪避威力-1，本回合守备威力+1
   INSPIRE: 'inspire',     // 振奋：守备成功下回合消耗精力-1
   // ── 闪避类效果 ──
-  AGILITY: 'agility',     // 灵巧：闪避成功后下回合速度 +1
-  AFTERIMAGE: 'afterimage',  // 残影：消耗自身 1 点气数，本回合闪避 +1 幅度
+  AGILITY: 'agility',     // 灵巧：闪避成功后下回合动速 +1
+  AFTERIMAGE: 'afterimage',  // 残影：消耗自身 1 点命数，本回合行动期开始闪避点数 +
   MOMENTUM: 'momentum',    // 借势：闪避成功且未受伤，恢复 1 点精力
   SIDE_STEP: 'side_step',   // 侧步：下回合最终攻击威力-1，本回合闪避威力+1
   DISARM: 'disarm',      // 解甲：下回合最终守备威力-1，本回合闪避威力+1
@@ -288,7 +297,7 @@ export const EffectId = Object.freeze({
  * @property {string}   name         - 中文名
  * @property {string}   desc         - 简短描述
  * @property {string[]} applicableTo - 可装配到哪些行为（Action 枚举值数组）
- * @property {number}  [hpCost=0]   - 触发时消耗使用方的气数（自伤类效果，如破气=1）。
+ * @property {number}  [hpCost=0]   - 触发时消耗使用方的命数（自伤类效果，如泣命=1）。
  *                                     AI 及规则层通过此字段内省效果代价，无需硬编码 ID 列表。
  */
 
@@ -300,59 +309,59 @@ export const EffectId = Object.freeze({
 export const EffectDefs = Object.freeze({
   [EffectId.WOUND]: {
     id: EffectId.WOUND, name: '创伤',
-    desc: '攻击成功时，对方在下回合结束时损失 1 点气数',
+    desc: '攻击成功时，对方下回合行动期开始扣除一点命数',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.BREAK_QI]: {
-    id: EffectId.BREAK_QI, name: '破气',
-    desc: '消耗自身 1 点气数，本回合攻击 +1 最终点数',
+    id: EffectId.BREAK_QI, name: '泣命',
+    desc: '消耗自身 1 点命数，本回合行动期开始攻击点数 +1',
     applicableTo: [Action.ATTACK],
     hpCost: 1,
   },
   [EffectId.CHARGE]: {
     id: EffectId.CHARGE, name: '蓄力',
-    desc: '本回合攻击不执行，下回合攻击 +1 最终点数',
+    desc: '本回合攻击不执行，下回合行动期开始攻击点数 +1',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.POUNCE]: {
     id: EffectId.POUNCE, name: '猛扑',
-    desc: '本回合攻击 +1 最终点数，下回合闪避 -1 最终点数',
+    desc: '本回合行动期开始攻击点数 +1，下回合行动期开始闪避点数 -1',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.RECKLESS]: {
     id: EffectId.RECKLESS, name: '舍身',
-    desc: '本回合攻击 +1 最终点数，下回合守备 -1 最终点数',
+    desc: '本回合行动期开始攻击点数 +1，下回合行动期开始守备点数 -1',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.ENERGIZE]: {
     id: EffectId.ENERGIZE, name: '蓄能',
-    desc: '攻击成功时，下回合闪避最终点数 +1',
+    desc: '攻击成功时，下回合行动期开始闪避点数 +1',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.AURA_SHIELD]: {
     id: EffectId.AURA_SHIELD, name: '御气',
-    desc: '消耗自身 1 点气数，本回合守备 +1 最终点数',
+    desc: '消耗自身 1 点命数，本回合行动期开始守备点数 +1',
     applicableTo: [Action.GUARD],
     hpCost: 1,
   },
   [EffectId.DEFLECT]: {
     id: EffectId.DEFLECT, name: '卸力',
-    desc: '守备成功时，对手下回合攻击 -1 最终点数',
+    desc: '守备成功时，对手下回合行动期开始攻击点数 -1',
     applicableTo: [Action.GUARD],
   },
   [EffectId.ENTRENCH]: {
     id: EffectId.ENTRENCH, name: '固守',
-    desc: '守备成功时，下回合守备 +1 最终点数',
+    desc: '守备成功时，下回合行动期开始守备点数 +1',
     applicableTo: [Action.GUARD],
   },
   [EffectId.IRON_WALL]: {
     id: EffectId.IRON_WALL, name: '铁壁',
-    desc: '本回合守备 +1 最终点数，下回合攻击 -1 最终点数',
+    desc: '本回合行动期开始守备点数 +1，下回合行动期开始攻击点数 -1',
     applicableTo: [Action.GUARD],
   },
   [EffectId.PHALANX]: {
     id: EffectId.PHALANX, name: '步阵',
-    desc: '本回合守备 +1 最终点数，下回合闪避 -1 最终点数',
+    desc: '本回合行动期开始守备点数 +1，下回合行动期开始闪避点数 -1',
     applicableTo: [Action.GUARD],
   },
   [EffectId.INSPIRE]: {
@@ -362,12 +371,12 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.AGILITY]: {
     id: EffectId.AGILITY, name: '灵巧',
-    desc: '闪避成功时，下回合最终速度 +1',
+    desc: '闪避成功时，下回合动速 +1',
     applicableTo: [Action.DODGE],
   },
   [EffectId.AFTERIMAGE]: {
     id: EffectId.AFTERIMAGE, name: '残影',
-    desc: '消耗自身 1 点气数，本回合闪避 +1 最终点数',
+    desc: '消耗自身 1 点命数，本回合行动期开始闪避点数 +1',
     applicableTo: [Action.DODGE],
     hpCost: 1,
   },
@@ -378,12 +387,12 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.SIDE_STEP]: {
     id: EffectId.SIDE_STEP, name: '侧步',
-    desc: '本回合闪避 +1 最终点数，下回合攻击 -1 最终点数',
+    desc: '本回合行动期开始闪避点数 +1，下回合行动期开始攻击点数 -1',
     applicableTo: [Action.DODGE],
   },
   [EffectId.DISARM]: {
     id: EffectId.DISARM, name: '解甲',
-    desc: '本回合闪避 +1 最终点数，下回合守备 -1 最终点数',
+    desc: '本回合行动期开始闪避点数 +1，下回合行动期开始守备点数 -1',
     applicableTo: [Action.DODGE],
   },
   [EffectId.DEPRESS]: {
@@ -433,8 +442,8 @@ export function calcActionCost(ctx, playerState) {
  * @typedef {Object} ActionCtx
  * @property {string}   action
  * @property {number}   enhance   - 强化次数
- * @property {number}   speed     - 当前速度
- * @property {number}   pts       - 最终点数（attack/guard: 1+enhance, dodge: 1+enhance）
+ * @property {number}   speed     - 当前动速
+ * @property {number}   pts       - 点数（attack/guard: 1+enhance, dodge: 1+enhance）
  * @property {number}   cost
  * @property {boolean}  insightUsed
  * @property {Array<string|null>} effects
@@ -444,9 +453,9 @@ export function calcActionCost(ctx, playerState) {
  * @typedef {Object} PlayerState
  * 玩家/AI 的完整状态
  * @property {string}  id          - PlayerId
- * @property {number}  hp          - 当前气数
+ * @property {number}  hp          - 当前命数
  * @property {number}  stamina     - 当前精力
- * @property {number}  speed       - 当前速度（回合内数值）
+ * @property {number}  speed       - 当前动速（回合内数值）
  * @property {boolean} ready       - 是否已就绪
  * @property {boolean} insightUsed - 本回合是否已使用主动洞察
  * @property {boolean} wasInsighted - 本回合是否经历了洞察（主动或被动）

@@ -41,7 +41,7 @@ export class EffectLayer {
       cp2.pts = Math.max(0, cp2.pts + (p2State.dodgeBoost || 0) - (p2State.dodgeDebuff || 0));
     }
 
-    // ── 灵巧跨回合速度增益 ────────────────────────────
+    // ── 灵巧跨回合动速增益 ────────────────────────────
     if (p1State.agilityBoost) cp1.speed += p1State.agilityBoost;
     if (p2State.agilityBoost) cp2.speed += p2State.agilityBoost;
 

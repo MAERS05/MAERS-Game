@@ -86,7 +86,7 @@
     .hud-top {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
       padding: 24px 48px;
       z-index: 10;
       position: relative;
@@ -282,7 +282,7 @@
       width: 64px;
     }
 
-    /* 气数（菱形格） */
+    /* 命数（菱形格） */
     .hp-pip {
       width: 13px;
       height: 13px;
@@ -318,7 +318,7 @@
       opacity: 0.4;
     }
 
-    /* 速度调节行 */
+    /* 动速调节行 */
     .speed-row {
       display: flex;
       align-items: center;
@@ -625,6 +625,40 @@
       opacity: 0 !important;
       pointer-events: none !important;
       transition: opacity 1s ease !important;
+    }
+
+    /* 重新开始按钮（极简版） */
+    #restartBtn {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.9);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease, transform 0.4s ease;
+      background: rgba(5, 7, 18, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      padding: 20px 60px;
+      color: var(--text-main);
+      cursor: pointer;
+      font-size: 1.2rem;
+      font-weight: bold;
+      letter-spacing: 8px;
+      text-indent: 8px; /* 居中对齐文字，因为有横向间距 */
+      backdrop-filter: blur(12px);
+      box-shadow: 0 0 40px rgba(0,0,0,0.8);
+      z-index: 500;
+    }
+    #restartBtn:hover {
+      background: rgba(15, 20, 35, 0.95);
+      border-color: rgba(255, 255, 255, 0.4);
+      transform: translate(-50%, -50%) scale(1.05);
+    }
+    #restartBtn.show {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+      pointer-events: auto;
     }
 
     .clash-name {
@@ -1550,7 +1584,7 @@
       <!-- 属性 -->
       <div class="stats-col">
         <div class="stat-row">
-          <span class="stat-label">气数</span>
+          <span class="stat-label">命数</span>
           <div class="hp-pip" id="p1-hp-1"></div>
           <div class="hp-pip" id="p1-hp-2"></div>
           <div class="hp-pip" id="p1-hp-3"></div>
@@ -1562,18 +1596,19 @@
           <div class="stamina-pip" id="p1-stam-3"></div>
         </div>
         <div class="stat-row speed-row">
-          <span class="stat-label">速度</span>
-          <button class="speed-btn" id="p1SpeedDown" title="降速+1精力">－</button>
+          <span class="stat-label">动速</span>
+          <button class="speed-btn" id="p1SpeedDown" title="降动速+1精力消耗">－</button>
           <span class="speed-val" id="p1SpeedVal">1</span>
-          <button class="speed-btn" id="p1SpeedUp" title="提速-1精力">＋</button>
+          <button class="speed-btn" id="p1SpeedUp" title="提动速-1精力消耗">＋</button>
         </div>
       </div>
     </div>
 
     <!-- 中央回合区 -->
     <div class="hud-center">
+      <div class="phase-indicator" id="phaseIndicator">回合开始期</div>
       <div class="turn-indicator" id="turnIndicator">TURN 1</div>
-      <button class="history-btn" id="historyBtn" title="战事录">📜</button>
+      <button class="history-btn" id="historyBtn" title="战事记录">📜</button>
     </div>
 
     <!-- P2 状态卡（敌方） -->
@@ -1598,7 +1633,7 @@
           <div class="hp-pip" id="p2-hp-1"></div>
           <div class="hp-pip" id="p2-hp-2"></div>
           <div class="hp-pip" id="p2-hp-3"></div>
-          <span class="stat-label" style="text-align:right">气数</span>
+          <span class="stat-label" style="text-align:right">命数</span>
         </div>
         <div class="stat-row">
           <div class="stamina-pip" id="p2-stam-1"></div>
@@ -1608,7 +1643,7 @@
         </div>
         <div class="stat-row speed-row" style="justify-content:flex-end">
           <span class="speed-val" id="p2SpeedVal">1</span>
-          <span class="stat-label" style="text-align:right">速度</span>
+          <span class="stat-label" style="text-align:right">动速</span>
         </div>
       </div>
 
@@ -1643,24 +1678,41 @@
     <!-- 被动洞察提示 -->
     <div class="insight-notice" id="insightNotice"></div>
 
+    <!-- 行动期提示 -->
+    <div class="insight-notice" id="actionNotice" style="pointer-events: none; z-index: 100; font-size: 24px; letter-spacing: 4px; padding: 12px 32px; background: rgba(185, 28, 28, 0.85); border: 2px solid #ef4444; text-shadow: 0 0 10px rgba(0,0,0,0.8);">双方行动中: 3s</div>
+
+    <!-- 回合开始提示 -->
+    <div class="insight-notice" id="roundStartNotice" style="pointer-events: none; z-index: 100; padding: 24px 48px; background: rgba(5, 7, 18, 0.95); border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 0 40px rgba(0,0,0,0.8); display: flex; flex-direction: column; align-items: center; gap: 12px;">
+      <div style="font-size: 28px; letter-spacing: 12px; color: var(--text-main); font-weight: bold; text-indent: 12px;">回合开始</div>
+      <div id="roundStartCountdownHint" style="font-size: 14px; color: var(--text-muted); opacity: 0.8;">1s 后自动关闭</div>
+    </div>
+
+    <!-- 回合结束提示 -->
+    <div class="insight-notice" id="turnEndNotice" style="pointer-events: none; z-index: 100; padding: 24px 48px; background: rgba(5, 7, 18, 0.95); border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 0 40px rgba(0,0,0,0.8); display: flex; flex-direction: column; align-items: center; gap: 12px;">
+      <div style="font-size: 28px; letter-spacing: 12px; color: var(--text-main); font-weight: bold; text-indent: 12px;">回合结束</div>
+      <div id="turnEndCountdownHint" style="font-size: 14px; color: var(--text-muted); opacity: 0.8;">1s 后自动关闭</div>
+    </div>
+
     <!-- 结算日志 -->
     <div class="battle-log" id="battleLog">
       <div class="clash-name" id="clashName"></div>
       <div class="log-detail" id="logDetail"></div>
-      <div class="log-hint">点击关闭，开始下一回合</div>
+      <div class="log-hint" id="battleLogHint">点击关闭，开始下一回合</div>
     </div>
 
-    <!-- ═══ 装备期覆盖面板 ═══ -->
+    <!-- 重新开始按钮 -->
+    <button id="restartBtn" onclick="location.reload()">重新开始</button>
+
+    <!-- ═══ 装配期覆盖面板 ═══ -->
     <div class="equip-overlay" id="equipOverlay">
       <div class="equip-overlay-inner">
         <div class="equip-header">
-          <span class="equip-title">效果装配</span>
-          <span class="equip-countdown">装备期 <strong id="equipCountdown">10</strong>s</span>
+          <span class="equip-title" id="equipOverlayTitle">装配期</span>
         </div>
         <div class="equip-slots-wrapper">
           <!-- 攻击槽 -->
           <div class="equip-action-block" data-action="attack">
-            <div class="equip-action-label">攻击</div>
+            <div class="equip-action-label" style="color: var(--color-atk)">攻击</div>
             <div class="equip-slots" id="equipSlots-attack">
               <div class="equip-slot" data-action="attack" data-slot="0"><span class="slot-add">+</span></div>
               <div class="equip-slot" data-action="attack" data-slot="1"><span class="slot-add">+</span></div>
@@ -1669,7 +1721,7 @@
           </div>
           <!-- 守备槽 -->
           <div class="equip-action-block" data-action="guard">
-            <div class="equip-action-label">守备</div>
+            <div class="equip-action-label" style="color: var(--color-def)">守备</div>
             <div class="equip-slots" id="equipSlots-guard">
               <div class="equip-slot" data-action="guard" data-slot="0"><span class="slot-add">+</span></div>
               <div class="equip-slot" data-action="guard" data-slot="1"><span class="slot-add">+</span></div>
@@ -1678,7 +1730,7 @@
           </div>
           <!-- 闪避槽 -->
           <div class="equip-action-block" data-action="dodge">
-            <div class="equip-action-label">闪避</div>
+            <div class="equip-action-label" style="color: var(--color-dod)">闪避</div>
             <div class="equip-slots" id="equipSlots-dodge">
               <div class="equip-slot" data-action="dodge" data-slot="0"><span class="slot-add">+</span></div>
               <div class="equip-slot" data-action="dodge" data-slot="1"><span class="slot-add">+</span></div>
@@ -1686,6 +1738,7 @@
             </div>
           </div>
         </div>
+        <div class="log-hint" id="equipCountdownHint">10s 后关闭</div>
       </div>
     </div>
 

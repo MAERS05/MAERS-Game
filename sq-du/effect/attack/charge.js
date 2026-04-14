@@ -3,7 +3,7 @@
  * @description 【蓄力】其它类效果
  *
  * 触发条件：攻击前（前置效果）
- * 效果：本回合攻击不执行（转为待命），下回合攻击 +1 最终点数。
+ * 效果：本回合攻击不执行（转为待命），下回合攻击 +1 点数。
  *
  * 实现要点：
  *   - onPre：将 ctx.action 设为 STANDBY，标记 isCharge: true（供 resolver 识别为"其它"情形）
@@ -19,7 +19,7 @@ import { Action, EffectId } from '../../base/constants.js';
 export const ChargeEffect = Object.freeze({
   id: EffectId.CHARGE,
   name: '蓄力',
-  desc: '本回合攻击不执行，下回合攻击 +1 最终点数',
+  desc: '本回合攻击不执行，下回合行动期开始攻击点数 +1',
   applicableTo: [Action.ATTACK],
 
   /**

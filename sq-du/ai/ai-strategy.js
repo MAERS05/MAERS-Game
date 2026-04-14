@@ -4,7 +4,7 @@
  *
  * 职责：
  *  仅在已知对手底牌（重决策场景）时被调用。
- *  基于已知的对手行动，给出最优克制决策（行动类型、速度、强化）。
+ *  基于已知的对手行动，给出最优克制决策（行动类型、动速、强化）。
  *
  * 与 ai-base.js 的区别：
  *  - ai-base.js：盲决策权重，不知道对手意图
@@ -60,7 +60,7 @@ export class AIStrategyLayer {
         return this._counterGuard(revealedPts, snap, effectiveStamina);
 
       case Action.DODGE:
-        // 对手闪避时：攻击可能被闪开，关键在于速度
+        // 对手闪避时：攻击可能被闪开，关键在于动速
         // 有余量加速超越时，出攻击；否则待命
         return effectiveStamina >= 2 ? Action.ATTACK : Action.STANDBY;
 
@@ -113,19 +113,19 @@ export class AIStrategyLayer {
   }
 
   // ─────────────────────────────────────────────────────────
-  // 速度选择（完美信息下的速度博弈）
+  // 动速选择（完美信息下的动速博弈）
   // ─────────────────────────────────────────────────────────
 
   /**
-   * 守备/闪避克制攻击时：速度必须 > 对手攻击速度，才能提前就位。
-   * 攻击克制闪避时：速度必须 > 对手闪避速度，否则攻击被闪开。
+   * 守备/闪避克制攻击时：动速必须 > 对手攻击动速，才能提前就位。
+   * 攻击克制闪避时：动速必须 > 对手闪避动速，否则攻击被闪开。
    * 攻击克制待命/守备时：不需要特别高速，节省精力。
    */
   static _pickSpeed(revealedAct, revealedSpd, snap, action, effectiveStamina) {
     const BASE = DefaultStats.BASE_SPEED;
-    const canBoost = effectiveStamina >= 2; // 基础1 + 速度1
+    const canBoost = effectiveStamina >= 2; // 基础1 + 动速1
 
-    // 守备/闪避 vs 对手攻击：速度竞争
+    // 守备/闪避 vs 对手攻击：动速竞争
     if (revealedAct === Action.ATTACK && (action === Action.GUARD || action === Action.DODGE)) {
       if (!canBoost) return BASE;
       // 对手加速攻击：必须跟着加速才能提前就位
@@ -134,7 +134,7 @@ export class AIStrategyLayer {
       return Math.random() < 0.40 ? BASE + 1 : BASE;
     }
 
-    // 攻击 vs 对手闪避：速度必须严格超过闪避速度
+    // 攻击 vs 对手闪避：动速必须严格超过闪避动速
     if (revealedAct === Action.DODGE && action === Action.ATTACK) {
       if (!canBoost) return BASE; // 无法加速时攻击很可能被闪开（由_pickAction层面已考虑）
       // 对手加速闪避：必须超过，否则被闪
@@ -143,7 +143,7 @@ export class AIStrategyLayer {
       return BASE + 1;
     }
 
-    // 攻击 vs 待命/守备：速度无关紧要，保守
+    // 攻击 vs 待命/守备：动速无关紧要，保守
     if (action === Action.ATTACK) {
       if (!canBoost) return BASE;
       const playerWeakness = 1 - Math.max(snap.playerHpRatio, snap.playerStaminaRatio);
@@ -181,7 +181,7 @@ export class AIStrategyLayer {
       if (revealedPts >= 2) return 1;
     }
 
-    // 闪避 vs 攻击：强化闪避「躲开」幅度使点数更高
+    // 闪避 vs 攻击：强化闪避「躲开」点数使点数更高
     if (action === Action.DODGE && revealedAct === Action.ATTACK) {
       if (revealedPts >= 2 && effectiveStamina >= 2) return 1;
     }

@@ -278,12 +278,12 @@ export class BattleEngine {
       ...patch,
     };
 
-    // ── AI 速度消耗同步 ──────────────────────────────────
+    // ── AI 动速消耗同步 ──────────────────────────────────
     // AI 绕过了 adjustSpeed()，直接在 patch 中提交 speed 值。
     // 此处将 speed 差值转化为精力扣除，与 adjustSpeed 行为一致。
     if (patch.speed != null) {
       const targetSpeed = patch.speed;
-      const currentSpeed = p.speed; // 当前速度（回合初始为 BASE_SPEED）
+      const currentSpeed = p.speed; // 当前动速（回合初始为 BASE_SPEED）
       const delta = targetSpeed - currentSpeed;
 
       if (delta > 0) {
@@ -305,7 +305,7 @@ export class BattleEngine {
         p.speed = currentSpeed + actualBoost;
         p.actionCtx.speed = p.speed;
       } else if (delta < 0) {
-        // 降速：归还精力（重决策时可能改用更低速度）
+        // 降速：归还精力（重决策时可能改用更低动速）
         const refund = Math.abs(delta);
         p.speed = Math.max(DefaultStats.BASE_SPEED, targetSpeed);
         for (let i = 0; i < refund; i++) {
@@ -331,7 +331,7 @@ export class BattleEngine {
   }
 
   /**
-   * 玩家调整速度（消耗精力/释放精力）
+   * 玩家调整动速（消耗精力/释放精力）
    * @param {string} playerId
    * @param {number} delta - +1 提速（消耗精力），-1 降速（归还精力）
    */
@@ -365,7 +365,7 @@ export class BattleEngine {
       }
     }
 
-    // 同步更新行动配置中的速度
+    // 同步更新行动配置中的动速
     if (p.actionCtx) {
       p.actionCtx.speed = p.speed;
       p.actionCtx.pts = this._calcPts(p.actionCtx, p);
@@ -594,37 +594,45 @@ export class BattleEngine {
   // ═══════════════════════════════════════════
 
   _beginTurn() {
-    this._turn++;
+    this._setState(EngineState.IDLE);
 
-    // 重置回合状态（不重置 hp / stamina / speed / equippedEffects / effectIntel）
-    [PlayerId.P1, PlayerId.P2].forEach(id => {
-      const p = this._players[id];
-      p.ready = false;
-      p.insightUsed = false;
-      p.wasInsighted = false;
-      p.pendingInsightTarget = null;
-      p.pendingPassiveReveal = false;
-      p.canRedecide = false;
-      p.didRedecide = false;
-      p.speedDiscountSpent = 0;
-      p.speed = DefaultStats.BASE_SPEED; // resolver 会在结算时应用灵巧等速度加成
-      p.actionCtx = createActionCtx(Action.STANDBY);
-    });
+    const doRoundStart = () => {
+      this._turn++;
 
-    // 先进入装备期
-    this._setState(EngineState.EQUIPPING);
-    this._bus.emit(EngineEvent.EQUIP_PHASE_START, {
-      secondsLeft: TimerConfig.EQUIP_TIME,
-    });
+      // 重置回合状态（不重置 hp / stamina / speed / equippedEffects / effectIntel）
+      [PlayerId.P1, PlayerId.P2].forEach(id => {
+        const p = this._players[id];
+        p.ready = false;
+        p.insightUsed = false;
+        p.wasInsighted = false;
+        p.pendingInsightTarget = null;
+        p.pendingPassiveReveal = false;
+        p.canRedecide = false;
+        p.didRedecide = false;
+        p.speedDiscountSpent = 0;
+        p.speed = DefaultStats.BASE_SPEED;
+        p.actionCtx = createActionCtx(Action.STANDBY);
+      });
 
-    this._timer.reset();
-    // 延迟 1s 开始倒计时，以配合 UI 的 1s 淡入效果
-    setTimeout(() => {
-      if (this._state === EngineState.EQUIPPING) {
+      this._bus.emit(EngineEvent.TURN_START_PHASE, {});
+
+      // 延迟 1s 后，进入装备期
+      setTimeout(() => {
+        this._setState(EngineState.EQUIPPING);
+        this._bus.emit(EngineEvent.EQUIP_PHASE_START, {
+          secondsLeft: TimerConfig.EQUIP_TIME,
+        });
+        this._timer.reset();
         this._timer.start();
-      }
-    }, 1000);
-    // 注：AI 调度呈在 _onEquipEnd 里发起，装备期结束同时进入决策期
+      }, 1000);
+    };
+
+    if (this._turn > 0) {
+      this._bus.emit(EngineEvent.TURN_END_PHASE, {});
+      setTimeout(doRoundStart, 1000);
+    } else {
+      doRoundStart();
+    }
   }
 
   _triggerResolve() {
@@ -652,15 +660,18 @@ export class BattleEngine {
     // 将结算结果应用到状态
     this._applyResolveResult(result);
 
-    this._bus.emit(EngineEvent.TURN_RESOLVED, result);
+    this._bus.emit(EngineEvent.ACTION_PHASE_START, {});
 
-    // 检查胜负
-    const gameOver = this._checkGameOver(result);
-    if (gameOver) return;
+    setTimeout(() => {
+      if (this._state !== EngineState.RESOLVING) return;
+      this._bus.emit(EngineEvent.TURN_RESOLVED, result);
 
-    // 下一回合（UI 播放动画后应调用 engine.acknowledgeResolve()，
-    // 但为简化流程，这里在派发事件后自动延迟开始下一回合）
-    // 未来联机模式可改为等待双方确认信号
+      // 检查胜负
+      const gameOver = this._checkGameOver(result);
+      if (gameOver) return;
+
+      // 下一回合（UI 播放动画后应调用 engine.acknowledgeResolve()）
+    }, 3000);
   }
 
   /**
@@ -693,8 +704,14 @@ export class BattleEngine {
     );
 
     this._applyResolveResult(result);
-    this._bus.emit(EngineEvent.TURN_RESOLVED, result);
-    this._checkGameOver(result);
+    
+    this._bus.emit(EngineEvent.ACTION_PHASE_START, {});
+
+    setTimeout(() => {
+      if (this._state !== EngineState.RESOLVING) return;
+      this._bus.emit(EngineEvent.TURN_RESOLVED, result);
+      this._checkGameOver(result);
+    }, 3000);
   }
 
   // ═══════════════════════════════════════════
@@ -870,8 +887,8 @@ export class BattleEngine {
     p2.staminaDiscount = result.newState.p2.staminaDiscount ?? 0;
     p2.hpDrain = result.newState.p2.hpDrain ?? 0;
 
-    // 回合末速度归 BASE_SPEED（加速为临时性的）
-    // 注意：灵巧（agilityBoost）的速度加成已迁移到 resolver 内统一应用，
+    // 回合末动速归 BASE_SPEED（加速为临时性的）
+    // 注意：灵巧（agilityBoost）的动速加成已迁移到 resolver 内统一应用，
     // 不在此处预设，避免与 _beginTurn 的重置产生双重计算。
     p1.speed = DefaultStats.BASE_SPEED;
     p2.speed = DefaultStats.BASE_SPEED;
@@ -915,13 +932,13 @@ export class BattleEngine {
 
     let winner = null, reason = '';
     if (p1Dead && p2Dead) {
-      reason = '【同归于尽】双方同时气数耗尽。';
+      reason = '【同归于尽】双方同时命数耗尽。';
     } else if (p1Dead) {
       winner = PlayerId.P2;
-      reason = result.executeP1 ? '【处决】你精力耗尽，遭到致命一击！' : '【败北】你的气数已空。';
+      reason = result.executeP1 ? '【处决】你精力耗尽，遭到致命一击！' : '【败北】你的命数已空。';
     } else {
       winner = PlayerId.P1;
-      reason = result.executeP2 ? '【处决】敌方精力耗尽，被你一击终结！' : '【胜利】敌方气数已空。';
+      reason = result.executeP2 ? '【处决】敌方精力耗尽，被你一击终结！' : '【胜利】敌方命数已空。';
     }
 
     this._bus.emit(EngineEvent.GAME_OVER, { winner, reason });
@@ -998,9 +1015,9 @@ export class BattleEngine {
     this._bus.emit(EngineEvent.STATE_CHANGED, { state: newState });
   }
 
-  /** 计算行动最终点数
+  /** 计算行动点数
    * 攻击/守备/闪避均为 1 + enhance
-   * 闪避点数已与速度解耦，速度仅影响时序
+   * 闪避点数已与动速解耦，动速仅影响时序
    */
   _calcPts(ctx, _playerState) {
     if (ctx.action === Action.STANDBY) return 0;

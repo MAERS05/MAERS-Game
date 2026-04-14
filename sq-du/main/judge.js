@@ -168,10 +168,10 @@ export class JudgeLayer {
       return this._zero(Clash.MUTUAL_STANDBY, '双方都在蓄积力量，小心观察着对方——什么也没有发生。');
 
     if (p1Act === Action.GUARD && p2Act === Action.GUARD)
-      return this._zero(Clash.ACCUMULATE, `双方同时举起防御（你的最终速度 ${p1Ctx.speed}、最终点数 ${p1Ctx.pts}，敌方最终速度 ${p2Ctx.speed}、最终点数 ${p2Ctx.pts}），战场陷入僵持——【蓄势】。`);
+      return this._zero(Clash.ACCUMULATE, `双方同时举起防御（你的动速 ${p1Ctx.speed}、点数 ${p1Ctx.pts}，敌方动速 ${p2Ctx.speed}、点数 ${p2Ctx.pts}），战场陷入僵持——【蓄势】。`);
 
     if (p1Act === Action.DODGE && p2Act === Action.DODGE)
-      return this._zero(Clash.RETREAT, `双方同时撤招，你最终速度 ${p1Ctx.speed}、最终点数 ${p1Ctx.pts}，敌方最终速度 ${p2Ctx.speed}、最终点数 ${p2Ctx.pts}——点数相同，互相后撤。`);
+      return this._zero(Clash.RETREAT, `双方同时撤招，你动速 ${p1Ctx.speed}、点数 ${p1Ctx.pts}，敌方动速 ${p2Ctx.speed}、点数 ${p2Ctx.pts}——点数相同，互相后撤。`);
 
     if ((p1Act === Action.DODGE && p2Act === Action.GUARD) || (p1Act === Action.GUARD && p2Act === Action.DODGE)) {
       const isP1Dodge = p1Act === Action.DODGE;
@@ -181,23 +181,23 @@ export class JudgeLayer {
       const guarderName = isP1Dodge ? '敌方' : '你';
       const dodgeSpeed = isP1Dodge ? p1Ctx.speed : p2Ctx.speed;
       const guardSpeed = isP1Dodge ? p2Ctx.speed : p1Ctx.speed;
-      return this._zero(Clash.PROBE, `${dodgerName}试图以最终速度 ${dodgeSpeed}、最终点数 ${dodgePts} 闪躲，但${guarderName}守备最终速度 ${guardSpeed}、最终点数 ${guardPts} 点的空档下，双方仅是一次无果的试探。【试探】`);
+      return this._zero(Clash.PROBE, `${dodgerName}试图以动速 ${dodgeSpeed}、点数 ${dodgePts} 闪躲，但${guarderName}守备动速 ${guardSpeed}、点数 ${guardPts} 点的空档下，双方仅是一次无果的试探。【试探】`);
     }
 
     if (p1Act === Action.ATTACK && p2Act === Action.STANDBY)
-      return this._withExecute(Clash.ONE_SIDE_ATTACK, `你趁敌方待命，以 ${p1Ctx.speed} 的最终速度发动攻击（最终点数 ${p1Ctx.pts}）——命中！`, rawDmgP1, rawDmgP2, p1State, p2State, p1EntryEffective, p2EntryEffective);
+      return this._withExecute(Clash.ONE_SIDE_ATTACK, `你趁敌方待命，以 ${p1Ctx.speed} 的动速发动攻击（点数 ${p1Ctx.pts}）——命中！`, rawDmgP1, rawDmgP2, p1State, p2State, p1EntryEffective, p2EntryEffective);
 
     if (p2Act === Action.ATTACK && p1Act === Action.STANDBY)
-      return this._withExecute(Clash.ONE_SIDE_ATTACK, `敌方趁你待命，以 ${p2Ctx.speed} 的最终速度发动攻击（最终点数 ${p2Ctx.pts}）——命中！`, rawDmgP1, rawDmgP2, p1State, p2State, p1EntryEffective, p2EntryEffective);
+      return this._withExecute(Clash.ONE_SIDE_ATTACK, `敌方趁你待命，以 ${p2Ctx.speed} 的动速发动攻击（点数 ${p2Ctx.pts}）——命中！`, rawDmgP1, rawDmgP2, p1State, p2State, p1EntryEffective, p2EntryEffective);
 
     if (p1Act !== Action.ATTACK && p2Act === Action.STANDBY) {
       const actName = p1Act === Action.GUARD ? '守备' : '闪避';
-      return this._zero(Clash.WASTED_ACTION, `你发动了${actName}（最终速度 ${p1Ctx.speed}、最终点数 ${p1Ctx.pts}），而敌方处于待命状态——行动毫无意义。`);
+      return this._zero(Clash.WASTED_ACTION, `你发动了${actName}（动速 ${p1Ctx.speed}、点数 ${p1Ctx.pts}），而敌方处于待命状态——行动毫无意义。`);
     }
 
     if (p2Act !== Action.ATTACK && p1Act === Action.STANDBY) {
       const actName = p2Act === Action.GUARD ? '守备' : '闪避';
-      return this._zero(Clash.WASTED_ACTION, `敌方发动了${actName}（最终速度 ${p2Ctx.speed}、最终点数 ${p2Ctx.pts}），而你处于待命状态——行动毫无意义。`);
+      return this._zero(Clash.WASTED_ACTION, `敌方发动了${actName}（动速 ${p2Ctx.speed}、点数 ${p2Ctx.pts}），而你处于待命状态——行动毫无意义。`);
     }
 
     return this._deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2, p1EntryEffective, p2EntryEffective);
@@ -248,54 +248,54 @@ export class JudgeLayer {
 
     if (confront) {
       clash = Clash.CONFRONT;
-      clashDesc = `双方最终速度相同（${confront.speed}）且最终点数相当（${confront.pts}），攻势彼此抵消——无人受伤。【对峙】`;
+      clashDesc = `双方动速相同（${confront.speed}）且点数相当（${confront.pts}），攻势彼此抵消——无人受伤。【对峙】`;
     } else if (suppress) {
       const winIsP1 = suppress.winnerId === PlayerId.P1;
       clash = Clash.SUPPRESS;
       clashDesc = winIsP1
-        ? `双方最终速度相同（${suppress.speed}），但你的攻击最终点数（${suppress.winPts}）压制了敌方的攻击最终点数（${suppress.losePts}）——单方命中！【压制】`
-        : `双方最终速度相同（${suppress.speed}），但敌方的攻击最终点数（${suppress.winPts}）压制了你的攻击最终点数（${suppress.losePts}）——单方命中！【压制】`;
+        ? `双方动速相同（${suppress.speed}），但你的攻击点数（${suppress.winPts}）压制了敌方的攻击点数（${suppress.losePts}）——单方命中！【压制】`
+        : `双方动速相同（${suppress.speed}），但敌方的攻击点数（${suppress.winPts}）压制了你的攻击点数（${suppress.losePts}）——单方命中！【压制】`;
     } else if (hits.length >= 2) {
       const firstIsP1 = hits[0].attackerId === PlayerId.P1;
       const fastSpeed = firstIsP1 ? p1Ctx.speed : p2Ctx.speed;
       const slowSpeed = firstIsP1 ? p2Ctx.speed : p1Ctx.speed;
       clash = Clash.PREEMPT;
       clashDesc = firstIsP1
-        ? `你最终速度（${fastSpeed}）较快，攻击（最终点数 ${p1Ctx.pts}）率先命中；随后敌方以最终速度（${slowSpeed}）反击（最终点数 ${p2Ctx.pts}）也命中了你。【抢攻】`
-        : `敌方最终速度（${fastSpeed}）较快，攻击（最终点数 ${p2Ctx.pts}）率先命中；随后你以最终速度（${slowSpeed}）反击（最终点数 ${p1Ctx.pts}）也命中了敌方。【抢攻】`;
+        ? `你动速（${fastSpeed}）较快，攻击（点数 ${p1Ctx.pts}）率先命中；随后敌方以动速（${slowSpeed}）反击（点数 ${p2Ctx.pts}）也命中了你。【抢攻】`
+        : `敌方动速（${fastSpeed}）较快，攻击（点数 ${p2Ctx.pts}）率先命中；随后你以动速（${slowSpeed}）反击（点数 ${p1Ctx.pts}）也命中了敌方。【抢攻】`;
     } else if (evade) {
       const atkIsP1 = evade.attackerId === PlayerId.P1;
       clash = Clash.EVADE;
       clashDesc = atkIsP1
-        ? `敌方的闪避最终速度（${evade.dodgeSpeed}）比你的攻击最终速度（${evade.atkSpeed}）更快，轻易躲开了你的攻击（最终点数 ${evade.atkPts}）。【规避】`
-        : `你的闪避最终速度（${evade.dodgeSpeed}）比敌方的攻击最终速度（${evade.atkSpeed}）更快，轻易躲开了敌方的攻击（最终点数 ${evade.atkPts}）。【规避】`;
+        ? `敌方的闪避动速（${evade.dodgeSpeed}）比你的攻击动速（${evade.atkSpeed}）更快，轻易躲开了你的攻击（点数 ${evade.atkPts}）。【规避】`
+        : `你的闪避动速（${evade.dodgeSpeed}）比敌方的攻击动速（${evade.atkSpeed}）更快，轻易躲开了敌方的攻击（点数 ${evade.atkPts}）。【规避】`;
     } else if (dodgeOutmaneuvered) {
       const atkIsP1 = dodgeOutmaneuvered.attackerId === PlayerId.P1;
       clash = Clash.DODGE_OUTMANEUVERED;
       clashDesc = atkIsP1
-        ? `双方最终速度相同（${dodgeOutmaneuvered.speed}），敌方闪避最终点数（${dodgeOutmaneuvered.dodgePts}）超过你的攻击最终点数（${dodgeOutmaneuvered.atkPts}），闪身躲开。【虚步】`
-        : `双方最终速度相同（${dodgeOutmaneuvered.speed}），你闪避最终点数（${dodgeOutmaneuvered.dodgePts}）超过敌方的攻击最终点数（${dodgeOutmaneuvered.atkPts}），闪身躲开。【虚步】`;
+        ? `双方动速相同（${dodgeOutmaneuvered.speed}），敌方闪避点数（${dodgeOutmaneuvered.dodgePts}）超过你的攻击点数（${dodgeOutmaneuvered.atkPts}），闪身躲开。【虚步】`
+        : `双方动速相同（${dodgeOutmaneuvered.speed}），你闪避点数（${dodgeOutmaneuvered.dodgePts}）超过敌方的攻击点数（${dodgeOutmaneuvered.atkPts}），闪身躲开。【虚步】`;
     } else if (attackOverpowers) {
       const atkIsP1 = attackOverpowers.attackerId === PlayerId.P1;
       clash = Clash.ATTACK_OVERPOWERS;
       clashDesc = atkIsP1
-        ? `双方最终速度相同（${attackOverpowers.speed}），你的攻击最终点数（${attackOverpowers.atkPts}）压过了敌方的闪避最终点数（${attackOverpowers.dodgePts}）——强行命中！【强突】`
-        : `双方最终速度相同（${attackOverpowers.speed}），敌方的攻击最终点数（${attackOverpowers.atkPts}）压过了你的闪避最终点数（${attackOverpowers.dodgePts}）——强行命中！【强突】`;
+        ? `双方动速相同（${attackOverpowers.speed}），你的攻击点数（${attackOverpowers.atkPts}）压过了敌方的闪避点数（${attackOverpowers.dodgePts}）——强行命中！【强突】`
+        : `双方动速相同（${attackOverpowers.speed}），敌方的攻击点数（${attackOverpowers.atkPts}）压过了你的闪避点数（${attackOverpowers.dodgePts}）——强行命中！【强突】`;
     } else if (mutualHit) {
       clash = Clash.MUTUAL_HIT;
-      clashDesc = `双方最终速度相同（${mutualHit.speed}）且最终点数相当（攻击 ${mutualHit.atkPts} vs 闪避 ${mutualHit.dodgePts}）——擦肩而过，互生侥幸。【侥幸】`;
+      clashDesc = `双方动速相同（${mutualHit.speed}）且点数相当（攻击 ${mutualHit.atkPts} vs 闪避 ${mutualHit.dodgePts}）——擦肩而过，互生侥幸。【侥幸】`;
     } else if (fortify) {
       const atkIsP1 = fortify.attackerId === PlayerId.P1;
       clash = Clash.FORTIFY;
       const isFaster = fortify.shieldSpeed > fortify.atkSpeed;
       if (atkIsP1) {
         clashDesc = isFaster
-          ? `敌方抢先（最终速度 ${fortify.shieldSpeed}，你的攻击速度 ${fortify.atkSpeed}）举起守备（最终点数 ${fortify.shieldPts}），稳稳挡下了你的攻击（最终点数 ${fortify.atkPts}）。【坚固】`
-          : `敌方同时（双方最终速度 ${fortify.shieldSpeed}）举起守备（最终点数 ${fortify.shieldPts}），稳稳挡下了你的攻击（最终点数 ${fortify.atkPts}）。【坚固】`;
+          ? `敌方抢先（动速 ${fortify.shieldSpeed}，你的攻击动速 ${fortify.atkSpeed}）举起守备（点数 ${fortify.shieldPts}），稳稳挡下了你的攻击（点数 ${fortify.atkPts}）。【坚固】`
+          : `敌方同时（双方动速 ${fortify.shieldSpeed}）举起守备（点数 ${fortify.shieldPts}），稳稳挡下了你的攻击（点数 ${fortify.atkPts}）。【坚固】`;
       } else {
         clashDesc = isFaster
-          ? `你抢先（最终速度 ${fortify.shieldSpeed}，敌方的攻击速度 ${fortify.atkSpeed}）举起守备（最终点数 ${fortify.shieldPts}），稳稳挡下了敌方的攻击（最终点数 ${fortify.atkPts}）。【坚固】`
-          : `你同时（双方最终速度 ${fortify.shieldSpeed}）举起守备（最终点数 ${fortify.shieldPts}），稳稳挡下了敌方的攻击（最终点数 ${fortify.atkPts}）。【坚固】`;
+          ? `你抢先（动速 ${fortify.shieldSpeed}，敌方的攻击动速 ${fortify.atkSpeed}）举起守备（点数 ${fortify.shieldPts}），稳稳挡下了敌方的攻击（点数 ${fortify.atkPts}）。【坚固】`
+          : `你同时（双方动速 ${fortify.shieldSpeed}）举起守备（点数 ${fortify.shieldPts}），稳稳挡下了敌方的攻击（点数 ${fortify.atkPts}）。【坚固】`;
       }
     } else if (breakEvt) {
       const atkIsP1 = breakEvt.attackerId === PlayerId.P1;
@@ -303,12 +303,12 @@ export class JudgeLayer {
       const isFaster = breakEvt.shieldSpeed > breakEvt.atkSpeed;
       if (atkIsP1) {
         clashDesc = isFaster
-          ? `敌方虽抢先（最终速度 ${breakEvt.shieldSpeed}，你的攻击速度 ${breakEvt.atkSpeed}）举起守备（最终点数 ${breakEvt.shieldPts}），但仍被你的攻击（最终点数 ${breakEvt.atkPts}）无情击穿！【破势】`
-          : `敌方同时（双方最终速度 ${breakEvt.shieldSpeed}）举起守备（最终点数 ${breakEvt.shieldPts}），但仍被你的攻击（最终点数 ${breakEvt.atkPts}）无情击穿！【破势】`;
+          ? `敌方虽抢先（动速 ${breakEvt.shieldSpeed}，你的攻击动速 ${breakEvt.atkSpeed}）举起守备（点数 ${breakEvt.shieldPts}），但仍被你的攻击（点数 ${breakEvt.atkPts}）无情击穿！【破势】`
+          : `敌方同时（双方动速 ${breakEvt.shieldSpeed}）举起守备（点数 ${breakEvt.shieldPts}），但仍被你的攻击（点数 ${breakEvt.atkPts}）无情击穿！【破势】`;
       } else {
         clashDesc = isFaster
-          ? `你虽抢先（最终速度 ${breakEvt.shieldSpeed}，敌方的攻击速度 ${breakEvt.atkSpeed}）举起守备（最终点数 ${breakEvt.shieldPts}），但仍被敌方的攻击（最终点数 ${breakEvt.atkPts}）无情击穿！【破势】`
-          : `你同时（双方最终速度 ${breakEvt.shieldSpeed}）举起守备（最终点数 ${breakEvt.shieldPts}），但仍被敌方的攻击（最终点数 ${breakEvt.atkPts}）无情击穿！【破势】`;
+          ? `你虽抢先（动速 ${breakEvt.shieldSpeed}，敌方的攻击动速 ${breakEvt.atkSpeed}）举起守备（点数 ${breakEvt.shieldPts}），但仍被敌方的攻击（点数 ${breakEvt.atkPts}）无情击穿！【破势】`
+          : `你同时（双方动速 ${breakEvt.shieldSpeed}）举起守备（点数 ${breakEvt.shieldPts}），但仍被敌方的攻击（点数 ${breakEvt.atkPts}）无情击穿！【破势】`;
       }
     } else if (hits.length === 1) {
       const hit = hits[0];
@@ -317,24 +317,24 @@ export class JudgeLayer {
       if (targetCtx.action === Action.GUARD) {
         clash = Clash.RAID;
         clashDesc = atkIsP1
-          ? `你的攻击（最终速度 ${hit.atkSpeed}、最终点数 ${hit.atkPts}）抢在敌方拉起防御（最终速度 ${targetCtx.speed}）前命中目标！【袭击】`
-          : `敌方的攻击（最终速度 ${hit.atkSpeed}、最终点数 ${hit.atkPts}）抢在你拉起防御（最终速度 ${targetCtx.speed}）前命中目标！【袭击】`;
+          ? `你的攻击（动速 ${hit.atkSpeed}、点数 ${hit.atkPts}）抢在敌方拉起防御（动速 ${targetCtx.speed}）前命中目标！【袭击】`
+          : `敌方的攻击（动速 ${hit.atkSpeed}、点数 ${hit.atkPts}）抢在你拉起防御（动速 ${targetCtx.speed}）前命中目标！【袭击】`;
       } else if (targetCtx.action === Action.DODGE) {
         clash = Clash.SWIFT_STRIKE;
         clashDesc = atkIsP1
-          ? `你的攻击（最终速度 ${hit.atkSpeed}、最终点数 ${hit.atkPts}）抢在敌方准备闪躲（最终速度 ${targetCtx.speed}）前命中目标！【迅攻】`
-          : `敌方的攻击（最终速度 ${hit.atkSpeed}、最终点数 ${hit.atkPts}）抢在你准备闪躲（最终速度 ${targetCtx.speed}）前命中目标！【迅攻】`;
+          ? `你的攻击（动速 ${hit.atkSpeed}、点数 ${hit.atkPts}）抢在敌方准备闪躲（动速 ${targetCtx.speed}）前命中目标！【迅攻】`
+          : `敌方的攻击（动速 ${hit.atkSpeed}、点数 ${hit.atkPts}）抢在你准备闪躲（动速 ${targetCtx.speed}）前命中目标！【迅攻】`;
       } else if (targetCtx.action === Action.ATTACK) {
         clash = Clash.INTERRUPT;
         const tSpeed = targetCtx.speed;
         clashDesc = atkIsP1
-          ? `你最终速度（${hit.atkSpeed}）较快，抢在敌方（最终速度 ${tSpeed}）出手前便将其击倒！【截杀】`
-          : `敌方最终速度（${hit.atkSpeed}）较快，抢在你（最终速度 ${tSpeed}）出手前便将你击倒！【截杀】`;
+          ? `你动速（${hit.atkSpeed}）较快，抢在敌方（动速 ${tSpeed}）出手前便将其击倒！【截杀】`
+          : `敌方动速（${hit.atkSpeed}）较快，抢在你（动速 ${tSpeed}）出手前便将你击倒！【截杀】`;
       } else {
         clash = Clash.ONE_SIDE_ATTACK;
         clashDesc = atkIsP1
-          ? `你的攻击（最终速度 ${hit.atkSpeed}、最终点数 ${hit.atkPts}）直接命中了未作防备的敌方。【命中】`
-          : `敌方攻击（最终速度 ${hit.atkSpeed}、最终点数 ${hit.atkPts}）直接命中了未作防备的你。【命中】`;
+          ? `你的攻击（动速 ${hit.atkSpeed}、点数 ${hit.atkPts}）直接命中了未作防备的敌方。【命中】`
+          : `敌方攻击（动速 ${hit.atkSpeed}、点数 ${hit.atkPts}）直接命中了未作防备的你。【命中】`;
       }
     } else {
       clash = Clash.WASTED_ACTION;

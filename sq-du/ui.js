@@ -57,7 +57,7 @@ const ui = {
   ptDodge: $('pt-dodge'),
   ptGuard: $('pt-guard'),
   ptAttack: $('pt-attack'),
-  // 速度调节
+  // 动速调节
   p1SpeedUp: $('p1SpeedUp'),
   p1SpeedDown: $('p1SpeedDown'),
   // 指令区
@@ -99,6 +99,16 @@ const ui = {
   effectPickerList: $('effectPickerList'),
   // 全局控制
   globalPauseBtn: $('globalPauseBtn'),
+  // 阶段显示
+  phaseIndicator: $('phaseIndicator'),
+  equipOverlayTitle: $('equipOverlayTitle'),
+  equipCountdownHint: $('equipCountdownHint'),
+  actionNotice: $('actionNotice'),
+  roundStartNotice: $('roundStartNotice'),
+  roundStartCountdownHint: $('roundStartCountdownHint'),
+  turnEndNotice: $('turnEndNotice'),
+  turnEndCountdownHint: $('turnEndCountdownHint'),
+  restartBtn: $('restartBtn'),
 };
 
 // ─── 本地 UI 状态 ─────────────────────────────────────
@@ -176,11 +186,11 @@ function refreshPoints(stamina, speed) {
   const dis = p1.staminaDiscount || 0;
   const effectiveStamina = stamina + dis - pen;
   const canAct = effectiveStamina >= 1; // 基础行动必定消耗1点有效精力（待命除外但在选择栏位代表必然非待命）
-  
+
   ui.btnAttack.toggleAttribute('disabled', !canAct);
   ui.btnGuard.toggleAttribute('disabled', !canAct);
   ui.btnDodge.toggleAttribute('disabled', !canAct);
-  
+
   // 只要还有有效精力即可提速；是否透支行动由玩家自行选择
   ui.p1SpeedUp.disabled = effectiveStamina <= 0;
   ui.p1SpeedDown.disabled = p1.speed <= DefaultStats.BASE_SPEED;
@@ -196,7 +206,7 @@ function updateConfigPanel() {
     ui.actionConfigPanel.classList.remove('show');
     return;
   }
-  ui.enhanceRow.classList.remove('disabled'); // 闪避幅度同样可强化
+  ui.enhanceRow.classList.remove('disabled'); // 闪避点数同样可强化
 
   const snap = engine.getSnapshot();
   const p1 = snap.players[PlayerId.P1];
@@ -497,6 +507,7 @@ engine.on(EngineEvent.REDECIDE_OFFER, ({ playerId }) => {
 });
 
 engine.on(EngineEvent.REDECIDED, ({ playerId }) => {
+  ui.phaseIndicator.textContent = '重筹期';
   if (playerId === PlayerId.P1) {
     // 重新决策：只恢复操作控件的可用性，不清除已选行动
     // 玩家知道对手意图，允许在已有选择基础上微调（或保持原选择直接就绪）
@@ -513,6 +524,7 @@ engine.on(EngineEvent.REDECIDED, ({ playerId }) => {
 
 // 进入洞察期（30s）就立即提示，不等到倒计时结束
 engine.on(EngineEvent.PHASE_SHIFT, ({ playerId }) => {
+  ui.phaseIndicator.textContent = '暴露期';
   if (playerId === PlayerId.P1) {
     showInsightNotice('随着时间推移，你的意图已经处于被对方洞察的状态。');
   } else if (playerId === PlayerId.P2) {
@@ -554,7 +566,29 @@ engine.on(EngineEvent.ACTIVE_INSIGHT, ({ casterId, revealedAction, revealed }) =
   }
 });
 
+engine.on(EngineEvent.ACTION_PHASE_START, () => {
+  ui.phaseIndicator.textContent = '行动期';
+  ui.actionNotice.textContent = '双方行动中: 3s';
+  ui.actionNotice.classList.add('show');
+
+  let left = 2;
+  const intv = setInterval(() => {
+    if (left > 0) {
+      ui.actionNotice.textContent = `双方行动中: ${left}s`;
+      left--;
+    } else {
+      clearInterval(intv);
+      ui.actionNotice.classList.remove('show');
+    }
+  }, 1000);
+  ui.actionNotice._intv = intv;
+});
+
 engine.on(EngineEvent.TURN_RESOLVED, result => {
+  ui.phaseIndicator.textContent = '结算期';
+  if (ui.actionNotice._intv) clearInterval(ui.actionNotice._intv);
+  ui.actionNotice.classList.remove('show');
+
   document.body.classList.add('resolving');
   ui.insightNotice.classList.remove('show');
   ui.insightNotice.textContent = '';
@@ -597,13 +631,24 @@ engine.on(EngineEvent.TURN_RESOLVED, result => {
   updateHistoryUI();
 
   if (!isGameOver) {
-    ui.battleLog.querySelector('.log-hint').textContent = "4s后自动关闭";
+    const hintText = ui.battleLog.querySelector('.log-hint');
+    hintText.textContent = "5s 后自动关闭";
+
+    let left = 4;
+    const intv = setInterval(() => {
+      if (left >= 0 && ui.battleLog.classList.contains('show')) {
+        hintText.textContent = `${left}s 后自动关闭`;
+        left--;
+      } else {
+        clearInterval(intv);
+      }
+    }, 1000);
 
     setTimeout(() => {
       if (ui.battleLog.classList.contains('show') && !isGameOver) {
         ui.battleLog.classList.add('fade-out');
       }
-    }, 3000);
+    }, 4000);
 
     setTimeout(() => {
       if (ui.battleLog.classList.contains('show') && !isGameOver) {
@@ -612,7 +657,7 @@ engine.on(EngineEvent.TURN_RESOLVED, result => {
         document.body.classList.remove('resolving');
         engine.acknowledgeResolve();
       }
-    }, 4000);
+    }, 5000);
 
     ui.turnIndicator.textContent = `TURN ${result.turn + 1}`;
     resetForNewTurn();
@@ -628,10 +673,37 @@ engine.on(EngineEvent.TURN_RESOLVED, result => {
 engine.on(EngineEvent.GAME_OVER, ({ reason }) => {
   isGameOver = true;
   ui.logDetail.innerHTML += `<br><br><strong style="color:var(--color-atk)">${reason}</strong>`;
-  ui.battleLog.querySelector('.log-hint').textContent = '点击屏幕，重新开局';
   ui.standbyBtn.disabled = true;
   ui.readyBtn.disabled = true;
   ui.insightBtn.disabled = true;
+
+  // 倒计时5s后关闭战报，展示重新开始面板
+  const hintText = ui.battleLog.querySelector('.log-hint');
+  hintText.textContent = '5s 后自动关闭';
+
+  let left = 4;
+  const intv = setInterval(() => {
+    if (left >= 0) {
+      hintText.textContent = `${left}s 后自动关闭`;
+      left--;
+    } else {
+      clearInterval(intv);
+    }
+  }, 1000);
+
+  setTimeout(() => {
+    if (ui.battleLog.classList.contains('show')) {
+      ui.battleLog.classList.add('fade-out');
+    }
+  }, 4000);
+
+  setTimeout(() => {
+    ui.battleLog.classList.remove('show');
+    ui.battleLog.classList.remove('fade-out');
+    document.body.classList.remove('resolving');
+    // 显示重新开始按鈕
+    ui.restartBtn.classList.add('show');
+  }, 5000);
 });
 
 // ═══════════════════════════════════════════════════════
@@ -716,16 +788,16 @@ function updateStatusIcons(playerId, state) {
     tray.appendChild(img);
   };
 
-  if (state.staminaPenalty > 0) addIcon('tired.svg', `本回合增加 ${state.staminaPenalty} 点精力消耗`);
-  if (state.staminaDiscount > 0) addIcon('excited.svg', `本回合减少 ${state.staminaDiscount} 点精力消耗`);
-  if (state.guardBoost > 0) addIcon('shield.svg', `本回合守备点数增加 ${state.guardBoost}`);
-  if (state.guardDebuff > 0) addIcon('broken-shield.svg', `本回合守备点数减少 ${state.guardDebuff}`);
-  if (state.chargeBoost > 0) addIcon('strong.svg', `本回合攻击点数增加 ${state.chargeBoost}`);
-  if (state.ptsDebuff > 0) addIcon('broken-knife.svg', `本回合攻击点数减少 ${state.ptsDebuff}`);
-  if (state.dodgeBoost > 0) addIcon('avoid.svg', `本回合闪避点数增加 ${state.dodgeBoost}`);
-  if (state.dodgeDebuff > 0) addIcon('heavy.svg', `本回合闪避点数减少 ${state.dodgeDebuff}`);
-  if (state.agilityBoost > 0) addIcon('fast.svg', `本回合速度增加 ${state.agilityBoost}`);
-  if (state.hpDrain > 0) addIcon('wound.svg', `本回合结束时损失 ${state.hpDrain} 点气数`);
+  if (state.staminaPenalty > 0) addIcon('tired.svg', `本回合精力消耗 +${state.staminaPenalty}`);
+  if (state.staminaDiscount > 0) addIcon('excited.svg', `本回合精力消耗 -${state.staminaDiscount}`);
+  if (state.guardBoost > 0) addIcon('shield.svg', `本回合行动期开始守备点数 +${state.guardBoost}`);
+  if (state.guardDebuff > 0) addIcon('broken-shield.svg', `本回合行动期开始守备点数 -${state.guardDebuff}`);
+  if (state.chargeBoost > 0) addIcon('strong.svg', `本回合行动期开始攻击点数 +${state.chargeBoost}`);
+  if (state.ptsDebuff > 0) addIcon('broken-knife.svg', `本回合行动期开始攻击点数 -${state.ptsDebuff}`);
+  if (state.dodgeBoost > 0) addIcon('avoid.svg', `本回合行动期开始闪避点数 +${state.dodgeBoost}`);
+  if (state.dodgeDebuff > 0) addIcon('heavy.svg', `本回合行动期开始闪避点数 -${state.dodgeDebuff}`);
+  if (state.agilityBoost > 0) addIcon('fast.svg', `本回合行动期开始动速 +${state.agilityBoost}`);
+  if (state.hpDrain > 0) addIcon('wound.svg', `本回合行动期开始扣除 ${state.hpDrain} 点命数`);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -930,10 +1002,54 @@ ui.equipOverlay.addEventListener('click', e => {
   openEffectPicker(action, slot);
 });
 
+// 监听回合结束期（1s）
+engine.on(EngineEvent.TURN_END_PHASE, () => {
+  ui.phaseIndicator.textContent = '回合结束期';
+
+  ui.turnEndCountdownHint.textContent = '1s 后自动关闭';
+  ui.turnEndNotice.classList.add('show');
+
+  let left = 1;
+  const intv = setInterval(() => {
+    left--;
+    if (left >= 0) {
+      ui.turnEndCountdownHint.textContent = `${left}s 后自动关闭`;
+    }
+  }, 1000);
+
+  setTimeout(() => {
+    clearInterval(intv);
+    ui.turnEndNotice.classList.remove('show');
+  }, 1000);
+});
+
+// 监听回合开始期（1s）
+engine.on(EngineEvent.TURN_START_PHASE, () => {
+  ui.phaseIndicator.textContent = '回合开始期';
+  ui.equipOverlayTitle.textContent = '装配期';
+
+  ui.roundStartCountdownHint.textContent = '1s 后自动关闭';
+  ui.roundStartNotice.classList.add('show');
+
+  let left = 1;
+  const intv = setInterval(() => {
+    left--;
+    if (left >= 0) {
+      ui.roundStartCountdownHint.textContent = `${left}s 后自动关闭`;
+    }
+  }, 1000);
+
+  setTimeout(() => {
+    clearInterval(intv);
+    ui.roundStartNotice.classList.remove('show');
+  }, 1000);
+});
+
 // 监听装备期开始事件 → 显示覆盖面板并倒计时
 engine.on(EngineEvent.EQUIP_PHASE_START, ({ secondsLeft }) => {
-  ui.equipCountdown.textContent = secondsLeft;
+  ui.equipCountdownHint.textContent = `${secondsLeft}s 后关闭`;
   if (!ui.equipOverlay.classList.contains('active')) {
+    ui.phaseIndicator.textContent = '装配期';
     ui.equipOverlay.classList.add('active');
     // 每次进入装备期都刷新槽位显示
     refreshEquipSlots();
@@ -946,6 +1062,7 @@ engine.on(EngineEvent.EQUIP_PHASE_START, ({ secondsLeft }) => {
 
 // 监听装备期结束事件 → 隐藏覆盖面板，启用主操作区
 engine.on(EngineEvent.EQUIP_PHASE_END, () => {
+  ui.phaseIndicator.textContent = '决策期';
   ui.equipOverlay.classList.remove('active');
   ui.effectPicker.classList.remove('show');
 

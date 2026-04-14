@@ -57,7 +57,7 @@ export class AIJudgeLayer {
     const snap       = AIBaseLogic.snapshot(ai, player, history);
     const indicators = AIBaseLogic.buildIndicators(snap, effectiveStamina);
 
-    // 完美信息克制决策（行动/速度/强化均由策略层给出原始值）
+    // 完美信息克制决策（行动/动速/强化均由策略层给出原始值）
     const { action, speedRaw, enhanceRaw } = AIStrategyLayer.buildCounterDecision(
       revealedAction, snap, ai, effectiveStamina, indicators
     );
@@ -76,7 +76,7 @@ export class AIJudgeLayer {
   /**
    * 统一精力预算验证。
    *
-   * 裁剪优先级：强化 < 速度 < 基础行动（1 有效精力）
+   * 裁剪优先级：强化 < 动速 < 基础行动（1 有效精力）
    */
   static validateBudget(ai, action, speedRaw, enhanceRaw) {
     const BASE = DefaultStats.BASE_SPEED;
@@ -99,7 +99,7 @@ export class AIJudgeLayer {
       totalNeeded  = finalSpeedBoost + baseCost + finalEnhance;
     }
 
-    // 其次裁速度
+    // 其次裁动速
     if (totalNeeded > effectiveStamina) {
       finalSpeedBoost = Math.max(0, effectiveStamina - baseCost);
       finalEnhance    = 0;

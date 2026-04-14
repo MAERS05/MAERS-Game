@@ -21,13 +21,13 @@ import { Action, EffectId } from '../../base/constants.js';
 export const WoundEffect = Object.freeze({
   id: EffectId.WOUND,
   name: '创伤',
-  desc: '命中后为目标附加伤口——下回合结束时损失 1 点气数',
+  desc: '攻击成功时，对方下回合行动期开始扣除一点命数',
   staminaCost: 0,
   applicableTo: [Action.ATTACK],
 
   /**
    * 后置钩子：攻击命中（造成伤害）时调用，为目标打上伤口标记。
-   * 下回合结算时将扣除目标一点气数。
+   * 下回合结算时将扣除目标一点命数。
    * @param {object} ctx
    * @param {object} selfState
    * @param {object} oppState

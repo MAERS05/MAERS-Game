@@ -38,9 +38,9 @@ export class AIExtraLayer {
       .filter(id => EffectDefs[id]?.applicableTo.includes(action));
 
     const result = Array(EFFECT_SLOTS).fill(null);
-    // 追踪已选中的所有自伤效果累计气数消耗
+    // 追踪已选中的所有自伤效果累计命数消耗
     let selfHarmHpCost = 0;
-    // 允许的最大自伤气数消耗（至少保留 1 点 HP）
+    // 允许的最大自伤命数消耗（至少保留 1 点 HP）
     const maxSelfHarmHp = Math.max(0, ai.hp - 1);
     const remainingPool = [...inventory];
 
@@ -50,7 +50,7 @@ export class AIExtraLayer {
       const id = this._pickBestEffect(remainingPool, action, ai, scene);
       if (!id) break;
 
-      // 通过 EffectDefs 内省气数代价，效果自行声明，无需维护硬编码列表
+      // 通过 EffectDefs 内省命数代价，效果自行声明，无需维护硬编码列表
       const hpCost = EffectDefs[id]?.hpCost || 0;
       if (hpCost > 0 && selfHarmHpCost + hpCost > maxSelfHarmHp) {
         // 再选这个效果会导致 HP 归零甚至自杀，跳过

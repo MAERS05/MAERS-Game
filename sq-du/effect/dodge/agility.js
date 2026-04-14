@@ -3,8 +3,8 @@
  * @description 【灵巧】闪避效果
  *
  * 触发条件：闪避成功（规避、虚步情形）
- * 效果：闪避方下回合速度 +1，无需额外消耗精力。
- *       增益仅持续 1 回合，下回合结算完成后速度恢复正常。
+ * 效果：闪避方下回合动速 +1，无需额外消耗精力。
+ *       增益仅持续 1 回合，下回合结算完成后动速恢复正常。
  * 精力消耗：0（随闪避行动基础精力一并支付）
  *
  * 实现要点：
@@ -21,7 +21,7 @@ import { Action, EffectId } from '../../base/constants.js';
 export const AgilityEffect = Object.freeze({
   id: EffectId.AGILITY,
   name: '灵巧',
-  desc: '闪避成功后下回合最终速度 +1',
+  desc: '闪避成功后下回合动速 +1',
   staminaCost: 0,
   applicableTo: [Action.DODGE],
 
