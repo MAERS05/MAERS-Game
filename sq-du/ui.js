@@ -660,26 +660,27 @@ engine.on(EngineEvent.PHASE_STATE_SYNC, ({ state }) => {
 
 engine.on(EngineEvent.ACTIVE_INSIGHT, ({ casterId, revealedAction, revealed }) => {
   if (casterId === PlayerId.P1) {
+    // 只要成功发起了洞察（消耗了精力），就应立即解锁敌方基础信息（HP/精力）的实时显示
+    enemyInfoUnlocked = true;
+
     if (revealed && revealedAction) {
       // 对方已就绪，真正揭示意图
-      enemyInfoUnlocked = true;
       const actName = ActionName[revealedAction.action] ?? '未知';
       showInsightNotice(`已洞察敌方意图：【${actName}】`);
       pendingInsightAction = null;
-
-      // 主动洞察成功时立刻更新一次资源显示（刷新迷雾快照）
-      const snap = engine.getSnapshot();
-      renderPlayerResources(snap.players[PlayerId.P1], snap.players[PlayerId.P2]);
     } else {
       // 洞察已发起，对方尚未就绪
       pendingInsightAction = true; // 标记挂起，等 revealed 再清
       showInsightNotice('正在洞察对方意图…');
     }
+
     const snap = engine.getSnapshot();
     const p1 = snap.players[PlayerId.P1];
+    const p2 = snap.players[PlayerId.P2];
+
     if (!enforceUIConstraints(p1)) return;
 
-    updatePips('p1-stam', p1.stamina, DefaultStats.MAX_STAMINA, 'stam');
+    renderPlayerResources(p1, p2); // 立即触发资源刷新
     refreshPoints();
 
     if (!p1.ready) {

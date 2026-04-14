@@ -15,7 +15,8 @@ import { EffectHandlers } from '../base/effect-handlers.js';
 
 export class EffectLayer {
   static canExposeOpponentRuntime(observer, opponent, unlocked = false) {
-    return !!unlocked && !!opponent.ready;
+    // 只要执行了洞察操作（unlocked=true），或者双方都已就绪进入了不可逆的行动期，就应当实时同步所有属性
+    return !!unlocked || (!!observer.ready && !!opponent.ready);
   }
 
   static rewriteRoundDraft({ p1Ctx, p2Ctx, p1State, p2State }) {
