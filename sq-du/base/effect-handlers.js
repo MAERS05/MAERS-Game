@@ -43,8 +43,9 @@ import { DepressEffect } from '../effect/dodge/depress.js';
  * 每个 handler 可实现以下可选钩子：
  *   onPre(ctx, state)                          → 返回修改后的 ctx 副本（前置效果）
  *   onPost(ctx, selfState, oppState, dmgTaken) → void（后置效果，时间轴结算后触发）
+ *   onPhase(args)                              → void（阶段接口触发时机）
  */
-export const EffectHandlers = Object.freeze({
+const RawEffectHandlers = {
   [EffectId.WOUND]:       WoundEffect,
   [EffectId.BREAK_QI]:    BreakQiEffect,
   [EffectId.CHARGE]:      ChargeEffect,
@@ -63,4 +64,19 @@ export const EffectHandlers = Object.freeze({
   [EffectId.INSPIRE]:     InspireEffect,
   [EffectId.DEPRESS]:     DepressEffect,
   [EffectId.ENERGIZE]:    EnergizeEffect,
-});
+};
+
+/**
+ * 统一补全 onPhase，实际分发由 main/effect.js 负责（职责收敛）。
+ */
+export const EffectHandlers = Object.freeze(
+  Object.fromEntries(
+    Object.entries(RawEffectHandlers).map(([id, handler]) => [
+      id,
+      Object.freeze({
+        ...handler,
+        onPhase: handler?.onPhase || (() => {}),
+      }),
+    ])
+  )
+);

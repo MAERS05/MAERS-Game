@@ -57,7 +57,7 @@ export const ActionName = Object.freeze({
   [Action.ATTACK]: '攻击',
   [Action.GUARD]: '守备',
   [Action.DODGE]: '闪避',
-  [Action.STANDBY]: '待命',
+  [Action.STANDBY]: '蓄气',
 });
 
 // ─────────────────────────────────────────────
@@ -210,9 +210,25 @@ export const EngineEvent = Object.freeze({
 
   /** 装备期开始 payload: { secondsLeft: number } */
   EQUIP_PHASE_START: 'equip_phase_start',
+  /** 阶段接口：装配期开始 payload: {} */
+  EQUIP_START: 'equip_start',
 
   /** 装备期结束，进入决策期 payload: {} */
   EQUIP_PHASE_END: 'equip_phase_end',
+  /** 阶段接口：装配期结束 payload: {} */
+  EQUIP_END: 'equip_end',
+  /** 阶段接口：决策期开始 payload: {} */
+  DECISION_START: 'decision_start',
+  /** 阶段接口：决策期结束 payload: {} */
+  DECISION_END: 'decision_end',
+  /** 阶段接口：暴露期开始 payload: { playerId } */
+  EXPOSE_START: 'expose_start',
+  /** 阶段接口：暴露期结束 payload: { playerId } */
+  EXPOSE_END: 'expose_end',
+  /** 阶段接口：重筹期开始 payload: { playerId } */
+  REDECIDE_START: 'redecide_start',
+  /** 阶段接口：重筹期结束 payload: { playerId, reason: 'confirmed' | 'declined' } */
+  REDECIDE_END: 'redecide_end',
 
   /** 倒计时 tick payload: { p1: Number, p2: Number, phase: Phase } */
   TIMER_TICK: 'timer_tick',
@@ -243,9 +259,29 @@ export const EngineEvent = Object.freeze({
 
   /** 双方就绪开始行动（3s动画时间） payload: {} */
   ACTION_PHASE_START: 'action_phase_start',
+  /** 阶段接口：行动期开始 payload: { p1Action, p2Action, p1Effects, p2Effects } */
+  ACTION_START: 'action_start',
 
   /** 回合结算完成（显示战报） payload: ResolveResult */
   TURN_RESOLVED: 'turn_resolved',
+  /** 阶段接口：行动期结束 payload: {} */
+  ACTION_END: 'action_end',
+  /** 阶段接口：结算期开始 payload: {} */
+  RESOLVE_START: 'resolve_start',
+  /** 阶段接口：结算期结束 payload: { result: ResolveResult } */
+  RESOLVE_END: 'resolve_end',
+
+  /**
+   * 效果时机总线：所有阶段接口触发时同步派发
+   * payload: { phaseEvent: string, payload: object }
+   */
+  PHASE_EFFECT_HOOK: 'phase_effect_hook',
+
+  /**
+   * 阶段后状态同步：每个阶段接口执行完成后派发
+   * payload: { phaseEvent: string, state: Snapshot }
+   */
+  PHASE_STATE_SYNC: 'phase_state_sync',
 
   /** 回合结束期（1s） payload: {} */
   TURN_END_PHASE: 'turn_end_phase',
@@ -267,26 +303,26 @@ export const EngineEvent = Object.freeze({
  */
 export const EffectId = Object.freeze({
   // ── 攻击类效果 ──
-  WOUND: 'wound',       // 创伤：命中后为目标附加伤口（下回合行动额外消耗 1 精力）
-  BREAK_QI: 'break_qi',    // 泣命：消耗自身 1 点命数，本回合行动期开始攻击点数 +1
-  CHARGE: 'charge',      // 蓄力：本回合攻击不执行，下回合攻击 +1 点数
-  POUNCE: 'pounce',      // 猛扑：下回合最终闪避威力-1，本回合攻击威力+1
-  RECKLESS: 'reckless',    // 舍身：下回合最终守备威力-1，本回合攻击威力+1
-  ENERGIZE: 'energize',    // 蓄能：攻击成功下回合闪避点数+1
+  WOUND: 'wound',
+  BREAK_QI: 'break_qi',
+  CHARGE: 'charge',
+  POUNCE: 'pounce',
+  RECKLESS: 'reckless',
+  ENERGIZE: 'energize',
   // ── 守备类效果 ──
-  AURA_SHIELD: 'aura_shield', // 御气：消耗自身 1 点命数，本回合行动期开始攻击点数 +1
-  DEFLECT: 'deflect',     // 卸力：守备成功防挡时，对手下回合攻击 -1 点数
-  ENTRENCH: 'entrench',    // 固守：本回合未受到伤害，下回合守备 +1 点数
-  IRON_WALL: 'iron_wall',   // 铁壁：下回合最终攻击威力-1，本回合守备威力+1
-  PHALANX: 'phalanx',     // 步阵：下回合最终闪避威力-1，本回合守备威力+1
-  INSPIRE: 'inspire',     // 振奋：守备成功下回合消耗精力-1
+  AURA_SHIELD: 'aura_shield',
+  DEFLECT: 'deflect',
+  ENTRENCH: 'entrench',
+  IRON_WALL: 'iron_wall',
+  PHALANX: 'phalanx',
+  INSPIRE: 'inspire',
   // ── 闪避类效果 ──
-  AGILITY: 'agility',     // 灵巧：闪避成功后下回合动速 +1
-  AFTERIMAGE: 'afterimage',  // 残影：消耗自身 1 点命数，本回合行动期开始闪避点数 +
-  MOMENTUM: 'momentum',    // 借势：闪避成功且未受伤，恢复 1 点精力
-  SIDE_STEP: 'side_step',   // 侧步：下回合最终攻击威力-1，本回合闪避威力+1
-  DISARM: 'disarm',      // 解甲：下回合最终守备威力-1，本回合闪避威力+1
-  DEPRESS: 'depress',     // 低落：闪避成功下回合对方精力消耗+1
+  AGILITY: 'agility',
+  AFTERIMAGE: 'afterimage',
+  MOMENTUM: 'momentum',
+  SIDE_STEP: 'side_step',
+  DISARM: 'disarm',
+  DEPRESS: 'depress',
 });
 
 
@@ -309,95 +345,77 @@ export const EffectId = Object.freeze({
 export const EffectDefs = Object.freeze({
   [EffectId.WOUND]: {
     id: EffectId.WOUND, name: '创伤',
-    desc: '攻击成功时，对方下回合行动期开始扣除一点命数',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.BREAK_QI]: {
     id: EffectId.BREAK_QI, name: '泣命',
-    desc: '消耗自身 1 点命数，本回合行动期开始攻击点数 +1',
     applicableTo: [Action.ATTACK],
     hpCost: 1,
   },
   [EffectId.CHARGE]: {
     id: EffectId.CHARGE, name: '蓄力',
-    desc: '本回合攻击不执行，下回合行动期开始攻击点数 +1',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.POUNCE]: {
     id: EffectId.POUNCE, name: '猛扑',
-    desc: '本回合行动期开始攻击点数 +1，下回合行动期开始闪避点数 -1',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.RECKLESS]: {
     id: EffectId.RECKLESS, name: '舍身',
-    desc: '本回合行动期开始攻击点数 +1，下回合行动期开始守备点数 -1',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.ENERGIZE]: {
     id: EffectId.ENERGIZE, name: '蓄能',
-    desc: '攻击成功时，下回合行动期开始闪避点数 +1',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.AURA_SHIELD]: {
     id: EffectId.AURA_SHIELD, name: '御气',
-    desc: '消耗自身 1 点命数，本回合行动期开始守备点数 +1',
     applicableTo: [Action.GUARD],
     hpCost: 1,
   },
   [EffectId.DEFLECT]: {
     id: EffectId.DEFLECT, name: '卸力',
-    desc: '守备成功时，对手下回合行动期开始攻击点数 -1',
     applicableTo: [Action.GUARD],
   },
   [EffectId.ENTRENCH]: {
     id: EffectId.ENTRENCH, name: '固守',
-    desc: '守备成功时，下回合行动期开始守备点数 +1',
     applicableTo: [Action.GUARD],
   },
   [EffectId.IRON_WALL]: {
     id: EffectId.IRON_WALL, name: '铁壁',
-    desc: '本回合行动期开始守备点数 +1，下回合行动期开始攻击点数 -1',
     applicableTo: [Action.GUARD],
   },
   [EffectId.PHALANX]: {
     id: EffectId.PHALANX, name: '步阵',
-    desc: '本回合行动期开始守备点数 +1，下回合行动期开始闪避点数 -1',
     applicableTo: [Action.GUARD],
   },
   [EffectId.INSPIRE]: {
     id: EffectId.INSPIRE, name: '振奋',
-    desc: '守备成功时，下回合消耗精力 -1',
     applicableTo: [Action.GUARD],
   },
   [EffectId.AGILITY]: {
     id: EffectId.AGILITY, name: '灵巧',
-    desc: '闪避成功时，下回合动速 +1',
     applicableTo: [Action.DODGE],
   },
   [EffectId.AFTERIMAGE]: {
     id: EffectId.AFTERIMAGE, name: '残影',
-    desc: '消耗自身 1 点命数，本回合行动期开始闪避点数 +1',
     applicableTo: [Action.DODGE],
     hpCost: 1,
   },
   [EffectId.MOMENTUM]: {
     id: EffectId.MOMENTUM, name: '借势',
-    desc: '闪避成功时，恢复 1 点精力',
     applicableTo: [Action.DODGE],
   },
   [EffectId.SIDE_STEP]: {
     id: EffectId.SIDE_STEP, name: '侧步',
-    desc: '本回合行动期开始闪避点数 +1，下回合行动期开始攻击点数 -1',
     applicableTo: [Action.DODGE],
   },
   [EffectId.DISARM]: {
     id: EffectId.DISARM, name: '解甲',
-    desc: '本回合行动期开始闪避点数 +1，下回合行动期开始守备点数 -1',
     applicableTo: [Action.DODGE],
   },
   [EffectId.DEPRESS]: {
     id: EffectId.DEPRESS, name: '低落',
-    desc: '闪避成功时，下回合对方精力消耗 +1',
     applicableTo: [Action.DODGE],
   },
 });

@@ -8,7 +8,7 @@
       "description": "回合制对弈系统。\n一个实验性的高阶战斗交互与数值推理演示。",
       "url": "/sq-du.html",
       "status": "active",
-      "cover": "ui/sq-du/background/combat-bg.jpg"
+      "cover": "sq-du/background/combat-bg.jpg"
     }
   ]
 }

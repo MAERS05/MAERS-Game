@@ -21,7 +21,7 @@ import { Action, EffectId } from '../../base/constants.js';
 export const AgilityEffect = Object.freeze({
   id: EffectId.AGILITY,
   name: '灵巧',
-  desc: '闪避成功后下回合动速 +1',
+  desc: '本回合闪避成功后，下回合动速 +1',
   staminaCost: 0,
   applicableTo: [Action.DODGE],
 

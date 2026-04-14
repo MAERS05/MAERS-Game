@@ -12,7 +12,7 @@
 
 'use strict';
 
-import { Action, DefaultStats, EngineState, PlayerId } from '../base/constants.js';
+import { Action, DefaultStats, EngineState, PlayerId, TimerConfig } from '../base/constants.js';
 import { AIBaseLogic } from './ai-base.js';
 import { AIJudgeLayer } from './ai-judge.js';
 
@@ -132,8 +132,13 @@ function _shouldUseInsight(snap, ai, aiEffective) {
  * 带洞察的行动调度：先发洞察，异步等待结果后提交行动。
  */
 function _scheduleWithInsight(ctx, snap, aiEffective, getHistory) {
-  // 洞察时机：2-8s，模拟"观察一会儿再出手"
-  const insightDelay = (2 + Math.random() * 6) * 1000;
+  const decisionLimit = TimerConfig.DECISION_LIMIT;
+
+  // 洞察时机：决策期前段 8%~32%
+  const insightDelay = _secToMs(_randIn(
+    Math.max(2, decisionLimit * 0.08),
+    Math.max(4, decisionLimit * 0.32),
+  ));
 
   const insightHandle = setTimeout(() => {
     if (ctx.engineState() !== EngineState.TICKING) return;
@@ -143,8 +148,11 @@ function _scheduleWithInsight(ctx, snap, aiEffective, getHistory) {
     }
   }, insightDelay);
 
-  // 兜底：最晚在 22-28s 时强制提交行动（防止超时）
-  const fallbackDelay = (22 + Math.random() * 6) * 1000;
+  // 兜底：落在决策期末段（不进入暴露末尾），避免拖到超时边缘
+  const fallbackDelay = _secToMs(_randIn(
+    Math.max(3, decisionLimit - 3),
+    Math.max(4, decisionLimit - 1),
+  ));
   const fallbackHandle = setTimeout(() => {
     if (ctx.engineState() !== EngineState.TICKING) return;
     const currentAi = ctx.getState().ai;
@@ -210,14 +218,43 @@ function _evaluateRedecide(ai, player, revealedAction, effectiveStamina, getHist
 }
 
 /**
- * 行动延迟分布：60% 快速 / 30% 中速 / 10% 压线
+ * 行动延迟分布（随 TimerConfig 自动缩放）：
+ * - 60% 决策前段
+ * - 30% 决策后段
+ * - 10% 暴露期前段压线
  */
 function _pickDelay() {
+  const decisionLimit = TimerConfig.DECISION_LIMIT;
+  const decisionTime = TimerConfig.DECISION_TIME;
+
   const r = Math.random();
   const early = () => Math.min(Math.random(), Math.random()); // 偏向早段
+
+  const decisionEarlyStart = Math.max(1, Math.round(decisionLimit * 0.20));
+  const decisionEarlyRange = Math.max(2, Math.round(decisionLimit * 0.40));
+
+  const decisionLateStart = Math.max(
+    decisionEarlyStart + decisionEarlyRange,
+    Math.round(decisionLimit * 0.60),
+  );
+  const decisionLateRange = Math.max(2, decisionLimit - decisionLateStart);
+
+  const exposeHeadStart = decisionLimit;
+  const exposeHeadRange = Math.max(1, Math.min(9, decisionTime - decisionLimit - 1));
+
   return r < 0.60
-    ? (5  + early() * 15) * 1000
+    ? _secToMs(decisionEarlyStart + early() * decisionEarlyRange)
     : r < 0.90
-      ? (20 + early() * 10) * 1000
-      : (30 + early() * 10) * 1000;
+      ? _secToMs(decisionLateStart + early() * decisionLateRange)
+      : _secToMs(exposeHeadStart + early() * exposeHeadRange);
+}
+
+function _randIn(min, max) {
+  const lo = Math.min(min, max);
+  const hi = Math.max(min, max);
+  return lo + Math.random() * (hi - lo);
+}
+
+function _secToMs(sec) {
+  return Math.max(0, Math.round(sec * 1000));
 }

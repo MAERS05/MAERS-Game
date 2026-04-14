@@ -22,6 +22,8 @@ import {
   DefaultStats, TimerConfig, Phase, EngineMode,
   EffectId, EffectDefs, EFFECT_SLOTS,
 } from './base/constants.js';
+import { EffectHandlers } from './base/effect-handlers.js';
+import { EffectLayer } from './main/effect.js';
 
 // ─── 常量 ─────────────────────────────────────────────
 const RING_CIRC = 226.195; // 2π × 36（SVG 弧长）
@@ -31,6 +33,15 @@ const engine = new BattleEngine(EngineMode.PVE, {
   p1Name: '少女',
   p2Name: '马厄斯',
 });
+
+function getEffectMeta(effectId) {
+  const handler = EffectHandlers[effectId] || {};
+  const def = EffectDefs[effectId] || {};
+  return {
+    name: handler.name || def.name || effectId,
+    desc: handler.desc || def.desc || '',
+  };
+}
 
 // ─── DOM 引用 ─────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -117,6 +128,12 @@ let localEnhance = 0;     // P1 当前强化次数
 let matchHistory = [];    // 战事录
 let isGameOver = false;
 let pendingInsightAction = null; // 主动洞察结果，等对方就绪后才揭示
+let enemyInfoUnlocked = false;    // 本回合是否已通过洞察解锁敌方就绪后信息
+let enemyFogState = {
+  hp: 3, // 默认初始命数
+  stamina: 3, // 默认初始精力
+  speed: 1, // 默认初始动速
+};
 
 // ═══════════════════════════════════════════════════════
 // 工具函数
@@ -152,21 +169,36 @@ function updatePips(prefix, current, max, type) {
 }
 
 /** 实时计算包含了当前行动消耗在内的预期精力 */
-function getProjectedStamina(player) {
-  let s = player.stamina;
-  const ctx = player.actionCtx;
-  if (ctx && ctx.action !== Action.STANDBY) {
-    // 与 calcActionCost 保持相同公式，含振奋/低落修正
-    const pen = player.staminaPenalty || 0;
-    const dis = player.staminaDiscount || 0;
-    s -= Math.max(0, 1 + (ctx.enhance || 0) + pen - dis);
-  }
-  return Math.max(0, Math.min(DefaultStats.MAX_STAMINA, s));
-}
 
 /** 当前可用于“是否还能执行一次行为/洞察”的有效精力 */
 function getEffectiveStamina(player) {
   return (player.stamina || 0) + (player.staminaDiscount || 0) - (player.staminaPenalty || 0);
+}
+
+/** 统一渲染双方资源与基础状态（避免真实值/投影值显示不一致） */
+function renderPlayerResources(p1, p2) {
+  updatePips('p1-hp', p1.hp, DefaultStats.MAX_HP, 'hp');
+  updatePips('p1-stam', p1.stamina, DefaultStats.MAX_STAMINA, 'stam');
+  ui.p1SpeedVal.textContent = p1.speed;
+
+  const canExposeEnemy = EffectLayer.canExposeOpponentRuntime(p1, p2, enemyInfoUnlocked);
+
+  // 未被遮罩时，持续刷新敌方“最后已知状态”
+  if (canExposeEnemy) {
+    enemyFogState = { hp: p2.hp, stamina: p2.stamina, speed: p2.speed };
+  }
+
+  const showEnemy = canExposeEnemy ? { hp: p2.hp, stamina: p2.stamina, speed: p2.speed } : enemyFogState;
+
+  if (showEnemy.hp == null || showEnemy.stamina == null || showEnemy.speed == null) {
+    updatePips('p2-hp', 0, DefaultStats.MAX_HP, 'hp');
+    updatePips('p2-stam', 0, DefaultStats.MAX_STAMINA, 'stam');
+    ui.p2SpeedVal.textContent = '?';
+  } else {
+    updatePips('p2-hp', showEnemy.hp, DefaultStats.MAX_HP, 'hp');
+    updatePips('p2-stam', showEnemy.stamina, DefaultStats.MAX_STAMINA, 'stam');
+    ui.p2SpeedVal.textContent = showEnemy.speed;
+  }
 }
 
 /** 刷新行动按钮上的点数显示，并根据精力控制按钮可用性 */
@@ -217,8 +249,8 @@ function updateConfigPanel() {
 
   // 强化按钮可用性
   ui.enhanceMinusBtn.disabled = localEnhance <= 0;
-  const nextCost = 1 + localEnhance + 1; // 再加一次强化的总消耗
-  ui.enhancePlusBtn.disabled = nextCost > p1.stamina;
+  // 即时扣费模式下，当前行动基础成本已支付；再强化一次只需再支付 1 点“有效精力”
+  ui.enhancePlusBtn.disabled = getEffectiveStamina(p1) < 1;
 
   // 渲染已装备的效果（根据 pts 决定前端显示失效状态）
   ui.effectList.innerHTML = '';
@@ -233,11 +265,11 @@ function updateConfigPanel() {
     item.className = 'effect-item' + (!isValid ? ' incompatible' : '') + (effectId && isValid ? ' selected' : '');
 
     if (effectId && EffectDefs[effectId]) {
-      const def = EffectDefs[effectId];
+      const meta = getEffectMeta(effectId);
       item.innerHTML = `
         <div class="effect-item-main">
-          <div class="effect-item-name">${def.name}</div>
-          <div class="effect-item-desc">${def.desc}</div>
+          <div class="effect-item-name">${meta.name}</div>
+          <div class="effect-item-desc">${meta.desc}</div>
         </div>
       `;
     } else {
@@ -296,6 +328,7 @@ function resetForNewTurn() {
   selectedAction = null;
   localEnhance = 0;
   pendingInsightAction = null;
+  enemyInfoUnlocked = false;
   document.querySelectorAll('.act-btn').forEach(b => {
     b.classList.remove('selected');
     b.removeAttribute('disabled');
@@ -313,6 +346,15 @@ function resetForNewTurn() {
   const snap = engine.getSnapshot();
   const p1 = snap.players[PlayerId.P1];
   refreshPoints(p1.stamina, p1.speed);
+
+  // 新回合开始时，记录敌方目前的真实状态作为本回合的基础情报
+  // 若本回合未执行洞察，玩家看到的敌方血量、精力、速度将一直“锁定”在这个初始快照
+  const p2 = snap.players[PlayerId.P2];
+  enemyFogState = {
+    hp: p2.hp,
+    stamina: p2.stamina,
+    speed: p2.speed
+  };
 
   // 新回合开始：insightUsed 必然被引擎重置为 false，
   // 此处只需判断精力是否足够（避免在 _beginTurn 还未执行时读到旧 insightUsed）
@@ -430,24 +472,31 @@ engine.on(EngineEvent.TIMER_TICK, payload => {
   );
 });
 
+// 每个阶段接口执行后刷新一次状态显示，确保“时机=结算=可见”
+engine.on(EngineEvent.PHASE_STATE_SYNC, ({ state }) => {
+  const p1 = state.players[PlayerId.P1];
+  const p2 = state.players[PlayerId.P2];
+
+  renderPlayerResources(p1, p2);
+
+  updateStatusIcons(PlayerId.P1, p1);
+  // 敌方图标可见性由效果层策略统一决定
+  if (EffectLayer.canExposeOpponentRuntime(p1, p2, enemyInfoUnlocked)) {
+    updateStatusIcons(PlayerId.P2, p2);
+  }
+});
+
 // 强制保证 UI 表象与可用精力一致
 function enforceUIConstraints(p1) {
   if (selectedAction) {
-    const pen = p1.staminaPenalty || 0;
-    const dis = p1.staminaDiscount || 0;
-    const baseCost = Math.max(0, 1 + pen - dis);
-
-    if (selectedAction !== 'dodge') {
-      const maxEnhance = Math.max(0, p1.stamina - baseCost);
-      if (localEnhance > maxEnhance) {
-        localEnhance = maxEnhance;
-        engine.submitAction(PlayerId.P1, { enhance: localEnhance });
-        updateConfigPanel();
-        return false; // 下调导致触发了新的 ACTION_UPDATED，终止当前执行链
-      }
-    } else if (p1.stamina < baseCost) {
-      cancelSelection();
-      return false;
+    // 即时扣费模式：基础行动成本已在选行动时扣除。
+    // 当前剩余精力只决定“还能再强化几次”。
+    const maxEnhance = Math.max(0, p1.stamina);
+    if (localEnhance > maxEnhance) {
+      localEnhance = maxEnhance;
+      engine.submitAction(PlayerId.P1, { enhance: localEnhance });
+      updateConfigPanel();
+      return false; // 下调导致触发了新的 ACTION_UPDATED，终止当前执行链
     }
   }
   return true;
@@ -461,12 +510,8 @@ engine.on(EngineEvent.ACTION_UPDATED, ({ playerId }) => {
     refreshPoints(p1.stamina, p1.speed);
     ui.p1SpeedVal.textContent = p1.speed;
   }
-  if (playerId === PlayerId.P2) {
-    ui.p2SpeedVal.textContent = snap.players[PlayerId.P2].speed;
-  }
-  updatePips('p1-hp', p1.hp, DefaultStats.MAX_HP, 'hp');
-  const projStam = getProjectedStamina(p1);
-  updatePips('p1-stam', projStam, DefaultStats.MAX_STAMINA, 'stam');
+  // 敌方即时变化是否可见，统一交给 renderPlayerResources/可见性策略处理
+  renderPlayerResources(p1, snap.players[PlayerId.P2]);
 
   if (!p1.ready) {
     ui.insightBtn.disabled = p1.insightUsed || getEffectiveStamina(p1) < 1;
@@ -532,21 +577,37 @@ engine.on(EngineEvent.PHASE_SHIFT, ({ playerId }) => {
   }
 });
 
-engine.on(EngineEvent.PASSIVE_INSIGHT, ({ targetId, revealedAction }) => {
+engine.on(EngineEvent.PASSIVE_INSIGHT, ({ targetId, revealedAction, revealed }) => {
   const isP1Target = targetId === PlayerId.P1;
-  const msg = isP1Target
-    ? '你的意图已被对方锁定。'
-    : `对方意图已暴露：【${ActionName[revealedAction?.action ?? 'standby']}】`;
-  showInsightNotice(msg);
+  const snap = engine.getSnapshot();
+
+  // 只有真正揭示（对方已就绪）时才解锁信息并刷新 UI
+  if (!isP1Target && revealed) {
+    enemyInfoUnlocked = true;
+    renderPlayerResources(snap.players[PlayerId.P1], snap.players[PlayerId.P2]);
+  }
+
+  // 只有真正揭示时才发出通知（避免阶段转换时的空提示）
+  if (revealed) {
+    const msg = isP1Target
+      ? '你的意图已被对方锁定。'
+      : `对方意图已暴露：【${ActionName[revealedAction?.action ?? 'standby']}】`;
+    showInsightNotice(msg);
+  }
 });
 
 engine.on(EngineEvent.ACTIVE_INSIGHT, ({ casterId, revealedAction, revealed }) => {
   if (casterId === PlayerId.P1) {
     if (revealed && revealedAction) {
       // 对方已就绪，真正揭示意图
+      enemyInfoUnlocked = true;
       const actName = ActionName[revealedAction.action] ?? '未知';
       showInsightNotice(`已洞察敌方意图：【${actName}】`);
       pendingInsightAction = null;
+
+      // 主动洞察成功时立刻更新一次资源显示（刷新迷雾快照）
+      const snap = engine.getSnapshot();
+      renderPlayerResources(snap.players[PlayerId.P1], snap.players[PlayerId.P2]);
     } else {
       // 洞察已发起，对方尚未就绪
       pendingInsightAction = true; // 标记挂起，等 revealed 再清
@@ -556,8 +617,7 @@ engine.on(EngineEvent.ACTIVE_INSIGHT, ({ casterId, revealedAction, revealed }) =
     const p1 = snap.players[PlayerId.P1];
     if (!enforceUIConstraints(p1)) return;
 
-    const projStam = getProjectedStamina(p1);
-    updatePips('p1-stam', projStam, DefaultStats.MAX_STAMINA, 'stam');
+    updatePips('p1-stam', p1.stamina, DefaultStats.MAX_STAMINA, 'stam');
     refreshPoints(p1.stamina, p1.speed);
 
     if (!p1.ready) {
@@ -568,6 +628,14 @@ engine.on(EngineEvent.ACTIVE_INSIGHT, ({ casterId, revealedAction, revealed }) =
 
 engine.on(EngineEvent.ACTION_PHASE_START, () => {
   ui.phaseIndicator.textContent = '行动期';
+
+  // 行动期开始时刷新状态图标：敌方信息仍遵循洞察解锁规则
+  const snap = engine.getSnapshot();
+  updateStatusIcons(PlayerId.P1, snap.players[PlayerId.P1]);
+  if (!snap.players[PlayerId.P2].ready || enemyInfoUnlocked) {
+    updateStatusIcons(PlayerId.P2, snap.players[PlayerId.P2]);
+  }
+
   ui.actionNotice.textContent = '双方行动中: 3s';
   ui.actionNotice.classList.add('show');
 
@@ -593,13 +661,8 @@ engine.on(EngineEvent.TURN_RESOLVED, result => {
   ui.insightNotice.classList.remove('show');
   ui.insightNotice.textContent = '';
 
-  updatePips('p1-hp', result.newState.p1.hp, DefaultStats.MAX_HP, 'hp');
-  updatePips('p1-stam', result.newState.p1.stamina, DefaultStats.MAX_STAMINA, 'stam');
-  updatePips('p2-hp', result.newState.p2.hp, DefaultStats.MAX_HP, 'hp');
-  updatePips('p2-stam', result.newState.p2.stamina, DefaultStats.MAX_STAMINA, 'stam');
+  renderPlayerResources(result.newState.p1, result.newState.p2);
 
-  updateStatusIcons(PlayerId.P1, result.newState.p1);
-  updateStatusIcons(PlayerId.P2, result.newState.p2);
 
   ui.p1SpeedVal.textContent = DefaultStats.BASE_SPEED;
   ui.p2SpeedVal.textContent = DefaultStats.BASE_SPEED;
@@ -764,9 +827,8 @@ function updateStatusIcons(playerId, state) {
   const addIcon = (filename, title) => {
     const img = document.createElement('img');
     img.className = 'status-icon';
-    img.src = `ui/sq-du/effect/${filename}`;
+    img.src = `sq-du/effect/${filename}`;
 
-    // 点击查看说明（移动端友好）
     img.onclick = (e) => {
       e.stopPropagation();
       const tooltip = playerId === PlayerId.P1
@@ -790,13 +852,14 @@ function updateStatusIcons(playerId, state) {
 
   if (state.staminaPenalty > 0) addIcon('tired.svg', `本回合精力消耗 +${state.staminaPenalty}`);
   if (state.staminaDiscount > 0) addIcon('excited.svg', `本回合精力消耗 -${state.staminaDiscount}`);
-  if (state.guardBoost > 0) addIcon('shield.svg', `本回合行动期开始守备点数 +${state.guardBoost}`);
-  if (state.guardDebuff > 0) addIcon('broken-shield.svg', `本回合行动期开始守备点数 -${state.guardDebuff}`);
-  if (state.chargeBoost > 0) addIcon('strong.svg', `本回合行动期开始攻击点数 +${state.chargeBoost}`);
-  if (state.ptsDebuff > 0) addIcon('broken-knife.svg', `本回合行动期开始攻击点数 -${state.ptsDebuff}`);
-  if (state.dodgeBoost > 0) addIcon('avoid.svg', `本回合行动期开始闪避点数 +${state.dodgeBoost}`);
-  if (state.dodgeDebuff > 0) addIcon('heavy.svg', `本回合行动期开始闪避点数 -${state.dodgeDebuff}`);
-  if (state.agilityBoost > 0) addIcon('fast.svg', `本回合行动期开始动速 +${state.agilityBoost}`);
+  if (state.guardBoost > 0) addIcon('shield.svg', `本回合守备点数 +${state.guardBoost}`);
+  if (state.guardDebuff > 0) addIcon('broken-shield.svg', `本回合守备点数 -${state.guardDebuff}`);
+  if (state.chargeBoost > 0) addIcon('strong.svg', `本回合攻击点数 +${state.chargeBoost}`);
+  if (state.ptsDebuff > 0) addIcon('broken-knife.svg', `本回合攻击点数 -${state.ptsDebuff}`);
+  if (state.dodgeBoost > 0) addIcon('avoid.svg', `本回合闪避点数 +${state.dodgeBoost}`);
+  if (state.dodgeDebuff > 0) addIcon('heavy.svg', `本回合闪避点数 -${state.dodgeDebuff}`);
+  if (state.agilityBoost > 0) addIcon('fast.svg', `本回合动速 +${state.agilityBoost}`);
+  if (state.agilityDebuff > 0) addIcon('slow.svg', `本回合动速 -${state.agilityDebuff}`);
   if (state.hpDrain > 0) addIcon('wound.svg', `本回合行动期开始扣除 ${state.hpDrain} 点命数`);
 }
 
@@ -880,6 +943,7 @@ function openEffectPicker(action, slot) {
   inv.forEach(effectId => {
     const def = EffectDefs[effectId];
     if (!def) return;
+    const meta = getEffectMeta(effectId);
     // 同效果只能装备一格，已在其他槽的不显示
     if (equippedElsewhere.has(effectId)) return;
 
@@ -888,8 +952,8 @@ function openEffectPicker(action, slot) {
 
     item.innerHTML = `
       <div class="effect-item-main">
-        <div class="effect-item-name">${def.name}</div>
-        <div class="effect-item-desc">${def.desc}</div>
+        <div class="effect-item-name">${meta.name}</div>
+        <div class="effect-item-desc">${meta.desc}</div>
       </div>
     `;
 
@@ -1028,6 +1092,13 @@ engine.on(EngineEvent.TURN_START_PHASE, () => {
   ui.phaseIndicator.textContent = '回合开始期';
   ui.equipOverlayTitle.textContent = '装配期';
 
+  // 回合开始：先刷新一次，敌方图标是否可见由可见性策略决定
+  const snap = engine.getSnapshot();
+  updateStatusIcons(PlayerId.P1, snap.players[PlayerId.P1]);
+  if (EffectLayer.canExposeOpponentRuntime(snap.players[PlayerId.P1], snap.players[PlayerId.P2], enemyInfoUnlocked)) {
+    updateStatusIcons(PlayerId.P2, snap.players[PlayerId.P2]);
+  }
+
   ui.roundStartCountdownHint.textContent = '1s 后自动关闭';
   ui.roundStartNotice.classList.add('show');
 
@@ -1072,7 +1143,6 @@ engine.on(EngineEvent.EQUIP_PHASE_END, () => {
   if (!p1.ready) {
     ui.standbyBtn.disabled = false;
     ui.readyBtn.disabled = false;
-    const projStam = getProjectedStamina(p1);
     ui.insightBtn.disabled = p1.insightUsed || getEffectiveStamina(p1) < 1;
   }
 });
@@ -1112,7 +1182,7 @@ function updateIntelBox() {
     const def = EffectDefs[effectId];
     if (!def) return;
     def.applicableTo.forEach(act => {
-      if (grouped[act]) grouped[act].push(def);
+      if (grouped[act]) grouped[act].push(effectId);
     });
   });
 
@@ -1131,10 +1201,11 @@ function updateIntelBox() {
     const tagsDiv = document.createElement('div');
     tagsDiv.className = 'intel-group-tags';
 
-    grouped[act].forEach(def => {
+    grouped[act].forEach(effectId => {
+      const meta = getEffectMeta(effectId);
       const tag = document.createElement('div');
       tag.className = 'intel-tag';
-      tag.innerHTML = `<strong>${def.name}</strong><span>${def.desc}</span>`;
+      tag.innerHTML = `<strong>${meta.name}</strong><span>${meta.desc}</span>`;
       tagsDiv.appendChild(tag);
     });
 

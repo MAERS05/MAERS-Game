@@ -34,8 +34,8 @@ import {
   EFFECT_SLOTS,
   calcActionCost,
 } from './constants.js';
-
 import { DualTimer } from './timer.js';
+import { EffectLayer } from '../main/effect.js';
 import { resolve } from './resolver.js';
 import { scheduleAI, scheduleAIRedecide } from '../ai/ai-scheduler.js';
 import '../ai/ai-manual.js'; // 初始化 ManualAI 测试工具挂载到 window
@@ -130,6 +130,29 @@ function createPlayerState(id, overrides = {}) {
     },
     effectIntel: [],                              // 已获取的敌方效果情报
     speedDiscountSpent: 0,                        // 本回合因提速消耗的 discount 计数（用于精确归还）
+    actionDiscountSpent: 0,                       // 本回合因行动成本消耗的 discount 计数（用于精确归还）
+    insightDebuff: 0,                             // 洞察减益（洞察成本额外 +X）
+    restRecoverBonus: 0,                          // 蓄气恢复加值（下回合在 ACTION_START 生效）
+    restRecoverPenalty: 0,                        // 蓄气恢复减值（下回合在 ACTION_START 生效）
+    agilityDebuff: 0,                             // 动速减益（负溢出递延）
+    insightBlocked: false,                        // 本回合禁洞察
+    insightBlockNextTurn: false,                  // 下回合禁洞察预约
+    redecideBlocked: false,                       // 本回合禁重筹
+    redecideBlockNextTurn: false,                 // 下回合禁重筹预约
+    speedAdjustBlocked: false,                    // 本回合禁提速/降速
+    speedAdjustBlockNextTurn: false,              // 下回合禁提速/降速预约
+    actionBlocked: [],                            // 本回合禁用动作列表（Action 值）
+    actionBlockNextTurn: [],                      // 下回合禁用动作预约
+    slotBlocked: {
+      [Action.ATTACK]: [false, false, false],
+      [Action.GUARD]: [false, false, false],
+      [Action.DODGE]: [false, false, false],
+    },
+    slotBlockNextTurn: {
+      [Action.ATTACK]: [false, false, false],
+      [Action.GUARD]: [false, false, false],
+      [Action.DODGE]: [false, false, false],
+    },
     ...overrides,
   };
 }
@@ -192,6 +215,12 @@ export class BattleEngine {
     this._aiHandle = null;
     // AI 历史属性快照（只记原始数値，不记情形名称）
     this._aiHistory = [];
+
+    // 阶段边界去重标记（按回合重置）
+    this._phaseFlags = {
+      decisionEnded: { [PlayerId.P1]: false, [PlayerId.P2]: false },
+      exposeEnded: { [PlayerId.P1]: false, [PlayerId.P2]: false },
+    };
   }
 
   // ═══════════════════════════════════════════
@@ -272,11 +301,14 @@ export class BattleEngine {
     const p = this._players[playerId];
     if (!p || p.ready) return; // 已就绪，禁止修改
 
+    const prevCtx = p.actionCtx ? { ...p.actionCtx } : createActionCtx();
+
     p.actionCtx = {
       ...createActionCtx(),
       ...p.actionCtx,
       ...patch,
     };
+
 
     // ── AI 动速消耗同步 ──────────────────────────────────
     // AI 绕过了 adjustSpeed()，直接在 patch 中提交 speed 值。
@@ -324,6 +356,9 @@ export class BattleEngine {
     p.actionCtx.pts = this._calcPts(p.actionCtx, p);
     p.actionCtx.cost = calcActionCost(p.actionCtx, p);
 
+    // 行动成本即时结算：按差额扣/退（与洞察、提速一致）
+    this._reconcileActionCostDelta(p, prevCtx, p.actionCtx);
+
     this._bus.emit(EngineEvent.ACTION_UPDATED, {
       playerId,
       actionCtx: { ...p.actionCtx },
@@ -337,15 +372,10 @@ export class BattleEngine {
    */
   adjustSpeed(playerId, delta) {
     const p = this._players[playerId];
-    if (!p || p.ready) return;
-
-    const effectiveStamina = p.stamina + (p.staminaDiscount || 0) - (p.staminaPenalty || 0);
+    if (!EffectLayer.canAdjustSpeed(p, delta)) return;
 
     if (delta > 0) {
       // 提速：单次消耗 1 点有效精力
-      if (effectiveStamina <= 0) return;
-      
-      // 优先消耗一回合有效期的 discount
       if (p.staminaDiscount > 0) {
         p.staminaDiscount--;
         p.speedDiscountSpent = (p.speedDiscountSpent || 0) + 1;
@@ -354,7 +384,6 @@ export class BattleEngine {
       }
       p.speed++;
     } else if (delta < 0) {
-      if (p.speed <= DefaultStats.BASE_SPEED) return;
       p.speed--;
       // 降速归还时需对齐提速时的扣减来源，避免 discount->stamina 套利
       if ((p.speedDiscountSpent || 0) > 0) {
@@ -385,12 +414,24 @@ export class BattleEngine {
     const p = this._players[playerId];
     if (!p || p.ready) return;
 
-    // 如果没有选择行动，默认为待命
+    // 如果没有选择行动，默认为待命（即时恢复 1 精力）
     if (!p.actionCtx || !p.actionCtx.action) {
       p.actionCtx = createActionCtx(Action.STANDBY);
     }
 
+
     p.ready = true;
+
+    // 该方锁定行动：决策期结束（若未结束）
+    this._emitDecisionEndOnce(playerId);
+    // 若该方已经进入暴露状态，则在锁定时记作暴露期结束
+    if (p.wasInsighted || p.pendingPassiveReveal) {
+      this._emitExposeEndOnce(playerId);
+    }
+    // 若该方处于重筹回流，就绪即代表重筹期结束（确认）
+    if (p.didRedecide) {
+      this._emitPhaseEffectEvent(EngineEvent.REDECIDE_END, { playerId, reason: 'confirmed' });
+    }
 
     // 将玩家在快捷槽里预装的效果合并进本次行动
     // 仅限有意义的行动（待命没有效果槽）
@@ -457,26 +498,10 @@ export class BattleEngine {
   useInsight(casterId, targetId) {
     const caster = this._players[casterId];
     const target = this._players[targetId];
-    if (!caster || !target) return;
-    if (caster.insightUsed) return;      // 每回合只能主动洞察一次
+    if (!EffectLayer.canUseInsight(caster, target)) return;
 
-    const effectiveStamina = caster.stamina + (caster.staminaDiscount || 0) - (caster.staminaPenalty || 0);
-    if (effectiveStamina <= 0) return;   // 精力不足（按有效精力判定）
-    if (caster.ready) return;            // 已就绪则无需洞察
-
-    // 洞察消耗规则：
-    // - 基础固定 1 点
-    // - 受低落（staminaPenalty）增加
-    // - 不被振奋（staminaDiscount）直接减为 0
-    // 支付顺序仍是先扣 discount，再扣真实 stamina。
-    let insightCost = 1 + (caster.staminaPenalty || 0);
-    while (insightCost > 0 && caster.staminaDiscount > 0) {
-      caster.staminaDiscount--;
-      insightCost--;
-    }
-    if (insightCost > 0) {
-      caster.stamina = Math.max(0, caster.stamina - insightCost);
-    }
+    // 洞察消耗与门禁判定收敛到效果层策略
+    EffectLayer.applyInsightCost(caster);
 
     caster.insightUsed = true;
     caster.pendingInsightTarget = targetId; // 标记目标，待其就绪时才揭示
@@ -526,11 +551,15 @@ export class BattleEngine {
    */
   requestRedecide(playerId) {
     const p = this._players[playerId];
-    if (!p || !p.canRedecide || p.didRedecide) return;
+    if (!EffectLayer.canRequestRedecide(p)) return;
 
     p.ready = false;
     p.canRedecide = false;
     p.didRedecide = true;
+
+    // 进入重筹期：该方暴露期结束，开始重新决策
+    this._emitPhaseEffectEvent(EngineEvent.EXPOSE_END, { playerId });
+    this._emitPhaseEffectEvent(EngineEvent.REDECIDE_START, { playerId });
 
     // 恢复倒计时（从暂停处继续）
     this._timer.resume(playerId);
@@ -548,6 +577,9 @@ export class BattleEngine {
     if (!p || !p.canRedecide) return;
 
     p.canRedecide = false;
+
+    // 放弃重筹：结束重筹期
+    this._emitPhaseEffectEvent(EngineEvent.REDECIDE_END, { playerId, reason: 'declined' });
 
     // 如果双方都已经准备好并且都不再等待重决策，强制进入结算
     const p1 = this._players[PlayerId.P1];
@@ -599,6 +631,12 @@ export class BattleEngine {
     const doRoundStart = () => {
       this._turn++;
 
+      // 重置阶段边界标记
+      this._phaseFlags = {
+        decisionEnded: { [PlayerId.P1]: false, [PlayerId.P2]: false },
+        exposeEnded: { [PlayerId.P1]: false, [PlayerId.P2]: false },
+      };
+
       // 重置回合状态（不重置 hp / stamina / speed / equippedEffects / effectIntel）
       [PlayerId.P1, PlayerId.P2].forEach(id => {
         const p = this._players[id];
@@ -610,15 +648,36 @@ export class BattleEngine {
         p.canRedecide = false;
         p.didRedecide = false;
         p.speedDiscountSpent = 0;
+        p.actionDiscountSpent = 0;
+        // 回合门禁：把“下回合预约”转为本回合生效，再清理预约标记
+        p.insightBlocked = !!p.insightBlockNextTurn;
+        p.insightBlockNextTurn = false;
+        p.redecideBlocked = !!p.redecideBlockNextTurn;
+        p.redecideBlockNextTurn = false;
+        p.speedAdjustBlocked = !!p.speedAdjustBlockNextTurn;
+        p.speedAdjustBlockNextTurn = false;
+        p.actionBlocked = Array.isArray(p.actionBlockNextTurn) ? [...p.actionBlockNextTurn] : [];
+        p.actionBlockNextTurn = [];
+        p.slotBlocked = {
+          [Action.ATTACK]: [...(p.slotBlockNextTurn?.[Action.ATTACK] || [false, false, false])],
+          [Action.GUARD]: [...(p.slotBlockNextTurn?.[Action.GUARD] || [false, false, false])],
+          [Action.DODGE]: [...(p.slotBlockNextTurn?.[Action.DODGE] || [false, false, false])],
+        };
+        p.slotBlockNextTurn = {
+          [Action.ATTACK]: [false, false, false],
+          [Action.GUARD]: [false, false, false],
+          [Action.DODGE]: [false, false, false],
+        };
         p.speed = DefaultStats.BASE_SPEED;
         p.actionCtx = createActionCtx(Action.STANDBY);
       });
 
-      this._bus.emit(EngineEvent.TURN_START_PHASE, {});
+      this._emitPhaseEffectEvent(EngineEvent.TURN_START_PHASE, {});
 
       // 延迟 1s 后，进入装备期
       setTimeout(() => {
         this._setState(EngineState.EQUIPPING);
+        this._emitPhaseEffectEvent(EngineEvent.EQUIP_START);
         this._bus.emit(EngineEvent.EQUIP_PHASE_START, {
           secondsLeft: TimerConfig.EQUIP_TIME,
         });
@@ -628,7 +687,7 @@ export class BattleEngine {
     };
 
     if (this._turn > 0) {
-      this._bus.emit(EngineEvent.TURN_END_PHASE, {});
+      this._emitPhaseEffectEvent(EngineEvent.TURN_END_PHASE, {});
       setTimeout(doRoundStart, 1000);
     } else {
       doRoundStart();
@@ -637,11 +696,20 @@ export class BattleEngine {
 
   _triggerResolve() {
     this._timer.stop();
+
+    // 双方最终进入行动/结算：补齐暴露期结束（若有）
+    this._emitExposeEndOnce(PlayerId.P1);
+    this._emitExposeEndOnce(PlayerId.P2);
+
     this._setState(EngineState.RESOLVING);
 
-    // Bug #2: 结算前强制校验精力，防止因洞察/加速透支形成的白嫖行动
-    this._enforceStaminaLimit(PlayerId.P1);
-    this._enforceStaminaLimit(PlayerId.P2);
+    // 即时扣费模式：行动可执行性已在操作阶段确定，结算前不再二次改写 actionCtx。
+
+    // 行动期开始：交由效果层按阶段接口执行具体效果
+    this._emitPhaseEffectEvent(EngineEvent.ACTION_START, {
+      p1Action: this._players[PlayerId.P1].actionCtx ? { ...this._players[PlayerId.P1].actionCtx } : null,
+      p2Action: this._players[PlayerId.P2].actionCtx ? { ...this._players[PlayerId.P2].actionCtx } : null,
+    });
 
     const p1 = this._players[PlayerId.P1];
     const p2 = this._players[PlayerId.P2];
@@ -664,7 +732,14 @@ export class BattleEngine {
 
     setTimeout(() => {
       if (this._state !== EngineState.RESOLVING) return;
+      this._emitPhaseEffectEvent(EngineEvent.ACTION_END, {});
+      this._emitPhaseEffectEvent(EngineEvent.RESOLVE_START, {});
       this._bus.emit(EngineEvent.TURN_RESOLVED, result);
+
+      // 结算期固定 5s：结束后再发 RESOLVE_END
+      setTimeout(() => {
+        this._emitPhaseEffectEvent(EngineEvent.RESOLVE_END, { result });
+      }, 5000);
 
       // 检查胜负
       const gameOver = this._checkGameOver(result);
@@ -685,11 +760,22 @@ export class BattleEngine {
 
   _triggerInsightClash() {
     this._timer.stop();
+
+    // 识破强制结算前，补齐决策/暴露边界
+    this._emitDecisionEndOnce(PlayerId.P1);
+    this._emitDecisionEndOnce(PlayerId.P2);
+    this._emitExposeEndOnce(PlayerId.P1);
+    this._emitExposeEndOnce(PlayerId.P2);
+
     this._setState(EngineState.RESOLVING);
 
-    // Bug #2: 识破强制结算前也要校验精力（玩家可能尚未就绪，action 仍是意向配置）
-    this._enforceStaminaLimit(PlayerId.P1);
-    this._enforceStaminaLimit(PlayerId.P2);
+    // 即时扣费模式：行动可执行性已在操作阶段确定，识破前不再二次改写 actionCtx。
+
+    // 行动期开始：交由效果层按阶段接口执行具体效果
+    this._emitPhaseEffectEvent(EngineEvent.ACTION_START, {
+      p1Action: this._players[PlayerId.P1].actionCtx ? { ...this._players[PlayerId.P1].actionCtx } : null,
+      p2Action: this._players[PlayerId.P2].actionCtx ? { ...this._players[PlayerId.P2].actionCtx } : null,
+    });
 
     const p1 = this._players[PlayerId.P1];
     const p2 = this._players[PlayerId.P2];
@@ -709,7 +795,15 @@ export class BattleEngine {
 
     setTimeout(() => {
       if (this._state !== EngineState.RESOLVING) return;
+      this._emitPhaseEffectEvent(EngineEvent.ACTION_END, {});
+      this._emitPhaseEffectEvent(EngineEvent.RESOLVE_START, {});
       this._bus.emit(EngineEvent.TURN_RESOLVED, result);
+
+      // 结算期固定 5s：结束后再发 RESOLVE_END
+      setTimeout(() => {
+        this._emitPhaseEffectEvent(EngineEvent.RESOLVE_END, { result });
+      }, 5000);
+
       this._checkGameOver(result);
     }, 3000);
   }
@@ -728,8 +822,10 @@ export class BattleEngine {
     // 将每个玩家快捷槽里的效果同步到初始配置中
     // （在决策期选眼了行动后，将对应行为的快捷槽和 lastingSlots 坥加入 actionCtx.effects）
     // 这里只凉异状态，真正合并在 setReady() 的内部实现
+    this._emitPhaseEffectEvent(EngineEvent.EQUIP_END, {});
     this._setState(EngineState.TICKING);
     this._bus.emit(EngineEvent.EQUIP_PHASE_END, {});
+    this._emitPhaseEffectEvent(EngineEvent.DECISION_START, {});
 
     // PVE 模式：装备期结束后才调度 AI
     if (this._mode === EngineMode.PVE) {
@@ -752,6 +848,10 @@ export class BattleEngine {
     const target = this._players[playerId];
     const otherId = playerId === PlayerId.P1 ? PlayerId.P2 : PlayerId.P1;
 
+    // 进入暴露期：该方决策期结束、暴露期开始
+    this._emitDecisionEndOnce(playerId);
+    this._emitPhaseEffectEvent(EngineEvent.EXPOSE_START, { playerId });
+
     // 只标记进入洞察期，行动就绪后才揭示
     target.wasInsighted = true;
     target.pendingPassiveReveal = true;
@@ -770,7 +870,12 @@ export class BattleEngine {
    */
   _onTimeout(playerId) {
     const p = this._players[playerId];
-    p.actionCtx = createActionCtx(Action.STANDBY);
+    const prevCtx = p.actionCtx ? { ...p.actionCtx } : createActionCtx(Action.STANDBY);
+
+    p.actionCtx = EffectLayer.rewriteTimeoutAction(p.actionCtx);
+    // 强制蓄气前回滚行动成本差额（即时扣费模式）
+    this._reconcileActionCostDelta(p, prevCtx, p.actionCtx);
+
     // 复用公共 setReady 流程，确保洞察揭示和重决策检查均在其中处理
     this.setReady(playerId);
   }
@@ -870,8 +975,38 @@ export class BattleEngine {
     p1.dodgeBoost = result.newState.p1.dodgeBoost ?? 0;
     p1.dodgeDebuff = result.newState.p1.dodgeDebuff ?? 0;
     p1.agilityBoost = result.newState.p1.agilityBoost ?? 0;
+    p1.agilityDebuff = result.newState.p1.agilityDebuff ?? 0;
     p1.staminaPenalty = result.newState.p1.staminaPenalty ?? 0;
     p1.staminaDiscount = result.newState.p1.staminaDiscount ?? 0;
+    p1.insightDebuff = result.newState.p1.insightDebuff ?? 0;
+    p1.restRecoverBonus = result.newState.p1.restRecoverBonus ?? 0;
+    p1.restRecoverPenalty = result.newState.p1.restRecoverPenalty ?? 0;
+    p1.insightBlockNextTurn = result.newState.p1.insightBlockNextTurn ?? false;
+    p1.insightBlocked = result.newState.p1.insightBlocked ?? p1.insightBlocked ?? false;
+    p1.redecideBlocked = result.newState.p1.redecideBlocked ?? p1.redecideBlocked ?? false;
+    p1.redecideBlockNextTurn = result.newState.p1.redecideBlockNextTurn ?? false;
+    p1.speedAdjustBlocked = result.newState.p1.speedAdjustBlocked ?? p1.speedAdjustBlocked ?? false;
+    p1.speedAdjustBlockNextTurn = result.newState.p1.speedAdjustBlockNextTurn ?? false;
+    p1.actionBlocked = Array.isArray(result.newState.p1.actionBlocked) ? [...result.newState.p1.actionBlocked] : (p1.actionBlocked || []);
+    p1.actionBlockNextTurn = Array.isArray(result.newState.p1.actionBlockNextTurn) ? [...result.newState.p1.actionBlockNextTurn] : [];
+    p1.slotBlocked = result.newState.p1.slotBlocked ? {
+      [Action.ATTACK]: [...(result.newState.p1.slotBlocked[Action.ATTACK] || [false, false, false])],
+      [Action.GUARD]: [...(result.newState.p1.slotBlocked[Action.GUARD] || [false, false, false])],
+      [Action.DODGE]: [...(result.newState.p1.slotBlocked[Action.DODGE] || [false, false, false])],
+    } : (p1.slotBlocked || {
+      [Action.ATTACK]: [false, false, false],
+      [Action.GUARD]: [false, false, false],
+      [Action.DODGE]: [false, false, false],
+    });
+    p1.slotBlockNextTurn = result.newState.p1.slotBlockNextTurn ? {
+      [Action.ATTACK]: [...(result.newState.p1.slotBlockNextTurn[Action.ATTACK] || [false, false, false])],
+      [Action.GUARD]: [...(result.newState.p1.slotBlockNextTurn[Action.GUARD] || [false, false, false])],
+      [Action.DODGE]: [...(result.newState.p1.slotBlockNextTurn[Action.DODGE] || [false, false, false])],
+    } : (p1.slotBlockNextTurn || {
+      [Action.ATTACK]: [false, false, false],
+      [Action.GUARD]: [false, false, false],
+      [Action.DODGE]: [false, false, false],
+    });
     p1.hpDrain = result.newState.p1.hpDrain ?? 0;
 
     p2.hp = result.newState.p2.hp;
@@ -883,8 +1018,38 @@ export class BattleEngine {
     p2.dodgeBoost = result.newState.p2.dodgeBoost ?? 0;
     p2.dodgeDebuff = result.newState.p2.dodgeDebuff ?? 0;
     p2.agilityBoost = result.newState.p2.agilityBoost ?? 0;
+    p2.agilityDebuff = result.newState.p2.agilityDebuff ?? 0;
     p2.staminaPenalty = result.newState.p2.staminaPenalty ?? 0;
     p2.staminaDiscount = result.newState.p2.staminaDiscount ?? 0;
+    p2.insightDebuff = result.newState.p2.insightDebuff ?? 0;
+    p2.restRecoverBonus = result.newState.p2.restRecoverBonus ?? 0;
+    p2.restRecoverPenalty = result.newState.p2.restRecoverPenalty ?? 0;
+    p2.insightBlockNextTurn = result.newState.p2.insightBlockNextTurn ?? false;
+    p2.insightBlocked = result.newState.p2.insightBlocked ?? p2.insightBlocked ?? false;
+    p2.redecideBlocked = result.newState.p2.redecideBlocked ?? p2.redecideBlocked ?? false;
+    p2.redecideBlockNextTurn = result.newState.p2.redecideBlockNextTurn ?? false;
+    p2.speedAdjustBlocked = result.newState.p2.speedAdjustBlocked ?? p2.speedAdjustBlocked ?? false;
+    p2.speedAdjustBlockNextTurn = result.newState.p2.speedAdjustBlockNextTurn ?? false;
+    p2.actionBlocked = Array.isArray(result.newState.p2.actionBlocked) ? [...result.newState.p2.actionBlocked] : (p2.actionBlocked || []);
+    p2.actionBlockNextTurn = Array.isArray(result.newState.p2.actionBlockNextTurn) ? [...result.newState.p2.actionBlockNextTurn] : [];
+    p2.slotBlocked = result.newState.p2.slotBlocked ? {
+      [Action.ATTACK]: [...(result.newState.p2.slotBlocked[Action.ATTACK] || [false, false, false])],
+      [Action.GUARD]: [...(result.newState.p2.slotBlocked[Action.GUARD] || [false, false, false])],
+      [Action.DODGE]: [...(result.newState.p2.slotBlocked[Action.DODGE] || [false, false, false])],
+    } : (p2.slotBlocked || {
+      [Action.ATTACK]: [false, false, false],
+      [Action.GUARD]: [false, false, false],
+      [Action.DODGE]: [false, false, false],
+    });
+    p2.slotBlockNextTurn = result.newState.p2.slotBlockNextTurn ? {
+      [Action.ATTACK]: [...(result.newState.p2.slotBlockNextTurn[Action.ATTACK] || [false, false, false])],
+      [Action.GUARD]: [...(result.newState.p2.slotBlockNextTurn[Action.GUARD] || [false, false, false])],
+      [Action.DODGE]: [...(result.newState.p2.slotBlockNextTurn[Action.DODGE] || [false, false, false])],
+    } : (p2.slotBlockNextTurn || {
+      [Action.ATTACK]: [false, false, false],
+      [Action.GUARD]: [false, false, false],
+      [Action.DODGE]: [false, false, false],
+    });
     p2.hpDrain = result.newState.p2.hpDrain ?? 0;
 
     // 回合末动速归 BASE_SPEED（加速为临时性的）
@@ -978,37 +1143,71 @@ export class BattleEngine {
   // 工具函数（内部）
   // ═══════════════════════════════════════════
 
-  /**
-   * 强制校验并修正玩家当前的行动配置消耗
-   * 无论由何种原因（先挂行动后洞察/加速，或被迫识破未配置完），绝不允许透支精力
-   */
-  _enforceStaminaLimit(playerId) {
-    const p = this._players[playerId];
-    if (!p.actionCtx || p.actionCtx.action === Action.STANDBY) return;
+  // ═══════════════════════════════════════════
 
-    // calcActionCost 已内置 penalty/discount 及 isCharge 逻辑
-    const currentCost = calcActionCost(p.actionCtx, p);
-    const minCost = calcActionCost(
-      { ...p.actionCtx, enhance: 0 },  // 最低档：enhance=0 的基础消耗
-      p
-    );
+  _reconcileActionCostDelta(player, prevCtx, nextCtx) {
+    if (!player) return;
 
-    if (p.stamina < currentCost) {
-      if (p.stamina < minCost) {
-        // 连基础行动都付不起，强制待命
-        p.actionCtx = createActionCtx(Action.STANDBY);
-      } else {
-        // 付得起基础，但强化超额：向下收紧 enhance
-        // 解出最大可负担的 enhance: stamina >= 1 + enhance + pen - dis
-        const pen = p.staminaPenalty || 0;
-        const dis = p.staminaDiscount || 0;
-        p.actionCtx.enhance = Math.max(0, p.stamina - 1 - pen + dis);
-        p.actionCtx.cost = calcActionCost(p.actionCtx, p);
-        p.actionCtx.pts = 1 + p.actionCtx.enhance;
+    const prevCost = calcActionCost(prevCtx || createActionCtx(Action.STANDBY), player);
+    const nextCost = calcActionCost(nextCtx || createActionCtx(Action.STANDBY), player);
+    const deltaCost = nextCost - prevCost;
+
+    if (deltaCost > 0) {
+      for (let i = 0; i < deltaCost; i++) {
+        if ((player.staminaDiscount || 0) > 0) {
+          player.staminaDiscount--;
+          player.actionDiscountSpent = (player.actionDiscountSpent || 0) + 1;
+        } else {
+          player.stamina = Math.max(0, (player.stamina || 0) - 1);
+        }
+      }
+    } else if (deltaCost < 0) {
+      const refund = Math.abs(deltaCost);
+      for (let i = 0; i < refund; i++) {
+        if ((player.actionDiscountSpent || 0) > 0) {
+          player.actionDiscountSpent--;
+          player.staminaDiscount = (player.staminaDiscount || 0) + 1;
+        } else {
+          player.stamina = Math.min(DefaultStats.MAX_STAMINA, (player.stamina || 0) + 1);
+        }
       }
     }
   }
-  // ═══════════════════════════════════════════
+
+  _emitDecisionEndOnce(playerId) {
+    if (!this._phaseFlags.decisionEnded[playerId]) {
+      this._phaseFlags.decisionEnded[playerId] = true;
+      this._emitPhaseEffectEvent(EngineEvent.DECISION_END, { playerId });
+    }
+  }
+
+  /**
+   * 统一阶段事件派发：
+   *  1) 先发原阶段接口
+   *  2) 再发统一效果总线
+   *  3) 最后将该时机广播给双方已触发效果的 onPhase 钩子
+   */
+  _emitPhaseEffectEvent(phaseEvent, payload = {}) {
+    this._bus.emit(phaseEvent, payload);
+    this._bus.emit(EngineEvent.PHASE_EFFECT_HOOK, { phaseEvent, payload });
+
+    // 职责收敛：引擎只发事件，不直接执行具体效果
+    EffectLayer.dispatchPhaseEffects(phaseEvent, payload, this._players, this);
+
+    // 每个时机接口执行后统一同步一次状态快照
+    this._bus.emit(EngineEvent.PHASE_STATE_SYNC, {
+      phaseEvent,
+      state: this.getSnapshot(),
+    });
+  }
+
+  _emitExposeEndOnce(playerId) {
+    if (!this._phaseFlags.exposeEnded[playerId]) {
+      this._phaseFlags.exposeEnded[playerId] = true;
+      this._emitPhaseEffectEvent(EngineEvent.EXPOSE_END, { playerId });
+    }
+  }
+
 
   _setState(newState) {
     this._state = newState;

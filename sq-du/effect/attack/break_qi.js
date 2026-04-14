@@ -27,7 +27,6 @@ export const BreakQiEffect = Object.freeze({
    * @returns {object}     - 修改后的 ctx 副本
    */
   onPre(ctx, state) {
-    state.hp = Math.max(0, state.hp - 1);
     return { ...ctx, pts: ctx.pts + 1 };
   },
 });

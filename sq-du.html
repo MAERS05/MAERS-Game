@@ -58,7 +58,7 @@
       left: -5%;
       width: 110%;
       height: 110%;
-      background-image: url('ui/sq-du/background/combat-bg.jpg');
+      background-image: url('sq-du/background/combat-bg.jpg');
       background-size: cover;
       background-position: center;
       filter: blur(25px) brightness(0.6);
@@ -73,7 +73,7 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background-image: url('ui/sq-du/background/combat-bg.jpg');
+      background-image: url('sq-du/background/combat-bg.jpg');
       background-size: contain;
       background-position: center;
       background-repeat: no-repeat;
@@ -838,7 +838,7 @@
       cursor: not-allowed;
     }
 
-    /* 确认就绪 / 待命按钮 */
+    /* 确认就绪 / 蓄气按钮 */
     .commit-area {
       position: absolute;
       bottom: 188px;
@@ -1564,7 +1564,7 @@
           <circle class="ring-arc" id="p1Arc" cx="42" cy="42" r="36" />
         </svg>
         <div class="timer-center">
-          <span class="timer-sec" id="p1Sec">50</span>
+          <span class="timer-sec" id="p1Sec"></span>
           <span class="timer-phase-label" id="p1Phase">决策期</span>
         </div>
         <div class="timer-ready-overlay">✓</div>
@@ -1573,7 +1573,7 @@
       <!-- 头像和状态图标组合 -->
       <div class="avatar-wrap" style="position:relative;">
         <div class="avatar-frame" id="p1Avatar">
-          <img src="ui/sq-du/avatar/girl.jpg" alt="少女" style="width:100%;height:100%;object-fit:cover;">
+          <img src="sq-du/avatar/girl.jpg" alt="少女" style="width:100%;height:100%;object-fit:cover;">
         </div>
         <div class="status-icon-tray" id="p1-status"
           style="position:absolute; bottom:-22px; left:0; width:100%; justify-content:center; padding:0; min-height:16px;">
@@ -1617,7 +1617,7 @@
       <!-- 头像和状态图标组合 -->
       <div class="avatar-wrap" style="position:relative;">
         <div class="avatar-frame" id="p2Avatar">
-          <img src="ui/sq-du/avatar/man.jpg" alt="马厄斯" style="width:100%;height:100%;object-fit:cover;">
+          <img src="sq-du/avatar/man.jpg" alt="马厄斯" style="width:100%;height:100%;object-fit:cover;">
         </div>
         <div class="status-icon-tray" id="p2-status"
           style="position:absolute; bottom:-22px; left:0; width:100%; justify-content:center; padding:0; min-height:16px;">
@@ -1625,7 +1625,7 @@
         <div class="status-tooltip" id="p2StatusTooltip"></div>
       </div>
 
-      <img src="ui/all/information.svg" class="intel-icon-btn" id="p2IntelBtn" alt="情报">
+      <img src="ui-all/information.svg" class="intel-icon-btn" id="p2IntelBtn" alt="情报">
 
       <!-- 属性（方向翻转） -->
       <div class="stats-col">
@@ -1654,7 +1654,7 @@
           <circle class="ring-arc" id="p2Arc" cx="42" cy="42" r="36" />
         </svg>
         <div class="timer-center">
-          <span class="timer-sec" id="p2Sec">0</span>
+          <span class="timer-sec" id="p2Sec"></span>
           <span class="timer-phase-label" id="p2Phase"></span>
         </div>
         <div class="timer-ready-overlay"></div>
@@ -1755,7 +1755,7 @@
   <!-- ═══ 指令区 ═══ -->
   <div class="commit-area" id="commitArea">
     <div style="display: flex; gap: 12px; align-items: center;">
-      <button class="commit-btn" id="standbyBtn" title="跳过回合恢复1点精力">待命</button>
+      <button class="commit-btn" id="standbyBtn" title="跳过回合恢复1点精力">蓄气</button>
       <button class="commit-btn" id="readyBtn">就绪</button>
       <button class="redecide-btn" id="redecideBtn">重新决策</button>
       <button class="decline-btn" id="declineRedecideBtn">放弃</button>
@@ -1764,7 +1764,7 @@
 
     <!-- 主动洞察 -->
     <button class="insight-btn" id="insightBtn">
-      <img src="ui/sq-du/effect/eye.svg" style="width: 1.2em; height: 1.2em;">
+      <img src="sq-du/effect/eye.svg" style="width: 1.2em; height: 1.2em;">
       洞察对方（消耗 1 精力）
     </button>
   </div>

@@ -352,22 +352,12 @@ export class JudgeLayer {
     const newP1Hp = Math.max(0, p1State.hp - damageToP1);
     const newP2Hp = Math.max(0, p2State.hp - damageToP2);
 
+    // 精力在操作期即时扣/退；结算层不再做二次扣减。
+    // 仅处理额外奖励（如某些效果给予 staminaBonus）并封顶。
     const p1Bonus = p1State.staminaBonus || 0;
     const p2Bonus = p2State.staminaBonus || 0;
-    let newP1Stamina = p1State.stamina;
-    let newP2Stamina = p2State.stamina;
-
-    if (clash !== Clash.INSIGHT_CLASH) {
-      const p1IsRealStandby = p1Ctx.action === Action.STANDBY && !p1Ctx.isCharge;
-      const p2IsRealStandby = p2Ctx.action === Action.STANDBY && !p2Ctx.isCharge;
-      // 使用已冻结在 ctx 中的真实 cost，避免后置效果赋予的下回合 penalty 污染本回合结算
-      newP1Stamina = Math.min(DefaultStats.MAX_STAMINA,
-        (p1IsRealStandby ? p1State.stamina + 1 : Math.max(0, p1State.stamina - (p1Ctx.cost || 0))) + p1Bonus
-      );
-      newP2Stamina = Math.min(DefaultStats.MAX_STAMINA,
-        (p2IsRealStandby ? p2State.stamina + 1 : Math.max(0, p2State.stamina - (p2Ctx.cost || 0))) + p2Bonus
-      );
-    }
+    const newP1Stamina = Math.min(DefaultStats.MAX_STAMINA, Math.max(0, p1State.stamina + p1Bonus));
+    const newP2Stamina = Math.min(DefaultStats.MAX_STAMINA, Math.max(0, p2State.stamina + p2Bonus));
 
     return {
       turn, p1Action: { ...p1Ctx }, p2Action: { ...p2Ctx },
@@ -380,16 +370,76 @@ export class JudgeLayer {
           chargeBoost: p1State.chargeBoost || 0, ptsDebuff: p1State.ptsDebuff || 0,
           guardBoost: p1State.guardBoost || 0, guardDebuff: p1State.guardDebuff || 0,
           dodgeBoost: p1State.dodgeBoost || 0, dodgeDebuff: p1State.dodgeDebuff || 0,
-          agilityBoost: p1State.agilityBoost || 0, staminaPenalty: p1State.staminaPenalty || 0,
-          staminaDiscount: p1State.staminaDiscount || 0, hpDrain: p1State.hpDrain || 0
+          agilityBoost: p1State.agilityBoost || 0, agilityDebuff: p1State.agilityDebuff || 0, staminaPenalty: p1State.staminaPenalty || 0,
+          staminaDiscount: p1State.staminaDiscount || 0,
+          insightDebuff: p1State.insightDebuff || 0,
+          restRecoverBonus: p1State.restRecoverBonus || 0,
+          restRecoverPenalty: p1State.restRecoverPenalty || 0,
+          insightBlocked: p1State.insightBlocked || false,
+          insightBlockNextTurn: p1State.insightBlockNextTurn || false,
+          redecideBlocked: p1State.redecideBlocked || false,
+          redecideBlockNextTurn: p1State.redecideBlockNextTurn || false,
+          speedAdjustBlocked: p1State.speedAdjustBlocked || false,
+          speedAdjustBlockNextTurn: p1State.speedAdjustBlockNextTurn || false,
+          actionBlocked: Array.isArray(p1State.actionBlocked) ? [...p1State.actionBlocked] : [],
+          actionBlockNextTurn: Array.isArray(p1State.actionBlockNextTurn) ? [...p1State.actionBlockNextTurn] : [],
+          slotBlocked: p1State.slotBlocked ? {
+            [Action.ATTACK]: [...(p1State.slotBlocked[Action.ATTACK] || [false, false, false])],
+            [Action.GUARD]: [...(p1State.slotBlocked[Action.GUARD] || [false, false, false])],
+            [Action.DODGE]: [...(p1State.slotBlocked[Action.DODGE] || [false, false, false])],
+          } : {
+            [Action.ATTACK]: [false, false, false],
+            [Action.GUARD]: [false, false, false],
+            [Action.DODGE]: [false, false, false],
+          },
+          slotBlockNextTurn: p1State.slotBlockNextTurn ? {
+            [Action.ATTACK]: [...(p1State.slotBlockNextTurn[Action.ATTACK] || [false, false, false])],
+            [Action.GUARD]: [...(p1State.slotBlockNextTurn[Action.GUARD] || [false, false, false])],
+            [Action.DODGE]: [...(p1State.slotBlockNextTurn[Action.DODGE] || [false, false, false])],
+          } : {
+            [Action.ATTACK]: [false, false, false],
+            [Action.GUARD]: [false, false, false],
+            [Action.DODGE]: [false, false, false],
+          },
+          hpDrain: p1State.hpDrain || 0
         },
         p2: {
           hp: newP2Hp, stamina: newP2Stamina,
           chargeBoost: p2State.chargeBoost || 0, ptsDebuff: p2State.ptsDebuff || 0,
           guardBoost: p2State.guardBoost || 0, guardDebuff: p2State.guardDebuff || 0,
           dodgeBoost: p2State.dodgeBoost || 0, dodgeDebuff: p2State.dodgeDebuff || 0,
-          agilityBoost: p2State.agilityBoost || 0, staminaPenalty: p2State.staminaPenalty || 0,
-          staminaDiscount: p2State.staminaDiscount || 0, hpDrain: p2State.hpDrain || 0
+          agilityBoost: p2State.agilityBoost || 0, agilityDebuff: p2State.agilityDebuff || 0, staminaPenalty: p2State.staminaPenalty || 0,
+          staminaDiscount: p2State.staminaDiscount || 0,
+          insightDebuff: p2State.insightDebuff || 0,
+          restRecoverBonus: p2State.restRecoverBonus || 0,
+          restRecoverPenalty: p2State.restRecoverPenalty || 0,
+          insightBlocked: p2State.insightBlocked || false,
+          insightBlockNextTurn: p2State.insightBlockNextTurn || false,
+          redecideBlocked: p2State.redecideBlocked || false,
+          redecideBlockNextTurn: p2State.redecideBlockNextTurn || false,
+          speedAdjustBlocked: p2State.speedAdjustBlocked || false,
+          speedAdjustBlockNextTurn: p2State.speedAdjustBlockNextTurn || false,
+          actionBlocked: Array.isArray(p2State.actionBlocked) ? [...p2State.actionBlocked] : [],
+          actionBlockNextTurn: Array.isArray(p2State.actionBlockNextTurn) ? [...p2State.actionBlockNextTurn] : [],
+          slotBlocked: p2State.slotBlocked ? {
+            [Action.ATTACK]: [...(p2State.slotBlocked[Action.ATTACK] || [false, false, false])],
+            [Action.GUARD]: [...(p2State.slotBlocked[Action.GUARD] || [false, false, false])],
+            [Action.DODGE]: [...(p2State.slotBlocked[Action.DODGE] || [false, false, false])],
+          } : {
+            [Action.ATTACK]: [false, false, false],
+            [Action.GUARD]: [false, false, false],
+            [Action.DODGE]: [false, false, false],
+          },
+          slotBlockNextTurn: p2State.slotBlockNextTurn ? {
+            [Action.ATTACK]: [...(p2State.slotBlockNextTurn[Action.ATTACK] || [false, false, false])],
+            [Action.GUARD]: [...(p2State.slotBlockNextTurn[Action.GUARD] || [false, false, false])],
+            [Action.DODGE]: [...(p2State.slotBlockNextTurn[Action.DODGE] || [false, false, false])],
+          } : {
+            [Action.ATTACK]: [false, false, false],
+            [Action.GUARD]: [false, false, false],
+            [Action.DODGE]: [false, false, false],
+          },
+          hpDrain: p2State.hpDrain || 0
         },
       }
     };

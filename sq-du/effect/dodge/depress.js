@@ -5,7 +5,7 @@ import { Action, EffectId } from '../../base/constants.js';
 export const DepressEffect = Object.freeze({
   id: EffectId.DEPRESS,
   name: '低落',
-  desc: '闪避成功下回合对方精力消耗 +1',
+  desc: '本回合闪避成功后，下回合对方精力消耗 +1',
   staminaCost: 0,
   applicableTo: [Action.DODGE],
 

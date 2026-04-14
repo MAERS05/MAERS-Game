@@ -19,7 +19,7 @@ import { Action, EffectId } from '../../base/constants.js';
 export const DeflectEffect = Object.freeze({
   id: EffectId.DEFLECT,
   name: '卸力',
-  desc: '守备成功防挡来袭时，对手下回合攻击 -1 点数',
+  desc: '本回合守备成功防挡来袭后，对手下回合攻击 -1 点数',
   applicableTo: [Action.GUARD],
 
   /**
