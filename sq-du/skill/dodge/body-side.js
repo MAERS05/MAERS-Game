@@ -12,14 +12,13 @@ export const SideStepEffect = createSkillEffect({
   applicableTo: [Action.DODGE],
 
   onPre(ctx, state) {
-    // 1. 行动期开始时：附加[侧身]（效果本身提供 +1 闪避点数）
-    EffectLayer.queueEffect(state, EffectId.SIDE_STEP, { phaseEvent: 'ACTION_START', source: 'skill:body_side' });
-    // 为了 UI 和裁判层能在这一帧就看到变化，我们在 context 中直接加 1
+    // 侧身（本回合即时）：直接加闪避点数
+    state.dodgeBoost = (state.dodgeBoost || 0) + 1;
     return { ...ctx, pts: ctx.pts + 1 };
   },
 
   onPost(_ctx, state) {
-    // 2. 行动期结束时：为下一回合附加[虚弱]（点数-1）
+    // 虚弱（下回合延迟）：走队列
     EffectLayer.queueDelayedEffect(state, EffectId.WEAK, 1, 'TURN_START', { source: 'skill:step_side' });
   },
 });

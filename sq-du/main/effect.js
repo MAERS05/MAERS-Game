@@ -244,7 +244,7 @@ export class EffectLayer {
   }
 
   static _getEffectivePts(ctx, playerState) {
-    if (!ctx || ctx.action === Action.STANDBY) return 0;
+    if (!ctx || ctx.action === Action.STANDBY || ctx.action === Action.READY) return 0;
 
     let pts = ctx.pts || 0;
     if (ctx.action === Action.ATTACK) {
@@ -385,9 +385,9 @@ export class EffectLayer {
 
   static _applyActionStartRestRecovery(player) {
     const action = player?.actionCtx?.action;
-    const isCharge = !!player?.actionCtx?.isCharge;
 
-    if (action === Action.STANDBY && !isCharge) {
+    // 直接就绪和蓄势都恢复精力（蓄势的技能效果由 onPre 处理，恢复机制相同）
+    if (action === Action.STANDBY || action === Action.READY) {
       const bonus = player?.restRecoverBonus || 0;
       const penalty = player?.restRecoverPenalty || 0;
       const recover = Math.max(0, 1 + bonus - penalty);
@@ -465,5 +465,17 @@ export class EffectLayer {
       source: context.source || 'direct',
     });
     return true;
+  }
+
+  /**
+   * 标记一个即时触发的效果，供 UI 闪烁显示 ~1s。
+   * 用于 onPre 中直接修改 state 而没有走 pendingEffects 队列的效果
+   * （如御气的创伤 hp--、残影的创伤 hp--），
+   * 让玩家能通过图标感知到"有效果触发了"。
+   */
+  static markFlashEffect(owner, effectId) {
+    if (!owner) return;
+    owner._flashEffects = Array.isArray(owner._flashEffects) ? owner._flashEffects : [];
+    owner._flashEffects.push(effectId);
   }
 }

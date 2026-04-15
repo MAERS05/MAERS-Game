@@ -83,6 +83,7 @@ export class JudgeLayer {
         timeline.push({ type: EvtType.MOUNT_EVASION, actorId: playerId, speed: ctx.speed, pts: ctx.pts });
         break;
       case Action.STANDBY:
+      case Action.READY:
         break;
     }
   }
@@ -184,13 +185,14 @@ export class JudgeLayer {
     if (act === Action.GUARD) return '守备';
     if (act === Action.DODGE) return '闪避';
     if (act === Action.STANDBY) return '蓄势';
+    if (act === Action.READY) return '就绪';
     return '行动';
   }
 
   static _formatAction(ctx, isP1) {
     const actName = this._getActName(ctx.action);
     const pronoun = isP1 ? '你' : '敌方';
-    if (ctx.action === Action.STANDBY) {
+    if (ctx.action === Action.STANDBY || ctx.action === Action.READY) {
       return `${pronoun}执行了${actName}`;
     }
     return `${pronoun}执行了${actName}(动速${ctx.speed}，点数${ctx.pts})`;
@@ -223,10 +225,33 @@ export class JudgeLayer {
     if (p2Act === Action.ATTACK && p1Act === Action.STANDBY)
       return this._withExecute(Clash.ONE_SIDE_ATTACK, `${prefix}敌方的攻击成功命中！`, rawDmgP1, rawDmgP2, p1State, p2State, p1EntryEffective, p2EntryEffective);
 
-    // ── 盈势：一方蓄势，另一方守备或闪避 ──
+    // ── 待命：一方或双方直接就绪（READY） ──
+    if (p1Act === Action.READY || p2Act === Action.READY) {
+      const readySide = p1Act === Action.READY ? PlayerId.P1 : PlayerId.P2;
+      const otherAct = readySide === PlayerId.P1 ? p2Act : p1Act;
+
+      // 双方都直接就绪
+      if (p1Act === Action.READY && p2Act === Action.READY)
+        return this._zero(Clash.IDLE, `${prefix}双方按兵不动。【待命】`);
+
+      // READY vs 攻击：钳制
+      if (otherAct === Action.ATTACK)
+        return this._withExecute(
+          Clash.PINNED,
+          readySide === PlayerId.P1
+            ? `${prefix}敌方的攻击成功命中！【钳制】`
+            : `${prefix}你的攻击成功命中！【钳制】`,
+          rawDmgP1, rawDmgP2, p1State, p2State, p1EntryEffective, p2EntryEffective
+        );
+
+      // READY vs 守备/闪避/蓄势：待命
+      return this._zero(Clash.IDLE, `${prefix}无事发生。【待命】`);
+    }
+
+    // ── 运筹：一方蓄势，另一方守备或闪避 ──
     if ((p1Act === Action.STANDBY && (p2Act === Action.GUARD || p2Act === Action.DODGE)) ||
         (p2Act === Action.STANDBY && (p1Act === Action.GUARD || p1Act === Action.DODGE))) {
-      return this._zero(Clash.FULLNESS, `${prefix}无事发生。【盈势】`);
+      return this._zero(Clash.FULLNESS, `${prefix}无事发生。【运筹】`);
     }
 
     // ── 落空：其他无意义组合 ──
@@ -419,12 +444,18 @@ export class JudgeLayer {
       redecideBlockNextTurn: state.redecideBlockNextTurn || false,
       speedAdjustBlocked: state.speedAdjustBlocked || false,
       speedAdjustBlockNextTurn: state.speedAdjustBlockNextTurn || false,
+      readyBlocked: state.readyBlocked || false,
+      readyBlockNextTurn: state.readyBlockNextTurn || false,
+      standbyBlocked: state.standbyBlocked || false,
+      standbyBlockNextTurn: state.standbyBlockNextTurn || false,
       actionBlocked: Array.isArray(state.actionBlocked) ? [...state.actionBlocked] : [],
       actionBlockNextTurn: Array.isArray(state.actionBlockNextTurn) ? [...state.actionBlockNextTurn] : [],
       slotBlocked: copySlots(state.slotBlocked),
       slotBlockNextTurn: copySlots(state.slotBlockNextTurn),
       // 效果队列：必须传递，否则 onPost 里 queueEffect 写入的效果在结算后全部丢失
       pendingEffects: Array.isArray(state.pendingEffects) ? [...state.pendingEffects] : [],
+      // 闪烁标记：onPre 中直接修改 state 的即时效果需要在 UI 闪烁显示
+      _flashEffects: Array.isArray(state._flashEffects) ? [...state._flashEffects] : [],
     };
   }
 

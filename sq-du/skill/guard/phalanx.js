@@ -12,7 +12,9 @@ export const PhalanxEffect = createSkillEffect({
   applicableTo: [Action.GUARD],
 
   onPre(ctx, state) {
-    EffectLayer.queueEffect(state, EffectId.SOLID, { phaseEvent: 'ACTION_START', source: 'skill:phalanx' });
+    // 坚固（本回合即时）：直接加守备点数
+    state.guardBoost = (state.guardBoost || 0) + 1;
+    // 僵硬（下回合延迟）：走队列
     EffectLayer.queueEffect(state, EffectId.CLUMSY, { phaseEvent: 'ACTION_START', source: 'skill:phalanx' });
     return { ...ctx, pts: (ctx.pts || 0) + 1 };
   },

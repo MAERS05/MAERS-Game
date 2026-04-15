@@ -11,7 +11,9 @@ export const DisarmEffect = createSkillEffect({
   staminaCost: 0,
   applicableTo: [Action.DODGE],
   onPre(ctx, state) {
-    EffectLayer.queueEffect(state, EffectId.SIDE_STEP_STATE, { phaseEvent: 'ACTION_START', source: 'skill:disarm' });
+    // 侧身（本回合即时）：直接加闪避点数
+    state.dodgeBoost = (state.dodgeBoost || 0) + 1;
+    // 碎甲（下回合延迟）：走队列
     EffectLayer.queueEffect(state, EffectId.CRACKED_ARMOR, { phaseEvent: 'TURN_START', source: 'skill:disarm' });
     return { ...ctx, pts: (ctx.pts || 0) + 1 };
   },

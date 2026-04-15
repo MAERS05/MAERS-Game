@@ -167,6 +167,10 @@ function createPlayerState(id, overrides = {}) {
     redecideBlockNextTurn: false,                 // 下回合禁重筹预约
     speedAdjustBlocked: false,                    // 本回合禁提速/降速
     speedAdjustBlockNextTurn: false,              // 下回合禁提速/降速预约
+    readyBlocked: false,                          // 本回合禁手动就绪（只能等倒计时/蓄势）
+    readyBlockNextTurn: false,                    // 下回合禁手动就绪预约
+    standbyBlocked: false,                        // 本回合禁蓄势
+    standbyBlockNextTurn: false,                  // 下回合禁蓄势预约
     actionBlocked: [],                            // 本回合禁用动作列表（Action 值）
     actionBlockNextTurn: [],                      // 下回合禁用动作预约
     slotBlocked: {
@@ -189,7 +193,7 @@ function createPlayerState(id, overrides = {}) {
  * @param {string} [action]
  * @returns {import('./constants.js').ActionCtx}
  */
-function createActionCtx(action = Action.STANDBY) {
+function createActionCtx(action = Action.READY) {
   return {
     action,
     enhance: 0,
@@ -444,9 +448,9 @@ export class BattleEngine {
     const p = this._players[playerId];
     if (!p || p.ready) return;
 
-    // 如果没有选择行动，默认为待命（即时恢复 1 精力）
+    // 如果没有选择行动，默认为直接就绪（READY）
     if (!p.actionCtx || !p.actionCtx.action) {
-      p.actionCtx = createActionCtx(Action.STANDBY);
+      p.actionCtx = createActionCtx(Action.READY);
     }
 
 
@@ -467,7 +471,7 @@ export class BattleEngine {
     // 仅限有意义的行动（待命没有效果槽）
     // 若 actionCtx.effects 中已有非空值（如 AI 通过 submitAction 提交的），则保留不覆盖
     const action = p.actionCtx.action;
-    if (action !== Action.STANDBY) {
+    if (action !== Action.STANDBY && action !== Action.READY) {
       const hasExplicitEffects = p.actionCtx.effects?.some(e => e !== null);
       if (!hasExplicitEffects) {
         // 人类玩家路径：从装备槽同步
@@ -707,6 +711,10 @@ export class BattleEngine {
         p.redecideBlockNextTurn = false;
         p.speedAdjustBlocked = !!p.speedAdjustBlockNextTurn;
         p.speedAdjustBlockNextTurn = false;
+        p.readyBlocked = !!p.readyBlockNextTurn;
+        p.readyBlockNextTurn = false;
+        p.standbyBlocked = !!p.standbyBlockNextTurn;
+        p.standbyBlockNextTurn = false;
         p.actionBlocked = Array.isArray(p.actionBlockNextTurn) ? [...p.actionBlockNextTurn] : [];
         p.actionBlockNextTurn = [];
         p.slotBlocked = {
@@ -720,7 +728,7 @@ export class BattleEngine {
           [Action.DODGE]: [false, false, false],
         };
         p.speed = DefaultStats.BASE_SPEED;
-        p.actionCtx = createActionCtx(Action.STANDBY);
+        p.actionCtx = createActionCtx(Action.READY);
 
         // 溢出字段每回合开始重置
         // （上回合溢出已由 overflow-manager 转化为 pendingEffects，
@@ -791,6 +799,15 @@ export class BattleEngine {
     );
 
     this._applyResolveResult(result);
+    // 结算后立即同步状态到 UI，确保 onPre 产生的 hp/stamina 变化（如御气的自伤）
+    // 在行动期开始时就可见，而不是延迟到 ACTION_END（3s 后）才刷新
+    this._bus.emit(EngineEvent.PHASE_STATE_SYNC, {
+      phaseEvent: EngineEvent.ACTION_START,
+      state: this.getSnapshot(),
+    });
+    // 闪烁标记仅供本次 sync 读取一次，立即清除防止 ACTION_END 再次触发
+    this._players[PlayerId.P1]._flashEffects = [];
+    this._players[PlayerId.P2]._flashEffects = [];
     this._bus.emit(EngineEvent.ACTION_PHASE_START, {});
 
     setTimeout(() => {
@@ -1040,6 +1057,10 @@ export class BattleEngine {
     player.redecideBlockNextTurn   = ns.redecideBlockNextTurn   ?? false;
     player.speedAdjustBlocked      = ns.speedAdjustBlocked      ?? player.speedAdjustBlocked ?? false;
     player.speedAdjustBlockNextTurn = ns.speedAdjustBlockNextTurn ?? false;
+    player.readyBlocked            = ns.readyBlocked            ?? player.readyBlocked ?? false;
+    player.readyBlockNextTurn      = ns.readyBlockNextTurn      ?? false;
+    player.standbyBlocked          = ns.standbyBlocked          ?? player.standbyBlocked ?? false;
+    player.standbyBlockNextTurn    = ns.standbyBlockNextTurn    ?? false;
     player.actionBlocked      = Array.isArray(ns.actionBlocked)      ? [...ns.actionBlocked]      : (player.actionBlocked || []);
     player.actionBlockNextTurn = Array.isArray(ns.actionBlockNextTurn) ? [...ns.actionBlockNextTurn] : [];
     player.slotBlocked        = copySlots(ns.slotBlocked,     player.slotBlocked     || emptySlots);
@@ -1063,6 +1084,8 @@ export class BattleEngine {
     player.dodgePtsUnderflow  = ns.dodgePtsUnderflow  ?? 0;
     // 效果队列：从结算包裹写回真实玩家对象，确保 onPost 排队的效果不丢失
     player.pendingEffects    = Array.isArray(ns.pendingEffects) ? [...ns.pendingEffects] : (player.pendingEffects || []);
+    // 闪烁标记：从 onPre 的 markFlashEffect 传递到 UI 层
+    player._flashEffects     = Array.isArray(ns._flashEffects) ? [...ns._flashEffects] : [];
   }
 
 
@@ -1134,7 +1157,7 @@ export class BattleEngine {
 
     // 计算不含折扣修正的"毛成本"（用于追踪折扣消耗量）
     const calcGrossCost = (ctx) => {
-      if (!ctx || (ctx.action === Action.STANDBY && !ctx.isCharge)) return 0;
+      if (!ctx || ctx.action === Action.STANDBY || ctx.action === Action.READY) return 0;
       return 1 + (ctx.enhance || 0) + (player.staminaPenalty || 0);
     };
 
@@ -1217,7 +1240,7 @@ export class BattleEngine {
    * 闪避点数已与动速解耦，动速仅影响时序
    */
   _calcPts(ctx, _playerState) {
-    if (ctx.action === Action.STANDBY) return 0;
+    if (ctx.action === Action.STANDBY || ctx.action === Action.READY) return 0;
     return 1 + (ctx.enhance || 0);
   }
   // _calcCost 已移至 constants.js 的 calcActionCost 导出函数，engine 直接 import 使用

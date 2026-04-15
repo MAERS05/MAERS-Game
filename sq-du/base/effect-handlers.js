@@ -20,7 +20,7 @@ import { SolidEffect, CrackedArmorEffect, BrokenArmorEffect } from '../effect/fu
 import { SideStepEffect, ClumsyEffect, ShackledDodgeEffect } from '../effect/function/dodge-status.js';
 
 // ── 攻击类效果 ──
-import { WoundEffect } from '../skill/attack/wound.js';
+import { InflictEffect } from '../skill/attack/inflict.js';
 import { BreakQiEffect } from '../skill/attack/break_qi.js';
 import { ChargeEffect } from '../skill/attack/charge.js';
 import { PounceEffect } from '../skill/attack/pounce.js';
@@ -61,7 +61,7 @@ import { SeeThrough } from '../skill/dodge/see-through.js';
  *   onPhase(args)                              → void（阶段接口触发时机）
  */
 const RawEffectHandlers = {
-  [EffectId.WOUND]: WoundEffect,
+  [EffectId.WOUND]: InflictEffect,
   [EffectId.BREAK_QI]: BreakQiEffect,
   [EffectId.CHARGE]: ChargeEffect,
   [EffectId.AURA_SHIELD]: AuraShieldEffect,

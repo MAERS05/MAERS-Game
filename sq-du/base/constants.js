@@ -42,14 +42,16 @@ export const Action = Object.freeze({
   GUARD: 'guard',
   DODGE: 'dodge',
   STANDBY: 'standby',
+  READY: 'ready',
 });
 
 /** 行为的默认基础点数（不含强化） */
 export const ActionBasePts = Object.freeze({
   [Action.ATTACK]: 1,
   [Action.GUARD]: 1,
-  [Action.DODGE]: 1, // 闪避点数独立，基础点数为 1，可通过强化提升
+  [Action.DODGE]: 1,
   [Action.STANDBY]: 0,
+  [Action.READY]: 0,
 });
 
 /** 行为的显示名称（中文） */
@@ -57,7 +59,8 @@ export const ActionName = Object.freeze({
   [Action.ATTACK]: '攻击',
   [Action.GUARD]: '守备',
   [Action.DODGE]: '闪避',
-  [Action.STANDBY]: '蓄气',
+  [Action.STANDBY]: '蓄势',
+  [Action.READY]: '就绪',
 });
 
 // ─────────────────────────────────────────────
@@ -103,7 +106,11 @@ export const Clash = Object.freeze({
   /** 同速，闪避点数 = 攻击点数，无事发生 */
   MUTUAL_HIT: 'MUTUAL_HIT',                  // 侥幸
   /** 一方蓄势，另一方守备或闪避 */
-  FULLNESS: 'FULLNESS',                       // 盈势
+  FULLNESS: 'FULLNESS',                       // 运筹
+  /** 直接就绪 vs 直接就绪/闪避/守备/蓄势 */
+  IDLE: 'IDLE',                               // 待命
+  /** 直接就绪 vs 攻击命中 */
+  PINNED: 'PINNED',                           // 钳制
   /** 无法归入常规情形的特殊操作（如蓄力技能等） */
   OTHER: 'OTHER',                             // 其它
   /** 双方都开启洞察，回合直接结束 */
@@ -132,7 +139,9 @@ export const ClashName = Object.freeze({
   [Clash.DODGE_OUTMANEUVERED]: '规避',
   [Clash.ATTACK_OVERPOWERS]: '阔击',
   [Clash.MUTUAL_HIT]: '侥幸',
-  [Clash.FULLNESS]: '盈势',
+  [Clash.FULLNESS]: '运筹',
+  [Clash.IDLE]: '待命',
+  [Clash.PINNED]: '钳制',
   [Clash.OTHER]: '其它',
   [Clash.INSIGHT_CLASH]: '识破',
   [Clash.WASTED_ACTION]: '落空',
@@ -378,7 +387,7 @@ export const EffectId = Object.freeze({
  */
 export const EffectDefs = Object.freeze({
   [EffectId.WOUND]: {
-    id: EffectId.WOUND, name: '创伤',
+    id: EffectId.WOUND, name: '附伤',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.BREAK_QI]: {
@@ -501,19 +510,17 @@ export const EFFECT_SLOTS = 3;
  * 计算一个行动的精力消耗（唯一权威实现）。
  *
  * 规则：
- *  - 真正的待命（action=STANDBY 且没有 isCharge 标记）消耗为 0。
- *  - 蓄力（isCharge=true）将本回合行动转为 STANDBY，但依然按原攻击行动的
- *    基础消耗结算，防止蓄力变成「免费待命+1」的漏洞。
- *  - 振奋（staminaDiscount）/ 低落（staminaPenalty）在此处统一修正。
+ *  - 直接就绪（READY）：零消耗，不触发任何效果。
+ *  - 蓄势（STANDBY）：零消耗，但可触发蓄势类技能。
+ *  - 攻/守/闪：按 1 + enhance 基础计算，再加 penalty 减 discount。
  *
- * @param {{ action: string, enhance?: number, isCharge?: boolean }} ctx
+ * @param {{ action: string, enhance?: number }} ctx
  * @param {{ staminaPenalty?: number, staminaDiscount?: number } | null} [playerState]
  * @returns {number} 0 或正整数
  */
 export function calcActionCost(ctx, playerState) {
-  // 真正的待命：不消耗精力
-  if (ctx.action === Action.STANDBY && !ctx.isCharge) return 0;
-  // 蓄力 / 普通行动：按 1 + enhance 基础计算，再加 penalty 减 discount
+  if (ctx.action === Action.READY) return 0;
+  if (ctx.action === Action.STANDBY) return 0;
   const base = 1 + (ctx.enhance || 0);
   const pen = playerState?.staminaPenalty || 0;
   const dis = playerState?.staminaDiscount || 0;

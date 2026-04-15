@@ -1,6 +1,6 @@
 'use strict';
 
-import { Action, EffectId } from '../../base/constants.js';
+import { Action, DefaultStats, EffectId } from '../../base/constants.js';
 import { createSkillEffect } from '../../effect/function/skill-factory.js';
 import { EffectLayer } from '../../main/effect.js';
 
@@ -10,8 +10,15 @@ export const BreakQiEffect = createSkillEffect({
   desc: '在行动期开始后，行动期结束前为自身附加1级[创伤]并触发，随后为自身附加1级[力量]并触发。',
   applicableTo: [Action.ATTACK],
   onPre(ctx, state) {
-    EffectLayer.queueEffect(state, EffectId.WOUNDED, { phaseEvent: 'ACTION_START', source: 'skill:break_qi' });
-    EffectLayer.queueEffect(state, EffectId.POWER, { phaseEvent: 'ACTION_START', source: 'skill:break_qi' });
+    // 创伤（本回合即时）：直接扣命数
+    if ((state.hp || 0) > 0) {
+      state.hp--;
+    } else {
+      state.hpUnderflow = (state.hpUnderflow || 0) + 1;
+    }
+    EffectLayer.markFlashEffect(state, EffectId.WOUNDED);
+    // 力量（本回合即时）：直接加攻击点数
+    state.chargeBoost = (state.chargeBoost || 0) + 1;
     return { ...ctx, pts: ctx.pts + 1 };
   },
 });

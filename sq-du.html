@@ -642,8 +642,9 @@
       transition: opacity 1s ease !important;
     }
 
-    /* 重新开始按钮（极简版） */
-    #restartBtn {
+    /* 重新开始/开始游戏 按钮（极简版） */
+    #restartBtn,
+    #startBtn {
       position: absolute;
       top: 50%;
       left: 50%;
@@ -667,13 +668,15 @@
       z-index: 500;
     }
 
-    #restartBtn:hover {
+    #restartBtn:hover,
+    #startBtn:hover {
       background: rgba(15, 20, 35, 0.95);
       border-color: rgba(255, 255, 255, 0.4);
       transform: translate(-50%, -50%) scale(1.05);
     }
 
-    #restartBtn.show {
+    #restartBtn.show,
+    #startBtn.show {
       opacity: 1;
       transform: translate(-50%, -50%) scale(1);
       pointer-events: auto;
@@ -1598,6 +1601,17 @@
     .status-tooltip.show {
       display: block;
     }
+
+    /* 闪烁效果图标：即时消费型效果的 1s 临时可视化 */
+    .status-icon.flash-effect {
+      animation: flashShow 1s step-end forwards;
+    }
+
+    @keyframes flashShow {
+      0%   { opacity: 1; }
+      99%  { opacity: 1; }
+      100% { opacity: 0; }
+    }
   </style>
 </head>
 
@@ -1733,8 +1747,8 @@
 
     <!-- 行动期提示 -->
     <div class="insight-notice" id="actionNotice"
-      style="pointer-events: none; z-index: 100; font-size: 24px; letter-spacing: 4px; padding: 12px 32px; background: rgba(185, 28, 28, 0.85); border: 2px solid #ef4444; text-shadow: 0 0 10px rgba(0,0,0,0.8);">
-      双方行动中: 3s</div>
+      style="pointer-events: none; z-index: 100; font-size: 20px; letter-spacing: 6px; color: #f59e0b; text-shadow: 0 4px 12px rgba(245, 158, 11, 0.4), 0 0 8px rgba(0, 0, 0, 0.8); background: transparent; border: none; padding: 0; box-shadow: none; backdrop-filter: none;">
+      双方行动中···：3s</div>
 
     <!-- 回合开始提示 -->
     <div class="insight-notice" id="roundStartNotice"
@@ -1763,6 +1777,9 @@
 
     <!-- 重新开始按钮 -->
     <button id="restartBtn" onclick="location.reload()">重新开始</button>
+
+    <!-- 开始游戏按钮 -->
+    <button id="startBtn">开始游戏</button>
 
     <!-- ═══ 装配期覆盖面板 ═══ -->
     <div class="equip-overlay" id="equipOverlay">
@@ -1878,7 +1895,7 @@
         攻击
         <span class="act-pt" id="pt-attack">1</span>
       </div>
-      <span class="act-sub-label">攻击力度</span>
+      <span class="act-sub-label">攻击力度及幅度</span>
     </div>
   </footer>
 

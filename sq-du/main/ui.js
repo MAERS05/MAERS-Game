@@ -142,6 +142,31 @@ let enemyFogState = {
   speed: 1, // 默认初始动速
 };
 
+/**
+ * 闪烁效果队列：用于本回合即时消费的效果（如御气的创伤 hp--）
+ * 这类效果没有持久化的状态字段，无法被 updateStatusIcons 的 flatChecks 捕获，
+ * 需要临时闪烁图标 1s 让玩家感知到效果触发了。
+ * 格式：Map<playerId, Array<{ effectId, expiresAt }>>
+ */
+const flashEffects = new Map();
+
+/** 注册一个闪烁效果图标（1s 后自动消失） */
+function flashEffect(playerId, effectId, durationMs = 1000) {
+  if (!flashEffects.has(playerId)) flashEffects.set(playerId, []);
+  flashEffects.get(playerId).push({
+    effectId,
+    expiresAt: Date.now() + durationMs,
+  });
+}
+
+/** 清理已过期的闪烁效果 */
+function pruneFlashEffects(playerId) {
+  const list = flashEffects.get(playerId);
+  if (!list) return;
+  const now = Date.now();
+  flashEffects.set(playerId, list.filter(e => e.expiresAt > now));
+}
+
 // ═══════════════════════════════════════════════════════
 // 工具函数
 // ═══════════════════════════════════════════════════════
@@ -425,8 +450,9 @@ ui.standbyBtn.addEventListener('click', () => {
   const snap = engine.getSnapshot();
   const p1 = snap.players[PlayerId.P1];
   if (p1.ready) return;
+  if (p1.standbyBlocked) return; // 禁止蓄势
 
-  // 取消正在选中的下方按钮并将预期行为置为待命
+  // 取消正在选中的下方按钮并将预期行为置为蓄势
   document.querySelectorAll('.act-btn').forEach(b => b.classList.remove('selected'));
   selectedAction = null;
   localEnhance = 0;
@@ -438,6 +464,15 @@ ui.standbyBtn.addEventListener('click', () => {
 
 ui.readyBtn.addEventListener('click', () => {
   if (isGameOver) return;
+  const snap = engine.getSnapshot();
+  const p1 = snap.players[PlayerId.P1];
+  if (p1.ready) return;
+  if (p1.readyBlocked) return; // 禁止手动就绪
+
+  if (!selectedAction) {
+    // 没选任何行动 → 直接就绪（READY），不触发技能
+    engine.submitAction(PlayerId.P1, { action: Action.READY, enhance: 0 });
+  }
   engine.setReady(PlayerId.P1);
 });
 
@@ -526,6 +561,16 @@ engine.on(EngineEvent.PHASE_STATE_SYNC, ({ state }) => {
   const p2 = state.players[PlayerId.P2];
 
   renderPlayerResources(p1, p2);
+
+  // 拾取 onPre 标记的即时闪烁效果（如御气的创伤 hp--）
+  for (const [pid, pState] of [[PlayerId.P1, p1], [PlayerId.P2, p2]]) {
+    if (Array.isArray(pState._flashEffects) && pState._flashEffects.length > 0) {
+      for (const eid of pState._flashEffects) {
+        flashEffect(pid, eid);
+      }
+      pState._flashEffects = [];
+    }
+  }
 
   updateStatusIcons(PlayerId.P1, p1);
   // 敌方图标可见性由效果层策略统一决定
@@ -699,13 +744,13 @@ engine.on(EngineEvent.ACTION_PHASE_START, () => {
     updateStatusIcons(PlayerId.P2, snap.players[PlayerId.P2]);
   }
 
-  ui.actionNotice.textContent = '双方行动中: 3s';
+  ui.actionNotice.textContent = '双方行动中···：3s';
   ui.actionNotice.classList.add('show');
 
   let left = 2;
   const intv = setInterval(() => {
     if (left > 0) {
-      ui.actionNotice.textContent = `双方行动中: ${left}s`;
+      ui.actionNotice.textContent = `双方行动中···：${left}s`;
       left--;
     } else {
       clearInterval(intv);
@@ -920,6 +965,9 @@ function updateStatusIcons(playerId, state) {
   if (!tray) return;
   tray.innerHTML = '';
 
+  // 清理过期闪烁效果
+  pruneFlashEffects(playerId);
+
   const addIcon = (filename, effectText, timingKey) => {
     const img = document.createElement('img');
     img.className = 'status-icon';
@@ -1019,6 +1067,20 @@ function updateStatusIcons(playerId, state) {
       addIcon('close-avoid.svg', `锁链：禁止闪避`, 'EQUIP_END');
     if (!rendered.has(EffectId.BROKEN_ARMOR) && state.actionBlocked.includes(Action.GUARD))
       addIcon('close-shield.svg', `废甲：禁止守备`, 'EQUIP_END');
+  }
+
+  // ── 3. 渲染闪烁效果图标（即时消费型效果的临时可视化） ──
+  const flashes = flashEffects.get(playerId) || [];
+  for (const flash of flashes) {
+    if (rendered.has(flash.effectId)) continue;
+    const meta = EFFECT_ICON_META[flash.effectId];
+    if (!meta) continue;
+    const label = formatEffectLabel(meta, 1);
+    addIcon(meta.icon, label, 'ACTION_START');
+    // 给闪烁图标添加消退动画
+    const lastIcon = tray.lastElementChild;
+    if (lastIcon) lastIcon.classList.add('flash-effect');
+    rendered.add(flash.effectId);
   }
 }
 
@@ -1425,4 +1487,14 @@ if (ui.globalPauseBtn) {
 }
 
 initUI();
-engine.startGame();
+
+const startBtn = document.getElementById('startBtn');
+if (startBtn) {
+  startBtn.classList.add('show');
+  startBtn.addEventListener('click', () => {
+    startBtn.classList.remove('show');
+    engine.startGame();
+  });
+} else {
+  engine.startGame();
+}

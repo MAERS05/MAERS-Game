@@ -11,7 +11,9 @@ export const IronWallEffect = createSkillEffect({
   staminaCost: 0,
   applicableTo: [Action.GUARD],
   onPre(ctx, state) {
-    EffectLayer.queueEffect(state, EffectId.SOLID, { phaseEvent: 'ACTION_START', source: 'skill:iron_wall' });
+    // 坚固（本回合即时）：直接加守备点数
+    state.guardBoost = (state.guardBoost || 0) + 1;
+    // 虚弱（下回合延迟）：走队列
     EffectLayer.queueEffect(state, EffectId.WEAK, { phaseEvent: 'TURN_START', source: 'skill:iron_wall' });
     return { ...ctx, pts: (ctx.pts || 0) + 1 };
   },
