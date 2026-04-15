@@ -7,7 +7,7 @@ import { EffectLayer } from '../../main/effect.js';
 export const AfterimageEffect = createSkillEffect({
   id: EffectId.AFTERIMAGE,
   name: '残影',
-  desc: '行动期开始时，为自身附加1层[创伤]并触发，随后为自身附加1层[侧身]并触发',
+  desc: '在行动期开始后，行动期结束前为自身附加1级[创伤]并触发，随后为自身附加1级[侧身]并触发',
   applicableTo: [Action.DODGE],
   onPre(ctx, state) {
     EffectLayer.queueEffect(state, EffectId.WOUNDED, { phaseEvent: 'ACTION_START', source: 'skill:afterimage' });

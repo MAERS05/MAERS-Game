@@ -7,7 +7,7 @@ import { EffectLayer } from '../../main/effect.js';
 export const SideStepEffect = createSkillEffect({
   id: EffectId.BODY_SIDE,
   name: '倾身',
-  desc: '行动期开始时，为自己附加1层[侧身]并触发，行动期结束时，为自己附加1层[虚弱]并在下一回合开始时触发',
+  desc: '在行动期开始后，行动期结束前为自身附加1级[侧身]并触发，随后为自身附加1级[虚弱]并在下一回合的回合开始后，装配期开始前触发',
   staminaCost: 0,
   applicableTo: [Action.DODGE],
 
@@ -20,6 +20,6 @@ export const SideStepEffect = createSkillEffect({
 
   onPost(_ctx, state) {
     // 2. 行动期结束时：为下一回合附加[虚弱]（点数-1）
-    EffectLayer.queueDelayedEffect(state, EffectId.WEAK, 1, 'ACTION_START', { source: 'skill:step_side' });
+    EffectLayer.queueDelayedEffect(state, EffectId.WEAK, 1, 'TURN_START', { source: 'skill:step_side' });
   },
 });

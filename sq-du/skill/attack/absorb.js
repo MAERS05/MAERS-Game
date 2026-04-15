@@ -7,7 +7,7 @@ import { EffectLayer } from '../../main/effect.js';
 export const Absorb = createSkillEffect({
   id: 'absorb',
   name: '吸收',
-  desc: '行动期结束时，若攻击成功，为自身附加1层[振奋]并在下一回合开始时触发，为对方附加1层[萎靡]并在下一回合开始时触发',
+  desc: '若攻击成功，为自身附加1级[振奋]并在下一回合的回合开始后，装配期开始前触发，为对方附加1级[萎靡]并在下一回合的回合开始后，装配期开始前触发',
   applicableTo: [Action.ATTACK],
 
   onPost(ctx, owner, opponent, selfDmg, oppDmg) {
@@ -15,7 +15,7 @@ export const Absorb = createSkillEffect({
     if (ctx.action !== Action.ATTACK) return;
     if ((oppDmg || 0) <= 0) return;
 
-    EffectLayer.queueEffect(owner,    EffectId.REJUVENATED, { phaseEvent: 'TURN_START', source: 'skill:absorb' });
-    EffectLayer.queueEffect(opponent, EffectId.SLUGGISH,    { phaseEvent: 'TURN_START', source: 'skill:absorb' });
+    EffectLayer.queueEffect(owner, EffectId.REJUVENATED, { phaseEvent: 'TURN_START', source: 'skill:absorb' });
+    EffectLayer.queueEffect(opponent, EffectId.SLUGGISH, { phaseEvent: 'TURN_START', source: 'skill:absorb' });
   },
 });

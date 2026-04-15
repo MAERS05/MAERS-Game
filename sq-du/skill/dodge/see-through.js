@@ -7,7 +7,7 @@ import { EffectLayer } from '../../main/effect.js';
 export const SeeThrough = createSkillEffect({
   id: EffectId.SEE_THROUGH,
   name: '看破',
-  desc: '行动期结束时，若闪避成功，为我方附加1层[先机]并在下一回合开始时触发。',
+  desc: '若闪避成功，为我方附加1级[先机]并在下一回合的回合开始后，装配期开始前触发。',
   applicableTo: [Action.DODGE],
   onPost(ctx, owner, opponent, selfDmg, oppDmg) {
     if (!ctx || !owner || !opponent) return;

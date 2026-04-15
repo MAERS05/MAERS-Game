@@ -659,6 +659,7 @@ export class BattleEngine {
         actionCtx: p.actionCtx
           ? { ...p.actionCtx, effects: [...(p.actionCtx.effects || [])] }
           : null,
+        pendingEffects: [...(p.pendingEffects || [])],
       };
     };
     return {

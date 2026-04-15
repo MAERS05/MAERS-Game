@@ -7,13 +7,13 @@ import { EffectLayer } from '../../main/effect.js';
 export const PhalanxEffect = createSkillEffect({
   id: EffectId.PHALANX,
   name: '步阵',
-  desc: '行动期开始时，为自身附加1层[坚固]并触发，行动期结束时，为自身附加1层[僵硬]并在下一回合开始时触发',
+  desc: '在行动期开始后，行动期结束前为自身附加1级[坚固]并触发，随后为自身附加1级[僵硬]并在下一回合的行动期开始后，行动期结束前触发',
   staminaCost: 0,
   applicableTo: [Action.GUARD],
 
   onPre(ctx, state) {
     EffectLayer.queueEffect(state, EffectId.SOLID, { phaseEvent: 'ACTION_START', source: 'skill:phalanx' });
-    EffectLayer.queueEffect(state, EffectId.CLUMSY, { phaseEvent: 'TURN_START', source: 'skill:phalanx' });
+    EffectLayer.queueEffect(state, EffectId.CLUMSY, { phaseEvent: 'ACTION_START', source: 'skill:phalanx' });
     return { ...ctx, pts: (ctx.pts || 0) + 1 };
   },
 });

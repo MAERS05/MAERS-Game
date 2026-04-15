@@ -7,7 +7,7 @@ import { EffectLayer } from '../../main/effect.js';
 export const BreakQiEffect = createSkillEffect({
   id: EffectId.BREAK_QI,
   name: '泣命',
-  desc: '行动期开始时，为自身附加1层[创伤]并触发，随后为自身附加1层[力量]并触发效果。',
+  desc: '在行动期开始后，行动期结束前为自身附加1级[创伤]并触发，随后为自身附加1级[力量]并触发。',
   applicableTo: [Action.ATTACK],
   onPre(ctx, state) {
     EffectLayer.queueEffect(state, EffectId.WOUNDED, { phaseEvent: 'ACTION_START', source: 'skill:break_qi' });

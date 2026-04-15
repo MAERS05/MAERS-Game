@@ -7,7 +7,7 @@ import { EffectLayer } from '../../main/effect.js';
 export const DepressEffect = createSkillEffect({
   id: EffectId.DEPRESS,
   name: '低落',
-  desc: '行动期结束时，若闪避成功，为对方附加1层[疲惫]并在下一回合开始时触发',
+  desc: '若闪避成功，为对方附加1级[疲惫]并在下一回合的回合开始后，装配期开始前触发',
   staminaCost: 0,
   applicableTo: [Action.DODGE],
   onPost(ctx, selfState, oppState, dmgTaken, oppDmgTaken, oppCtx) {

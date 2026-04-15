@@ -882,6 +882,39 @@ function initUI() {
   updateStatusIcons(PlayerId.P2, engine.getSnapshot().players[PlayerId.P2]);
 }
 
+/** effectId → 图标元数据 */
+const EFFECT_ICON_META = {
+  [EffectId.POWER]:         { icon: 'strong.svg',        name: '力量',  resource: '攻击点数', sign: +1 },
+  [EffectId.WEAK]:          { icon: 'broken-knife.svg',  name: '虚弱',  resource: '攻击点数', sign: -1 },
+  [EffectId.SOLID]:         { icon: 'shield.svg',        name: '坚固',  resource: '守备点数', sign: +1 },
+  [EffectId.CRACKED_ARMOR]: { icon: 'broken-shield.svg', name: '碎甲',  resource: '守备点数', sign: -1 },
+  [EffectId.SIDE_STEP]:     { icon: 'avoid.svg',         name: '侧身',  resource: '闪避点数', sign: +1 },
+  'side_step_state':        { icon: 'avoid.svg',         name: '侧身',  resource: '闪避点数', sign: +1 },
+  [EffectId.CLUMSY]:        { icon: 'heavy.svg',         name: '僵硬',  resource: '闪避点数', sign: -1 },
+  [EffectId.LIGHT]:         { icon: 'fast.svg',          name: '轻盈',  resource: '动速',     sign: +1 },
+  [EffectId.HEAVY]:         { icon: 'fast.svg',          name: '沉重',  resource: '动速',     sign: -1 },
+  [EffectId.WOUNDED]:       { icon: 'wound.svg',         name: '创伤',  resource: '命数',     sign: -1 },
+  [EffectId.FORTIFIED]:     { icon: 'treat.svg',         name: '旺盛',  resource: '命数',     sign: +1 },
+  [EffectId.REJUVENATED]:   { icon: 'excited.svg',       name: '振奋',  resource: '精力',     sign: +1 },
+  [EffectId.SLUGGISH]:      { icon: 'tired.svg',         name: '萎靡',  resource: '精力',     sign: -1 },
+  [EffectId.EXHAUSTED]:     { icon: 'tired.svg',         name: '疲惫',  resource: '精力消耗', sign: +1 },
+  [EffectId.EXCITED]:       { icon: 'excited.svg',       name: '兴奋',  resource: '精力消耗', sign: -1 },
+  [EffectId.INSIGHTFUL]:    { icon: 'eye.svg',           name: '先机',  resource: '洞察消耗', sign: -1 },
+  [EffectId.DULL]:          { icon: 'weak-eye.svg',      name: '愚钝',  resource: '洞察消耗', sign: +1 },
+  [EffectId.BLINDED]:       { icon: 'close-eye.svg',     name: '蒙蔽',  resource: '禁止洞察', binary: true },
+  [EffectId.BROKEN_BLADE]:  { icon: 'close-knife.svg',   name: '碎刃',  resource: '禁止攻击', binary: true },
+  [EffectId.BROKEN_ARMOR]:  { icon: 'close-shield.svg',  name: '废甲',  resource: '禁止守备', binary: true },
+  [EffectId.SHACKLED]:      { icon: 'fast.svg',          name: '禁锢',  resource: '禁止调速', binary: true },
+  [EffectId.SHACKLED_DODGE]: { icon: 'close-avoid.svg',  name: '锁链',  resource: '禁止闪避', binary: true },
+};
+
+/** 生成效果文本（动态 n 值） */
+function formatEffectLabel(meta, n) {
+  if (meta.binary) return `${meta.name}：${meta.resource}`;
+  const val = meta.sign * n;
+  return `${meta.name}：${meta.resource} ${val > 0 ? '+' : ''}${val}`;
+}
+
 function updateStatusIcons(playerId, state) {
   const tray = playerId === PlayerId.P1 ? ui.p1StatusTray : ui.p2StatusTray;
   if (!tray) return;
@@ -916,26 +949,76 @@ function updateStatusIcons(playerId, state) {
     tray.appendChild(img);
   };
 
-  if (state.staminaPenalty > 0) addIcon('tired.svg', `精力消耗 +${state.staminaPenalty}`, 'ACTION_START');
-  if (state.staminaDiscount > 0) addIcon('excited.svg', `精力消耗 -${state.staminaDiscount}`, 'ACTION_START');
-  if (state.guardBoost > 0) addIcon('shield.svg', `守备点数 +${state.guardBoost}`, 'ACTION_START');
-  if (state.guardDebuff > 0) addIcon('broken-shield.svg', `守备点数 -${state.guardDebuff}`, 'ACTION_START');
-  if (state.chargeBoost > 0) addIcon('strong.svg', `攻击点数 +${state.chargeBoost}`, 'ACTION_START');
-  if (state.ptsDebuff > 0) addIcon('broken-knife.svg', `攻击点数 -${state.ptsDebuff}`, 'ACTION_START');
-  if (state.dodgeBoost > 0) addIcon('avoid.svg', `闪避点数 +${state.dodgeBoost}`, 'ACTION_START');
-  if (state.dodgeDebuff > 0) addIcon('heavy.svg', `闪避点数 -${state.dodgeDebuff}`, 'ACTION_START');
-  if (state.agilityBoost > 0) addIcon('fast.svg', `动速 +${state.agilityBoost}`, 'ACTION_START');
-  if (state.agilityDebuff > 0) addIcon('slow.svg', `动速 -${state.agilityDebuff}`, 'ACTION_START');
-  if (state.hpDrain > 0) addIcon('wound.svg', `命数 -${state.hpDrain}`, 'ACTION_START');
-  if (state.hpBonusNextTurn > 0) addIcon('treat.svg', `命数 +${state.hpBonusNextTurn}`, 'TURN_START');
+  // ── 从 pendingEffects 队列聚合：按 (effectId, phaseEvent) 分组计数 ──
+  const pending = Array.isArray(state.pendingEffects) ? state.pendingEffects : [];
+  const groups = new Map(); // key = "effectId|phaseEvent" → { effectId, phaseEvent, n }
 
-  if (state.insightDebuff > 0) addIcon('weak-eye.svg', `洞察精力消耗 +1`, 'ACTION_START');
-  if (state.insightDebuff < 0) addIcon('eye.svg', `洞察精力消耗 -1`, 'ACTION_START');
-  if (state.insightBlocked) addIcon('close-eye.svg', `禁止洞察`, 'ACTION_START');
+  for (const entry of pending) {
+    const eid = entry.effectId;
+    const phase = entry.readyAt?.phaseEvent || '';
+    const key = `${eid}|${phase}`;
+    if (groups.has(key)) {
+      groups.get(key).n += 1;
+    } else {
+      groups.set(key, { effectId: eid, phaseEvent: phase, n: 1 });
+    }
+  }
+
+  // 已渲染的 effectId 集合（跨 pending 和 flat 去重）
+  const rendered = new Set();
+
+  // ── 1. 渲染 pending 效果图标（动态时机 + 动态 n 值） ──
+  for (const [, group] of groups) {
+    const meta = EFFECT_ICON_META[group.effectId];
+    if (!meta) continue;
+    const label = formatEffectLabel(meta, group.n);
+    addIcon(meta.icon, label, group.phaseEvent);
+    rendered.add(group.effectId);
+  }
+
+  // ── 2. 兜底：从 flat state 字段渲染已触发但不在队列中的效果 ──
+  const flatChecks = [
+    { field: 'chargeBoost',     eid: EffectId.POWER,         sign: +1, resource: '攻击点数', name: '力量',  icon: 'strong.svg' },
+    { field: 'ptsDebuff',       eid: EffectId.WEAK,          sign: -1, resource: '攻击点数', name: '虚弱',  icon: 'broken-knife.svg' },
+    { field: 'guardBoost',      eid: EffectId.SOLID,         sign: +1, resource: '守备点数', name: '坚固',  icon: 'shield.svg' },
+    { field: 'guardDebuff',     eid: EffectId.CRACKED_ARMOR, sign: -1, resource: '守备点数', name: '碎甲',  icon: 'broken-shield.svg' },
+    { field: 'dodgeBoost',      eid: EffectId.SIDE_STEP,     sign: +1, resource: '闪避点数', name: '侧身',  icon: 'avoid.svg' },
+    { field: 'dodgeDebuff',     eid: EffectId.CLUMSY,        sign: -1, resource: '闪避点数', name: '僵硬',  icon: 'heavy.svg' },
+    { field: 'agilityBoost',    eid: EffectId.LIGHT,         sign: +1, resource: '动速',     name: '轻盈',  icon: 'fast.svg' },
+    { field: 'agilityDebuff',   eid: EffectId.HEAVY,         sign: -1, resource: '动速',     name: '沉重',  icon: 'fast.svg' },
+    { field: 'staminaPenalty',  eid: EffectId.EXHAUSTED,     sign: +1, resource: '精力消耗', name: '疲惫',  icon: 'tired.svg' },
+    { field: 'staminaDiscount', eid: EffectId.EXCITED,       sign: -1, resource: '精力消耗', name: '兴奋',  icon: 'excited.svg' },
+    { field: 'hpDrain',         eid: EffectId.WOUNDED,       sign: -1, resource: '命数',     name: '创伤',  icon: 'wound.svg' },
+    { field: 'hpBonusNextTurn', eid: EffectId.FORTIFIED,     sign: +1, resource: '命数',     name: '旺盛',  icon: 'treat.svg' },
+  ];
+
+  for (const { field, eid, sign, resource, name, icon } of flatChecks) {
+    const val = state[field] || 0;
+    if (val <= 0) continue;
+    if (rendered.has(eid)) continue;
+    const display = sign * val;
+    addIcon(icon, `${name}：${resource} ${display > 0 ? '+' : ''}${display}`, 'ACTION_START');
+    rendered.add(eid);
+  }
+
+  // 洞察相关
+  if (!rendered.has(EffectId.DULL) && state.insightDebuff > 0)
+    addIcon('weak-eye.svg', `愚钝：洞察消耗 +${state.insightDebuff}`, 'EQUIP_END');
+  if (!rendered.has(EffectId.INSIGHTFUL) && state.insightDebuff < 0)
+    addIcon('eye.svg', `先机：洞察消耗 ${state.insightDebuff}`, 'TURN_START');
+  if (!rendered.has(EffectId.BLINDED) && state.insightBlocked)
+    addIcon('close-eye.svg', `蒙蔽：禁止洞察`, 'EQUIP_END');
+  if (!rendered.has(EffectId.SHACKLED) && state.speedAdjustBlocked)
+    addIcon('fast.svg', `禁锢：禁止调速`, 'EQUIP_END');
+
+  // 行动禁止
   if (state.actionBlocked) {
-    if (state.actionBlocked.includes(Action.ATTACK)) addIcon('close-knife.svg', `禁止攻击`, 'ACTION_START');
-    if (state.actionBlocked.includes(Action.DODGE)) addIcon('close-avoid.svg', `禁止闪避`, 'ACTION_START');
-    if (state.actionBlocked.includes(Action.GUARD)) addIcon('close-shield.svg', `禁止防御`, 'ACTION_START');
+    if (!rendered.has(EffectId.BROKEN_BLADE) && state.actionBlocked.includes(Action.ATTACK))
+      addIcon('close-knife.svg', `碎刃：禁止攻击`, 'EQUIP_END');
+    if (!rendered.has(EffectId.SHACKLED_DODGE) && state.actionBlocked.includes(Action.DODGE))
+      addIcon('close-avoid.svg', `锁链：禁止闪避`, 'EQUIP_END');
+    if (!rendered.has(EffectId.BROKEN_ARMOR) && state.actionBlocked.includes(Action.GUARD))
+      addIcon('close-shield.svg', `废甲：禁止守备`, 'EQUIP_END');
   }
 }
 
