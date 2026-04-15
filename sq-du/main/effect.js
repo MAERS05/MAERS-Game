@@ -16,8 +16,9 @@ import { clampPts } from '../effect/function/overflow-manager.js';
 
 export class EffectLayer {
   static canExposeOpponentRuntime(observer, opponent, unlocked = false) {
-    // 只要执行了洞察操作（unlocked=true），或者双方都已就绪进入了不可逆的行动期，就应当实时同步所有属性
-    return !!unlocked || (!!observer.ready && !!opponent.ready);
+    // 仅在执行了洞察操作（unlocked=true）时实时暴露对方属性
+    // 双方就绪后的资源更新由 forceP2Sync 控制时机（ACTION_END 而非 ACTION_START）
+    return !!unlocked;
   }
 
   static rewriteRoundDraft({ p1Ctx, p2Ctx, p1State, p2State }) {
@@ -133,22 +134,12 @@ export class EffectLayer {
       cp2.pts = clampPts(raw, 'dodgePtsOverflow', 'dodgePtsUnderflow', p2State);
     }
 
-    // ── 动速：应用轻盈(agilityBoost)和沉重(agilityDebuff) ──
+    // ── 动速：应用轻盈(agilityBoost)和沉重(agilityDebuff)，并裁剪上下限 ──
     const p1SpeedRaw = (cp1.speed || DefaultStats.BASE_SPEED) + (p1State.agilityBoost || 0) - (p1State.agilityDebuff || 0);
-    if (p1SpeedRaw > 0) {
-      cp1.speed = p1SpeedRaw;
-    } else {
-      cp1.speed = 0;
-      p1State.speedUnderflow = (p1State.speedUnderflow || 0) + Math.abs(p1SpeedRaw);
-    }
+    cp1.speed = clampPts(p1SpeedRaw, 'speedOverflow', 'speedUnderflow', p1State);
 
     const p2SpeedRaw = (cp2.speed || DefaultStats.BASE_SPEED) + (p2State.agilityBoost || 0) - (p2State.agilityDebuff || 0);
-    if (p2SpeedRaw > 0) {
-      cp2.speed = p2SpeedRaw;
-    } else {
-      cp2.speed = 0;
-      p2State.speedUnderflow = (p2State.speedUnderflow || 0) + Math.abs(p2SpeedRaw);
-    }
+    cp2.speed = clampPts(p2SpeedRaw, 'speedOverflow', 'speedUnderflow', p2State);
 
     // ── 消费本回合一次性 boost/debuff（已应用到 pts/speed，清零等待衰减填充下回合） ──
     p1State.chargeBoost = 0;
@@ -470,7 +461,7 @@ export class EffectLayer {
   /**
    * 标记一个即时触发的效果，供 UI 闪烁显示 ~1s。
    * 用于 onPre 中直接修改 state 而没有走 pendingEffects 队列的效果
-   * （如御气的创伤 hp--、残影的创伤 hp--），
+   * （如血盾的创伤 hp--、弃身的创伤 hp--），
    * 让玩家能通过图标感知到"有效果触发了"。
    */
   static markFlashEffect(owner, effectId) {

@@ -95,6 +95,7 @@ export function scheduleAIRedecide(ctx) {
  *  5. 精力冗余（自身精力充足时洞察成本低）
  */
 function _shouldUseInsight(snap, ai, aiEffective) {
+  if (ai.insightBlocked) return false;  // 被禁止洞察
   if (aiEffective < 2) return false; // 需至少留 1 精力给行动
 
   let score = 0;

@@ -54,19 +54,26 @@ export function resolve(p1Ctx, p2Ctx, p1State, p2State, bothInsighted, turn) {
   // ── 2. 裁判层：构建物理时间轴并推演博弈结果 ─────────
   const { bs, derived } = JudgeLayer.evaluateTimeline(p1CtxEff, p2CtxEff, p1State, p2State, p1EntryEffective, p2EntryEffective);
 
-  // ── 3. 效果层（后置处理）：执行基于伤害或博弈结果的效果（如荆棘、受击增益）─────────
-  EffectLayer.processPostEffects(
-    p1CtxEff, p2CtxEff, p1State, p2State, 
-    p1TriggeredEffects, p2TriggeredEffects,
-    bs[PlayerId.P1].dmgReceived,
-    bs[PlayerId.P2].dmgReceived
-  );
+  // ── 3. 延迟后置处理：不再在此处执行 onPost ──────────
+  // onPost 效果（基于攻击/守备/闪避成功结果触发）需要延迟到 ACTION_END 后执行，
+  // 否则 UI 会在行动期开始时就暴露本回合结果。
+  // 将所需数据打包到 result 中，由 engine 在 ACTION_END 后调用。
 
   // ── 4. 裁判层（最终裁定）：集成最终损伤、扣减/回复精力、整理账单并封装传出 ─────────
-  return JudgeLayer.buildFinalResult(
+  const result = JudgeLayer.buildFinalResult(
     turn, p1CtxEff, p2CtxEff, p1State, p2State,
     derived, false, p1TriggeredEffects, p2TriggeredEffects,
     p1EntryEffective, p2EntryEffective
   );
+
+  // 附带后置处理所需数据（engine 将在 ACTION_END 后消费）
+  result._postEffectData = {
+    p1CtxEff, p2CtxEff,
+    p1TriggeredEffects, p2TriggeredEffects,
+    p1DmgReceived: bs[PlayerId.P1].dmgReceived,
+    p2DmgReceived: bs[PlayerId.P2].dmgReceived,
+  };
+
+  return result;
 }
 

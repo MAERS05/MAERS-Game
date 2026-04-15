@@ -17,8 +17,8 @@ export const BreakQiEffect = createSkillEffect({
       state.hpUnderflow = (state.hpUnderflow || 0) + 1;
     }
     EffectLayer.markFlashEffect(state, EffectId.WOUNDED);
-    // 力量（本回合即时）：直接加攻击点数
-    state.chargeBoost = (state.chargeBoost || 0) + 1;
+    // 力量（本回合即时）：通过返回 pts+1 直接应用（不走 chargeBoost 避免双重叠加）
+    EffectLayer.markFlashEffect(state, EffectId.POWER);
     return { ...ctx, pts: ctx.pts + 1 };
   },
 });

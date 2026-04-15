@@ -12,8 +12,8 @@ export const RigidEffect = createSkillEffect({
   applicableTo: [Action.GUARD],
 
   onPre(ctx, state) {
-    // 坚固（本回合即时）：直接加守备点数
-    state.guardBoost = (state.guardBoost || 0) + 1;
+    // 坚固（本回合即时）：通过返回 pts+1 直接应用（不走 guardBoost 避免双重叠加）
+    EffectLayer.markFlashEffect(state, EffectId.SOLID);
     // 僵硬（下回合延迟）：走队列
     EffectLayer.queueEffect(state, EffectId.CLUMSY, { phaseEvent: 'ACTION_START', source: 'skill:rigid' });
     return { ...ctx, pts: (ctx.pts || 0) + 1 };

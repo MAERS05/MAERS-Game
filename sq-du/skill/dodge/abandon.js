@@ -17,8 +17,8 @@ export const AbandonEffect = createSkillEffect({
       state.hpUnderflow = (state.hpUnderflow || 0) + 1;
     }
     EffectLayer.markFlashEffect(state, EffectId.WOUNDED);
-    // 侧身（本回合即时）：直接加闪避点数
-    state.dodgeBoost = (state.dodgeBoost || 0) + 1;
+    // 侧身（本回合即时）：通过返回 pts+1 直接应用（不走 dodgeBoost 避免双重叠加）
+    EffectLayer.markFlashEffect(state, EffectId.SIDE_STEP);
     return { ...ctx, pts: (ctx.pts || 0) + 1 };
   },
 });

@@ -11,8 +11,8 @@ export const RecklessEffect = createSkillEffect({
   staminaCost: 0,
   applicableTo: [Action.ATTACK],
   onPre(ctx, state) {
-    // 力量（本回合即时）：直接加攻击点数
-    state.chargeBoost = (state.chargeBoost || 0) + 1;
+    // 力量（本回合即时）：通过返回 pts+1 直接应用（不走 chargeBoost 避免双重叠加）
+    EffectLayer.markFlashEffect(state, EffectId.POWER);
     // 碎甲（下回合延迟）：走队列
     EffectLayer.queueEffect(state, EffectId.CRACKED_ARMOR, { phaseEvent: 'TURN_START', source: 'skill:reckless' });
     return { ...ctx, pts: ctx.pts + 1 };

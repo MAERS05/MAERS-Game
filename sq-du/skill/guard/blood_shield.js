@@ -18,6 +18,7 @@ export const BloodShieldEffect = createSkillEffect({
     }
     EffectLayer.markFlashEffect(state, EffectId.WOUNDED);
     // 坚固（本回合即时）：直接加守备点数（通过 pts+1 体现）
+    EffectLayer.markFlashEffect(state, EffectId.SOLID);
     return { ...ctx, pts: (ctx.pts || 0) + 1 };
   },
 });

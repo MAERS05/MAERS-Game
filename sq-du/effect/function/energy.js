@@ -7,7 +7,7 @@ export const SluggishEffect = createStatusEffect({
   id: 'sluggish',
   name: '萎靡',
   desc: '精力 -1',
-  applicableTo: [Action.STANDBY],
+  applicableTo: [Action.ATTACK, Action.GUARD, Action.DODGE, Action.STANDBY],
   apply(state) {
     if ((state.stamina || 0) > 0) {
       state.stamina--;
@@ -21,7 +21,7 @@ export const RejuvenatedEffect = createStatusEffect({
   id: 'rejuvenated',
   name: '振奋',
   desc: '精力 +1',
-  applicableTo: [Action.STANDBY],
+  applicableTo: [Action.ATTACK, Action.GUARD, Action.DODGE, Action.STANDBY],
   apply(state) {
     if ((state.stamina || 0) < DefaultStats.MAX_STAMINA) {
       state.stamina = (state.stamina || 0) + 1;

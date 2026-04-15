@@ -37,6 +37,7 @@ import {
 import { DualTimer } from './timer.js';
 import { EffectLayer } from '../main/effect.js';
 import { resolve } from './resolver.js';
+import { collectOverflows } from '../effect/function/overflow-manager.js';
 import { scheduleAI, scheduleAIRedecide } from '../ai/ai-scheduler.js';
 import '../ai/ai-manual.js'; // 初始化 ManualAI 测试工具挂载到 window
 
@@ -753,6 +754,18 @@ export class BattleEngine {
 
       this._emitPhaseEffectEvent(EngineEvent.TURN_START_PHASE, {});
 
+      // TURN_START 效果触发后，收集溢出并转换为下回合 pendingEffects
+      // （例如 FORTIFIED 给满血角色 +1 HP 产生的溢出）
+      [PlayerId.P1, PlayerId.P2].forEach(pid => {
+        collectOverflows(this._players[pid], this._turn);
+      });
+
+      // 效果触发后立即同步状态到 UI，刷新双方精力/命数条
+      this._bus.emit(EngineEvent.PHASE_STATE_SYNC, {
+        phaseEvent: EngineEvent.TURN_START_PHASE,
+        state: this.getSnapshot(),
+      });
+
       // 延迟 1s 后，进入装备期
       setTimeout(() => {
         this._setState(EngineState.EQUIPPING);
@@ -799,7 +812,7 @@ export class BattleEngine {
     );
 
     this._applyResolveResult(result);
-    // 结算后立即同步状态到 UI，确保 onPre 产生的 hp/stamina 变化（如御气的自伤）
+    // 结算后立即同步状态到 UI，确保 onPre 产生的 hp/stamina 变化（如血盾的自伤）
     // 在行动期开始时就可见，而不是延迟到 ACTION_END（3s 后）才刷新
     this._bus.emit(EngineEvent.PHASE_STATE_SYNC, {
       phaseEvent: EngineEvent.ACTION_START,
@@ -813,6 +826,25 @@ export class BattleEngine {
     setTimeout(() => {
       if (this._state !== EngineState.RESOLVING) return;
       this._emitPhaseEffectEvent(EngineEvent.ACTION_END, {});
+
+      // ── 延迟后置处理：在行动期结束后、结算期开始前执行 onPost 效果 ──
+      // onPost 基于攻击/守备/闪避成败触发，必须在此时才暴露给 UI
+      if (result._postEffectData) {
+        const d = result._postEffectData;
+        EffectLayer.processPostEffects(
+          d.p1CtxEff, d.p2CtxEff,
+          this._players[PlayerId.P1], this._players[PlayerId.P2],
+          d.p1TriggeredEffects, d.p2TriggeredEffects,
+          d.p1DmgReceived, d.p2DmgReceived
+        );
+        // 同步一次状态到 UI，让 onPost 产生的效果图标在此时可见
+        this._bus.emit(EngineEvent.PHASE_STATE_SYNC, {
+          phaseEvent: EngineEvent.ACTION_END,
+          state: this.getSnapshot(),
+        });
+        delete result._postEffectData;
+      }
+
       this._emitPhaseEffectEvent(EngineEvent.RESOLVE_START, {});
       this._bus.emit(EngineEvent.TURN_RESOLVED, result);
       setTimeout(() => {

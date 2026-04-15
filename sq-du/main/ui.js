@@ -145,7 +145,7 @@ let enemyFogState = {
 };
 
 /**
- * 闪烁效果队列：用于本回合即时消费的效果（如御气的创伤 hp--）
+ * 闪烁效果队列：用于本回合即时消费的效果（如血盾的创伤 hp--）
  * 这类效果没有持久化的状态字段，无法被 updateStatusIcons 的 flatChecks 捕获，
  * 需要临时闪烁图标 1s 让玩家感知到效果触发了。
  * 格式：Map<playerId, Array<{ effectId, expiresAt }>>
@@ -232,7 +232,7 @@ function getEffectiveStamina(player) {
 }
 
 /** 统一渲染双方资源与基础状态（避免真实值/投影值显示不一致） */
-function renderPlayerResources(p1, p2) {
+function renderPlayerResources(p1, p2, { forceP2Sync = false } = {}) {
   updatePips('p1-hp', p1.hp, DefaultStats.MAX_HP, 'hp', p1);
   updatePips('p1-stam', p1.stamina, DefaultStats.MAX_STAMINA, 'stam', p1);
   const p1ActSpeed = p1.speed + (p1.agilityBoost || 0) - (p1.agilityDebuff || 0);
@@ -241,8 +241,15 @@ function renderPlayerResources(p1, p2) {
   const canExposeEnemy = EffectLayer.canExposeOpponentRuntime(p1, p2, enemyInfoUnlocked);
 
   // 未被遮罩时，持续刷新敌方“最后已知状态”
+  if (canExposeEnemy || forceP2Sync) {
+    if (!enemyFogState) enemyFogState = {};
+    enemyFogState.hp = p2.hp;
+    enemyFogState.stamina = p2.stamina;
+    enemyFogState.speed = p2.speed;
+  }
   if (canExposeEnemy) {
-    enemyFogState = { hp: p2.hp, stamina: p2.stamina, speed: p2.speed, staminaPenalty: p2.staminaPenalty, staminaDiscount: p2.staminaDiscount };
+    enemyFogState.staminaPenalty = p2.staminaPenalty;
+    enemyFogState.staminaDiscount = p2.staminaDiscount;
   }
 
   const showEnemy = canExposeEnemy ? { ...p2 } : enemyFogState;
@@ -425,7 +432,7 @@ function resetForNewTurn() {
 
   // 新回合开始：insightUsed 必然被引擎重置为 false，
   // 此处只需判断精力是否足够（避免在 _beginTurn 还未执行时读到旧 insightUsed）
-  ui.insightBtn.disabled = getEffectiveStamina(p1) < 1;
+  ui.insightBtn.disabled = getEffectiveStamina(p1) < 1 || p1.insightBlocked;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -558,13 +565,18 @@ engine.on(EngineEvent.TIMER_TICK, payload => {
 });
 
 // 每个阶段接口执行后刷新一次状态显示，确保“时机=结算=可见”
-engine.on(EngineEvent.PHASE_STATE_SYNC, ({ state }) => {
+engine.on(EngineEvent.PHASE_STATE_SYNC, ({ state, phaseEvent: syncPhase }) => {
   const p1 = state.players[PlayerId.P1];
   const p2 = state.players[PlayerId.P2];
 
-  renderPlayerResources(p1, p2);
+  // 效果触发阶段和行动阶段强制同步双方资源条
+  const forceP2Sync = [
+    EngineEvent.TURN_START_PHASE,
+    EngineEvent.ACTION_END, EngineEvent.RESOLVE_START,
+  ].includes(syncPhase);
+  renderPlayerResources(p1, p2, { forceP2Sync });
 
-  // 拾取 onPre 标记的即时闪烁效果（如御气的创伤 hp--）
+  // 拾取 onPre 标记的即时闪烁效果（如血盾的创伤 hp--）
   for (const [pid, pState] of [[PlayerId.P1, p1], [PlayerId.P2, p2]]) {
     if (Array.isArray(pState._flashEffects) && pState._flashEffects.length > 0) {
       for (const eid of pState._flashEffects) {
@@ -575,8 +587,8 @@ engine.on(EngineEvent.PHASE_STATE_SYNC, ({ state }) => {
   }
 
   updateStatusIcons(PlayerId.P1, p1);
-  // 敌方图标可见性由效果层策略统一决定
-  if (EffectLayer.canExposeOpponentRuntime(p1, p2, enemyInfoUnlocked)) {
+  // 敌方图标可见性：效果/行动阶段 或 洞察解锁
+  if (forceP2Sync || enemyInfoUnlocked) {
     updateStatusIcons(PlayerId.P2, p2);
   }
 });
@@ -609,7 +621,7 @@ engine.on(EngineEvent.ACTION_UPDATED, ({ playerId }) => {
   renderPlayerResources(p1, snap.players[PlayerId.P2]);
 
   if (!p1.ready) {
-    ui.insightBtn.disabled = p1.insightUsed || getEffectiveStamina(p1) < 1;
+    ui.insightBtn.disabled = p1.insightUsed || getEffectiveStamina(p1) < 1 || p1.insightBlocked;
   }
 });
 
@@ -658,7 +670,7 @@ engine.on(EngineEvent.REDECIDED, ({ playerId }) => {
     ui.waitingLabel.classList.remove('show');
     const snap = engine.getSnapshot();
     const p1State = snap.players[PlayerId.P1];
-    ui.insightBtn.disabled = p1State.insightUsed || getEffectiveStamina(p1State) < 1;
+    ui.insightBtn.disabled = p1State.insightUsed || getEffectiveStamina(p1State) < 1 || p1State.insightBlocked;
   }
 });
 
@@ -679,7 +691,7 @@ engine.on(EngineEvent.PASSIVE_INSIGHT, ({ targetId, revealedAction, revealed }) 
   // 只有真正揭示（对方已就绪）时才解锁信息并刷新 UI
   if (!isP1Target && revealed) {
     enemyInfoUnlocked = true;
-    renderPlayerResources(snap.players[PlayerId.P1], snap.players[PlayerId.P2]);
+    renderPlayerResources(snap.players[PlayerId.P1], snap.players[PlayerId.P2], { forceP2Sync: true });
   }
 
   // 只有真正揭示时才发出通知（避免阶段转换时的空提示）
@@ -693,13 +705,17 @@ engine.on(EngineEvent.PASSIVE_INSIGHT, ({ targetId, revealedAction, revealed }) 
 
 // 所有引擎内部阶段变化，在此统一同步渲染（单一数据源）
 // 引擎发出的格式：{ phaseEvent, state: getSnapshot() }
-engine.on(EngineEvent.PHASE_STATE_SYNC, ({ state }) => {
+engine.on(EngineEvent.PHASE_STATE_SYNC, ({ state, phaseEvent: syncPhase }) => {
   const p1 = state.players[PlayerId.P1];
   const p2 = state.players[PlayerId.P2];
   if (!p1 || !p2) return; // 引擎初始化完成前不渲染
-  renderPlayerResources(p1, p2);
+  const forceP2Sync = [
+    EngineEvent.TURN_START_PHASE,
+    EngineEvent.ACTION_END, EngineEvent.RESOLVE_START,
+  ].includes(syncPhase);
+  renderPlayerResources(p1, p2, { forceP2Sync });
   updateStatusIcons(PlayerId.P1, p1);
-  if (!p2.ready || enemyInfoUnlocked) {
+  if (forceP2Sync || enemyInfoUnlocked) {
     updateStatusIcons(PlayerId.P2, p2);
   }
   refreshPoints(); // 包含速度、可用行为状态的刷新
@@ -731,13 +747,17 @@ engine.on(EngineEvent.ACTIVE_INSIGHT, ({ casterId, revealedAction, revealed }) =
     refreshPoints();
 
     if (!p1.ready) {
-      ui.insightBtn.disabled = p1.insightUsed || getEffectiveStamina(p1) < 1;
+      ui.insightBtn.disabled = p1.insightUsed || getEffectiveStamina(p1) < 1 || p1.insightBlocked;
     }
   }
 });
 
 engine.on(EngineEvent.ACTION_PHASE_START, () => {
   ui.phaseIndicator.textContent = '行动期';
+
+  // 双方已就绪，立即清除洞察提示
+  ui.insightNotice.classList.remove('show');
+  ui.insightNotice.textContent = '';
 
   // 行动期开始时刷新状态图标：敌方信息仍遵循洞察解锁规则
   const snap = engine.getSnapshot();
@@ -771,7 +791,7 @@ engine.on(EngineEvent.TURN_RESOLVED, result => {
   ui.insightNotice.classList.remove('show');
   ui.insightNotice.textContent = '';
 
-  renderPlayerResources(result.newState.p1, result.newState.p2);
+  renderPlayerResources(result.newState.p1, result.newState.p2, { forceP2Sync: true });
 
 
   ui.p1SpeedVal.textContent = DefaultStats.BASE_SPEED;
@@ -942,8 +962,8 @@ const EFFECT_ICON_META = {
   [EffectId.HEAVY]:         { icon: 'fast.svg',          name: '沉重',  resource: '动速',     sign: -1 },
   [EffectId.WOUNDED]:       { icon: 'wound.svg',         name: '创伤',  resource: '命数',     sign: -1 },
   [EffectId.FORTIFIED]:     { icon: 'treat.svg',         name: '旺盛',  resource: '命数',     sign: +1 },
-  [EffectId.REJUVENATED]:   { icon: 'excited.svg',       name: '振奋',  resource: '精力',     sign: +1 },
-  [EffectId.SLUGGISH]:      { icon: 'tired.svg',         name: '萎靡',  resource: '精力',     sign: -1 },
+  [EffectId.REJUVENATED]:   { icon: 'uplifting.svg',     name: '振奋',  resource: '精力', sign: +1 },
+  [EffectId.SLUGGISH]:      { icon: 'listless.svg',      name: '萎靡',  resource: '精力', sign: -1 },
   [EffectId.EXHAUSTED]:     { icon: 'tired.svg',         name: '疲惫',  resource: '精力消耗', sign: +1 },
   [EffectId.EXCITED]:       { icon: 'excited.svg',       name: '兴奋',  resource: '精力消耗', sign: -1 },
   [EffectId.INSIGHTFUL]:    { icon: 'eye.svg',           name: '先机',  resource: '洞察消耗', sign: -1 },
@@ -1045,6 +1065,8 @@ function updateStatusIcons(playerId, state) {
   for (const { field, eid, sign, resource, name, icon } of flatChecks) {
     const val = state[field] || 0;
     if (val <= 0) continue;
+    // 若 pending 中已渲染过同 effectId，先覆盖（flat 字段是累计真实值，优先级更高）
+    // 但为了避免重复图标，跳过已渲染的（pending 的 n 值已经在上面正确聚合了）
     if (rendered.has(eid)) continue;
     const display = sign * val;
     addIcon(icon, `${name}：${resource} ${display > 0 ? '+' : ''}${display}`, 'ACTION_START');
@@ -1073,16 +1095,21 @@ function updateStatusIcons(playerId, state) {
 
   // ── 3. 渲染闪烁效果图标（即时消费型效果的临时可视化） ──
   const flashes = flashEffects.get(playerId) || [];
+  // 按 effectId 聚合闪烁计数
+  const flashGroups = new Map();
   for (const flash of flashes) {
-    if (rendered.has(flash.effectId)) continue;
-    const meta = EFFECT_ICON_META[flash.effectId];
+    flashGroups.set(flash.effectId, (flashGroups.get(flash.effectId) || 0) + 1);
+  }
+  for (const [eid, count] of flashGroups) {
+    if (rendered.has(eid)) continue;
+    const meta = EFFECT_ICON_META[eid];
     if (!meta) continue;
-    const label = formatEffectLabel(meta, 1);
+    const label = formatEffectLabel(meta, count);
     addIcon(meta.icon, label, 'ACTION_START');
     // 给闪烁图标添加消退动画
     const lastIcon = tray.lastElementChild;
     if (lastIcon) lastIcon.classList.add('flash-effect');
-    rendered.add(flash.effectId);
+    rendered.add(eid);
   }
 }
 
@@ -1322,12 +1349,10 @@ engine.on(EngineEvent.TURN_START_PHASE, () => {
   ui.phaseIndicator.textContent = '回合开始期';
   ui.equipOverlayTitle.textContent = '装配期';
 
-  // 回合开始：先刷新一次，敌方图标是否可见由可见性策略决定
+  // 回合开始：效果刚触发，双方图标均应可见
   const snap = engine.getSnapshot();
   updateStatusIcons(PlayerId.P1, snap.players[PlayerId.P1]);
-  if (EffectLayer.canExposeOpponentRuntime(snap.players[PlayerId.P1], snap.players[PlayerId.P2], enemyInfoUnlocked)) {
-    updateStatusIcons(PlayerId.P2, snap.players[PlayerId.P2]);
-  }
+  updateStatusIcons(PlayerId.P2, snap.players[PlayerId.P2]);
 
   ui.roundStartCountdownHint.textContent = '1s 后自动关闭';
   ui.roundStartNotice.classList.add('show');
@@ -1365,7 +1390,7 @@ engine.on(EngineEvent.EQUIP_PHASE_START, ({ secondsLeft }) => {
 engine.on(EngineEvent.EQUIP_PHASE_END, () => {
   ui.phaseIndicator.textContent = '决策期';
   ui.equipOverlay.classList.remove('active');
-  ui.effectPicker.classList.remove('show');
+  closePicker();
 
   const snap = engine.getSnapshot();
   const p1 = snap.players[PlayerId.P1];
@@ -1373,7 +1398,7 @@ engine.on(EngineEvent.EQUIP_PHASE_END, () => {
   if (!p1.ready) {
     ui.standbyBtn.disabled = false;
     ui.readyBtn.disabled = false;
-    ui.insightBtn.disabled = p1.insightUsed || getEffectiveStamina(p1) < 1;
+    ui.insightBtn.disabled = p1.insightUsed || getEffectiveStamina(p1) < 1 || p1.insightBlocked;
   }
 });
 
