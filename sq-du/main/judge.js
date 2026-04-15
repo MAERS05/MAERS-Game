@@ -216,7 +216,7 @@ export class JudgeLayer {
       return this._zero(Clash.RETREAT, `${prefix}互相后撤。`);
 
     if ((p1Act === Action.DODGE && p2Act === Action.GUARD) || (p1Act === Action.GUARD && p2Act === Action.DODGE)) {
-      return this._zero(Clash.PROBE, `${prefix}双方仅是一次无果的试探。【试探】`);
+      return this._zero(Clash.PROBE, `${prefix}双方仅是一次无果的试探。`);
     }
 
     if (p1Act === Action.ATTACK && p2Act === Action.STANDBY)
@@ -232,31 +232,31 @@ export class JudgeLayer {
 
       // 双方都直接就绪
       if (p1Act === Action.READY && p2Act === Action.READY)
-        return this._zero(Clash.IDLE, `${prefix}双方按兵不动。【待命】`);
+        return this._zero(Clash.IDLE, `${prefix}双方按兵不动。`);
 
       // READY vs 攻击：钳制
       if (otherAct === Action.ATTACK)
         return this._withExecute(
           Clash.PINNED,
           readySide === PlayerId.P1
-            ? `${prefix}敌方的攻击成功命中！【钳制】`
-            : `${prefix}你的攻击成功命中！【钳制】`,
+            ? `${prefix}敌方的攻击成功命中！`
+            : `${prefix}你的攻击成功命中！`,
           rawDmgP1, rawDmgP2, p1State, p2State, p1EntryEffective, p2EntryEffective
         );
 
       // READY vs 守备/闪避/蓄势：待命
-      return this._zero(Clash.IDLE, `${prefix}无事发生。【待命】`);
+      return this._zero(Clash.IDLE, `${prefix}无事发生。`);
     }
 
     // ── 运筹：一方蓄势，另一方守备或闪避 ──
     if ((p1Act === Action.STANDBY && (p2Act === Action.GUARD || p2Act === Action.DODGE)) ||
-        (p2Act === Action.STANDBY && (p1Act === Action.GUARD || p1Act === Action.DODGE))) {
-      return this._zero(Clash.FULLNESS, `${prefix}无事发生。【运筹】`);
+      (p2Act === Action.STANDBY && (p1Act === Action.GUARD || p1Act === Action.DODGE))) {
+      return this._zero(Clash.FULLNESS, `${prefix}无事发生。`);
     }
 
     // ── 落空：其他无意义组合 ──
     if ((p1Act !== Action.ATTACK && p2Act === Action.STANDBY) ||
-        (p2Act !== Action.ATTACK && p1Act === Action.STANDBY)) {
+      (p2Act !== Action.ATTACK && p1Act === Action.STANDBY)) {
       return this._zero(Clash.WASTED_ACTION, `${prefix}行动毫无意义。`);
     }
 
@@ -281,13 +281,13 @@ export class JudgeLayer {
       executeP1 = true;
       finalDmgP1 = p1State.hp;
       clash = Clash.EXECUTE;
-      clashDesc += ' 你已精力耗尽——敌方的攻击彻底终结了这场战斗！【处决】';
+      clashDesc += ' 你已精力耗尽——敌方的攻击彻底终结了这场战斗！';
     }
     if (rawDmgP2 > 0 && p2EntryEffective <= 0) {
       executeP2 = true;
       finalDmgP2 = p2State.hp;
       clash = Clash.EXECUTE;
-      clashDesc += ' 敌方已精力耗尽——你的攻击彻底终结了这场战斗！【处决】';
+      clashDesc += ' 敌方已精力耗尽——你的攻击彻底终结了这场战斗！';
     }
 
     return { clash, clashDesc, executeP1, executeP2, finalDmgP1, finalDmgP2 };
@@ -312,52 +312,52 @@ export class JudgeLayer {
 
     if (confront) {
       clash = Clash.CONFRONT;
-      clashDesc = `${prefix}攻势彼此抵消——无人受伤。【对峙】`;
+      clashDesc = `${prefix}攻势彼此抵消——无人受伤。`;
     } else if (suppress) {
       const winIsP1 = suppress.winnerId === PlayerId.P1;
       clash = Clash.SUPPRESS;
       clashDesc = winIsP1
-        ? `${prefix}你的攻击点数压制了敌方——单方命中！【压制】`
-        : `${prefix}敌方的攻击点数压制了你——单方命中！【压制】`;
+        ? `${prefix}你的攻击点数压制了敌方——单方命中！`
+        : `${prefix}敌方的攻击点数压制了你——单方命中！`;
     } else if (hits.length >= 2) {
       const firstIsP1 = hits[0].attackerId === PlayerId.P1;
       clash = Clash.PREEMPT;
       clashDesc = firstIsP1
-        ? `${prefix}你抢先命中，随后敌方的反击也命中了你。【抢攻】`
-        : `${prefix}敌方抢先命中，随后你的反击也命中了敌方。【抢攻】`;
+        ? `${prefix}你抢先命中，随后敌方的反击也命中了你。`
+        : `${prefix}敌方抢先命中，随后你的反击也命中了敌方。`;
     } else if (evade) {
       const atkIsP1 = evade.attackerId === PlayerId.P1;
       clash = Clash.EVADE;
       clashDesc = atkIsP1
-        ? `${prefix}敌方躲开了你的攻击。【规避】`
-        : `${prefix}你躲开了敌方的攻击。【规避】`;
+        ? `${prefix}敌方躲开了你的攻击。`
+        : `${prefix}你躲开了敌方的攻击。`;
     } else if (dodgeOutmaneuvered) {
       const atkIsP1 = dodgeOutmaneuvered.attackerId === PlayerId.P1;
       clash = Clash.DODGE_OUTMANEUVERED;
       clashDesc = atkIsP1
-        ? `${prefix}敌方虚步躲开了你的攻击。【虚步】`
-        : `${prefix}你虚步躲开了敌方的攻击。【虚步】`;
+        ? `${prefix}敌方虚步躲开了你的攻击。`
+        : `${prefix}你虚步躲开了敌方的攻击。`;
     } else if (attackOverpowers) {
       const atkIsP1 = attackOverpowers.attackerId === PlayerId.P1;
       clash = Clash.ATTACK_OVERPOWERS;
       clashDesc = atkIsP1
-        ? `${prefix}你的攻击压过了敌方的闪避——成功命中！【强突】`
-        : `${prefix}敌方的攻击压过了你的闪避——成功命中！【强突】`;
+        ? `${prefix}你的攻击压过了敌方的闪避——成功命中！`
+        : `${prefix}敌方的攻击压过了你的闪避——成功命中！`;
     } else if (mutualHit) {
       clash = Clash.MUTUAL_HIT;
-      clashDesc = `${prefix}擦肩而过，无事发生。【侥幸】`;
+      clashDesc = `${prefix}擦肩而过，无事发生。`;
     } else if (fortify) {
       const atkIsP1 = fortify.attackerId === PlayerId.P1;
       clash = Clash.FORTIFY;
       const isFaster = fortify.shieldSpeed > fortify.atkSpeed;
       if (atkIsP1) {
         clashDesc = isFaster
-          ? `${prefix}敌方抢在你的攻击前守备并成功挡下你的攻击。【坚固】`
-          : `${prefix}敌方及时守备并成功挡下你的攻击。【坚固】`;
+          ? `${prefix}敌方抢在你的攻击前守备并成功挡下你的攻击。`
+          : `${prefix}敌方及时守备并成功挡下你的攻击。`;
       } else {
         clashDesc = isFaster
-          ? `${prefix}你抢在敌方攻击前守备并成功挡下敌方的攻击。【坚固】`
-          : `${prefix}你及时守备并成功挡下敌方的攻击。【坚固】`;
+          ? `${prefix}你抢在敌方攻击前守备并成功挡下敌方的攻击。`
+          : `${prefix}你及时守备并成功挡下敌方的攻击。`;
       }
     } else if (breakEvt) {
       const atkIsP1 = breakEvt.attackerId === PlayerId.P1;
@@ -365,12 +365,12 @@ export class JudgeLayer {
       const isFaster = breakEvt.shieldSpeed > breakEvt.atkSpeed;
       if (atkIsP1) {
         clashDesc = isFaster
-          ? `${prefix}敌方虽抢先守备，仍被你的攻击无情击穿！【破势】`
-          : `${prefix}敌方虽及时守备，仍被你的攻击无情击穿！【破势】`;
+          ? `${prefix}敌方虽抢先守备，仍被你的攻击无情击穿！`
+          : `${prefix}敌方虽及时守备，仍被你的攻击无情击穿！`;
       } else {
         clashDesc = isFaster
-          ? `${prefix}你虽抢先守备，仍被敌方的攻击无情击穿！【破势】`
-          : `${prefix}你虽及时守备，仍被敌方的攻击无情击穿！【破势】`;
+          ? `${prefix}你虽抢先守备，仍被敌方的攻击无情击穿！`
+          : `${prefix}你虽及时守备，仍被敌方的攻击无情击穿！`;
       }
     } else if (hits.length === 1) {
       const hit = hits[0];
@@ -379,23 +379,23 @@ export class JudgeLayer {
       if (targetCtx.action === Action.GUARD) {
         clash = Clash.RAID;
         clashDesc = atkIsP1
-          ? `${prefix}你抢在敌方守备前完成命中！【袭击】`
-          : `${prefix}敌方抢在你守备前完成命中！【袭击】`;
+          ? `${prefix}你抢在敌方守备前完成命中！`
+          : `${prefix}敌方抢在你守备前完成命中！`;
       } else if (targetCtx.action === Action.DODGE) {
         clash = Clash.SWIFT_STRIKE;
         clashDesc = atkIsP1
-          ? `${prefix}你抢在敌方闪开前完成命中！【迅攻】`
-          : `${prefix}敌方抢在你闪开前完成命中！【迅攻】`;
+          ? `${prefix}你抢在敌方闪开前完成命中！`
+          : `${prefix}敌方抢在你闪开前完成命中！`;
       } else if (targetCtx.action === Action.ATTACK) {
         clash = Clash.INTERRUPT;
         clashDesc = atkIsP1
-          ? `${prefix}你抢先将敌方击倒！【截杀】`
-          : `${prefix}敌方抢先将你击倒！【截杀】`;
+          ? `${prefix}你抢先将敌方击倒！`
+          : `${prefix}敌方抢先将你击倒！`;
       } else {
         clash = Clash.ONE_SIDE_ATTACK;
         clashDesc = atkIsP1
-          ? `${prefix}你的攻击命中！【命中】`
-          : `${prefix}敌方的攻击命中！【命中】`;
+          ? `${prefix}你的攻击命中！`
+          : `${prefix}敌方的攻击命中！`;
       }
     } else {
       clash = Clash.WASTED_ACTION;
