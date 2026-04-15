@@ -1,6 +1,6 @@
 'use strict';
 
-import { EffectLayer } from '../main/effect.js';
+import { EffectLayer } from '../../main/effect.js';
 
 export function createSkillEffect({ id, name, desc, applicableTo, timing = null, onPre, onPost, onPhase }) {
   return Object.freeze({

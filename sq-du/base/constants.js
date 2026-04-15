@@ -66,70 +66,73 @@ export const ActionName = Object.freeze({
 
 /** 回合交锋情形枚举 */
 export const Clash = Object.freeze({
-  /** 双方都待命 */
-  MUTUAL_STANDBY: 'MUTUAL_STANDBY',
-  /** 一方攻击另一方待命 */
-  ONE_SIDE_ATTACK: 'ONE_SIDE_ATTACK',
+  /** 双方都蓄势 */
+  MUTUAL_STANDBY: 'MUTUAL_STANDBY',       // 相持
+  /** 一方攻击另一方蓄势 */
+  ONE_SIDE_ATTACK: 'ONE_SIDE_ATTACK',      // 遇袭
   /** 双方攻击，动速、点数均相同 */
-  CONFRONT: 'CONFRONT',      // 对峙
-  /** 双方攻击，动速不同 */
-  PREEMPT: 'PREEMPT',       // 抢攻
-  /** 双方攻击，动速相同，点数不同 */
-  SUPPRESS: 'SUPPRESS',      // 压制
-  /** 攻击方攻击，目标精力为 0 */
-  EXECUTE: 'EXECUTE',       // 处决
-  /** 双方守备 */
-  ACCUMULATE: 'ACCUMULATE',   // 蓄势
-  /** 进攻中途被打倒 */
-  INTERRUPT: 'INTERRUPT',     // 截杀
-  /** 双方闪避 */
-  RETREAT: 'RETREAT',      // 退让
+  CONFRONT: 'CONFRONT',                    // 交击
+  /** 双方攻击，动速不同（速度高的先攻，速度低的后攻） */
+  PREEMPT: 'PREEMPT',                      // 错击
+  /** 双方攻击，动速相同，一方点数大于另一方（仅点数大的造成攻击） */
+  SUPPRESS: 'SUPPRESS',                    // 压制
+  /** 对方精力为 0 时发动攻击，直接清空命数 */
+  EXECUTE: 'EXECUTE',                      // 处决
+  /** 双方都守备 */
+  STABILITY: 'STABILITY',                  // 安定
+  /** 进攻中途被击倒等特殊中断 */
+  INTERRUPT: 'INTERRUPT',                  // 截杀
+  /** 双方都闪避 */
+  RETREAT: 'RETREAT',                      // 退让
   /** 一方闪避，一方守备 */
-  PROBE: 'PROBE',        // 试探
-  /** 攻方动速高于守方动速 */
-  RAID: 'RAID',         // 突袭
-  /** 守方动速≥攻方动速，守方点数≥攻方点数 */
-  FORTIFY: 'FORTIFY',      // 坚固
-  /** 守方动速≥攻方动速，守方点数<攻方点数 */
-  BREAK: 'BREAK',        // 破势
-  /** 攻方动速高于闪方动速 */
-  SWIFT_STRIKE: 'SWIFT_STRIKE', // 迅攻
-  /** 闪方动速大于攻方动速 */
-  EVADE: 'EVADE',        // 规避
-  /** 同速，闪避点数 > 攻击点数 */
-  DODGE_OUTMANEUVERED: 'DODGE_OUTMANEUVERED', // 虚步
-  /** 同速，闪避点数 < 攻击点数 */
-  ATTACK_OVERPOWERS: 'ATTACK_OVERPOWERS',   // 强突
-  /** 同速，闪避点数 = 攻击点数，双方互中 */
-  MUTUAL_HIT: 'MUTUAL_HIT',          // 侥幸
-  /** 无法归入常规情形的特殊操作（如蓄力等未执行常规攻击的场合） */
-  OTHER: 'OTHER',                    // 其它
-  /** 双方均经历了洞察（主动或被动），回合直接结束 */
-  INSIGHT_CLASH: 'INSIGHT_CLASH',        // 识破
-  /** 一方攻击另一方非攻击（且未命中） */
-  WASTED_ACTION: 'WASTED_ACTION',        // 行动落空（守备/闪避 vs 待命）
+  PROBE: 'PROBE',                          // 试探
+  /** 守备速度低于攻击速度，攻击方造成攻击 */
+  RAID: 'RAID',                            // 突击
+  /** 守备点数 ≥ 攻击点数 且 守备速度 ≥ 攻击速度，守备方抵抗掉攻击 */
+  FORTIFY: 'FORTIFY',                      // 稳固
+  /** 守备点数 < 攻击点数 且 守备速度 ≥ 攻击速度，攻击方造成攻击 */
+  BREAK: 'BREAK',                          // 破甲
+  /** 闪避速度低于攻击速度，攻击方造成攻击 */
+  SWIFT_STRIKE: 'SWIFT_STRIKE',            // 迅攻
+  /** 闪避速度 > 攻击速度，闪避方躲开攻击 */
+  EVADE: 'EVADE',                          // 迅闪
+  /** 同速，闪避点数 > 攻击点数，闪避方躲开攻击 */
+  DODGE_OUTMANEUVERED: 'DODGE_OUTMANEUVERED', // 规避
+  /** 同速，闪避点数 < 攻击点数，攻击方造成攻击 */
+  ATTACK_OVERPOWERS: 'ATTACK_OVERPOWERS',     // 阔击
+  /** 同速，闪避点数 = 攻击点数，无事发生 */
+  MUTUAL_HIT: 'MUTUAL_HIT',                  // 侥幸
+  /** 一方蓄势，另一方守备或闪避 */
+  FULLNESS: 'FULLNESS',                       // 盈势
+  /** 无法归入常规情形的特殊操作（如蓄力技能等） */
+  OTHER: 'OTHER',                             // 其它
+  /** 双方都开启洞察，回合直接结束 */
+  INSIGHT_CLASH: 'INSIGHT_CLASH',             // 识破
+  /** 行动落空（无意义的行为组合） */
+  WASTED_ACTION: 'WASTED_ACTION',             // 落空
 });
 
 /** 情形的中文名称 */
 export const ClashName = Object.freeze({
   [Clash.MUTUAL_STANDBY]: '相持',
   [Clash.ONE_SIDE_ATTACK]: '遇袭',
-  [Clash.CONFRONT]: '对峙',
-  [Clash.PREEMPT]: '抢攻',
+  [Clash.CONFRONT]: '交击',
+  [Clash.PREEMPT]: '错击',
   [Clash.SUPPRESS]: '压制',
   [Clash.EXECUTE]: '处决',
-  [Clash.ACCUMULATE]: '蓄势',
+  [Clash.STABILITY]: '安定',
   [Clash.INTERRUPT]: '截杀',
   [Clash.RETREAT]: '退让',
   [Clash.PROBE]: '试探',
-  [Clash.RAID]: '突袭',
-  [Clash.FORTIFY]: '坚固',
-  [Clash.BREAK]: '破势',
+  [Clash.RAID]: '突击',
+  [Clash.FORTIFY]: '稳固',
+  [Clash.BREAK]: '破甲',
   [Clash.SWIFT_STRIKE]: '迅攻',
-  [Clash.EVADE]: '规避',
-  [Clash.DODGE_OUTMANEUVERED]: '虚步',
-  [Clash.ATTACK_OVERPOWERS]: '强突',
+  [Clash.EVADE]: '迅闪',
+  [Clash.DODGE_OUTMANEUVERED]: '规避',
+  [Clash.ATTACK_OVERPOWERS]: '阔击',
   [Clash.MUTUAL_HIT]: '侥幸',
+  [Clash.FULLNESS]: '盈势',
   [Clash.OTHER]: '其它',
   [Clash.INSIGHT_CLASH]: '识破',
   [Clash.WASTED_ACTION]: '落空',
@@ -190,9 +193,11 @@ export const Phase = Object.freeze({
 
 /** 玩家初始属性 */
 export const DefaultStats = Object.freeze({
-  MAX_HP: 3, // 命数上限
-  MAX_STAMINA: 3, // 精力上限
-  BASE_SPEED: 1, // 基础动速
+  MAX_HP: 3,      // 命数上限
+  MAX_STAMINA: 3,  // 精力上限
+  BASE_SPEED: 1,   // 基础动速
+  MAX_PTS: 3,      // 行为点数上限（攻击/守备/闪避）
+  MIN_PTS: 0,      // 行为点数下限
 });
 
 // ─────────────────────────────────────────────
@@ -347,7 +352,6 @@ export const EffectId = Object.freeze({
   AGILITY: 'agility',
   AFTERIMAGE: 'afterimage',
   MOMENTUM: 'momentum',
-  SIDE_STEP: 'side_step',
   DISARM: 'disarm',
   DEPRESS: 'depress',
   HIDE: 'hide',

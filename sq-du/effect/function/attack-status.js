@@ -1,15 +1,15 @@
 'use strict';
 
-import { Action, EffectId } from '../base/constants.js';
+import { Action, EffectId } from '../../base/constants.js';
 import { createStatusEffect } from './status-factory.js';
 
 export const PowerEffect = createStatusEffect({
-  id: EffectId.WOUND,
+  id: EffectId.POWER,
   name: '力量',
   desc: '本回合行动期开始时攻击点数 +1',
   applicableTo: [Action.ATTACK],
   apply(state) {
-    state.ptsDebuff = Math.max(0, (state.ptsDebuff || 0) - 1);
+    state.chargeBoost = (state.chargeBoost || 0) + 1;
   },
 });
 

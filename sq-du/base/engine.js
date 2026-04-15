@@ -131,14 +131,36 @@ function createPlayerState(id, overrides = {}) {
     effectIntel: [],                              // 已获取的敌方效果情报
     speedDiscountSpent: 0,                        // 本回合因提速消耗的 discount 计数（用于精确归还）
     actionDiscountSpent: 0,                       // 本回合因行动成本消耗的 discount 计数（用于精确归还）
-    insightDebuff: 0,                             // 洞察减益（洞察成本额外 +X）
-    staminaOverflow: 0,                           // 精力正溢出：下回合精力消耗 -X
-    staminaDebuff: 0,                             // 精力负溢出：下回合精力消耗 +X
-    hpOverflow: 0,                                // 命数正溢出：下回合开始命数 +X
-    hpDebuff: 0,                                  // 命数负溢出：本回合行动期结束命数 -X
-    restRecoverBonus: 0,                          // 蓄气恢复加值（下回合在 ACTION_START 生效）
-    restRecoverPenalty: 0,                        // 蓄气恢复减值（下回合在 ACTION_START 生效）
-    agilityDebuff: 0,                             // 动速减益（负溢出递延）
+    insightDebuff: 0,                             // 洞察成本修正（正=增加消耗，负=减少消耗）
+    // ── 溢出字段（由 overflow-manager 每回合结算后填充，下回合开始时消费） ──
+    hpOverflow: 0,                                // 命数正溢出
+    hpUnderflow: 0,                               // 命数负溢出
+    staminaOverflow: 0,                           // 精力正溢出
+    staminaUnderflow: 0,                          // 精力负溢出
+    staminaDebuff: 0,                             // 精力消耗增加（兼容旧逻辑）
+    speedOverflow: 0,                             // 动速正溢出
+    speedUnderflow: 0,                            // 动速负溢出
+    attackPtsOverflow: 0,                         // 攻击点数正溢出
+    attackPtsUnderflow: 0,                        // 攻击点数负溢出
+    guardPtsOverflow: 0,                          // 守备点数正溢出
+    guardPtsUnderflow: 0,                         // 守备点数负溢出
+    dodgePtsOverflow: 0,                          // 闪避点数正溢出
+    dodgePtsUnderflow: 0,                         // 闪避点数负溢出
+    hpBonusNextTurn: 0,                           // 旧兼容：命数正溢出
+    hpDrain: 0,                                   // 旧兼容：持续伤害
+    hpDebuff: 0,                                  // 旧兼容：命数负溢出
+    restRecoverBonus: 0,                          // 蓄气恢复加值
+    restRecoverPenalty: 0,                        // 蓄气恢复减值
+    agilityDebuff: 0,                             // 动速减益
+    agilityBoost: 0,                              // 动速增益
+    chargeBoost: 0,                               // 攻击点数增益
+    ptsDebuff: 0,                                 // 攻击点数减益
+    guardBoost: 0,                                // 守备点数增益
+    guardDebuff: 0,                               // 守备点数减益
+    dodgeBoost: 0,                                // 闪避点数增益
+    dodgeDebuff: 0,                               // 闪避点数减益
+    staminaPenalty: 0,                            // 精力消耗增加
+    staminaDiscount: 0,                           // 精力消耗减少
     insightBlocked: false,                        // 本回合禁洞察
     insightBlockNextTurn: false,                  // 下回合禁洞察预约
     redecideBlocked: false,                       // 本回合禁重筹
@@ -157,6 +179,7 @@ function createPlayerState(id, overrides = {}) {
       [Action.GUARD]: [false, false, false],
       [Action.DODGE]: [false, false, false],
     },
+    pendingEffects: [],                           // 待触发效果队列
     ...overrides,
   };
 }
@@ -698,14 +721,25 @@ export class BattleEngine {
         p.speed = DefaultStats.BASE_SPEED;
         p.actionCtx = createActionCtx(Action.STANDBY);
 
-        // 命数正溢出：将上一回合因回血超过上限而预存的觔加命数应用到本回合开始
-        if (p.hpBonusNextTurn > 0) {
-          p.hp = Math.min(DefaultStats.MAX_HP, (p.hp || 0) + p.hpBonusNextTurn);
-          p.hpBonusNextTurn = 0;
-        }
-        // 精力溢出字段每回合开始重置（应由本回合事件重新填充）
+        // 溢出字段每回合开始重置
+        // （上回合溢出已由 overflow-manager 转化为 pendingEffects，
+        //  将在 TURN_START_PHASE 时机由 EffectTimingLayer 触发）
+        p.hpOverflow = 0;
+        p.hpUnderflow = 0;
         p.staminaOverflow = 0;
-        p.staminaDebuff   = 0;
+        p.staminaUnderflow = 0;
+        p.staminaDebuff = 0;
+        p.speedOverflow = 0;
+        p.speedUnderflow = 0;
+        p.attackPtsOverflow = 0;
+        p.attackPtsUnderflow = 0;
+        p.guardPtsOverflow = 0;
+        p.guardPtsUnderflow = 0;
+        p.dodgePtsOverflow = 0;
+        p.dodgePtsUnderflow = 0;
+        // 旧兼容字段清理
+        p.hpBonusNextTurn = 0;
+        p.hpDrain = 0;
       });
 
       this._emitPhaseEffectEvent(EngineEvent.TURN_START_PHASE, {});
@@ -1014,6 +1048,18 @@ export class BattleEngine {
     player.hpDebuff          = ns.hpDebuff          ?? 0;
     player.staminaOverflow   = ns.staminaOverflow   ?? 0;
     player.staminaDebuff     = ns.staminaDebuff     ?? 0;
+    // ── 溢出字段 ──
+    player.hpOverflow        = ns.hpOverflow        ?? 0;
+    player.hpUnderflow       = ns.hpUnderflow       ?? 0;
+    player.staminaUnderflow  = ns.staminaUnderflow  ?? 0;
+    player.speedOverflow     = ns.speedOverflow     ?? 0;
+    player.speedUnderflow    = ns.speedUnderflow    ?? 0;
+    player.attackPtsOverflow  = ns.attackPtsOverflow  ?? 0;
+    player.attackPtsUnderflow = ns.attackPtsUnderflow ?? 0;
+    player.guardPtsOverflow   = ns.guardPtsOverflow   ?? 0;
+    player.guardPtsUnderflow  = ns.guardPtsUnderflow  ?? 0;
+    player.dodgePtsOverflow   = ns.dodgePtsOverflow   ?? 0;
+    player.dodgePtsUnderflow  = ns.dodgePtsUnderflow  ?? 0;
     // 效果队列：从结算包裹写回真实玩家对象，确保 onPost 排队的效果不丢失
     player.pendingEffects    = Array.isArray(ns.pendingEffects) ? [...ns.pendingEffects] : (player.pendingEffects || []);
   }

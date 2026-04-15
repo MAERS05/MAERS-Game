@@ -6,6 +6,7 @@ import {
   DefaultStats,
   calcActionCost
 } from '../base/constants.js';
+import { collectOverflows } from '../effect/function/overflow-manager.js';
 
 // 内部常量：时间轴事件类型
 export const EvtType = Object.freeze({
@@ -125,34 +126,51 @@ export class JudgeLayer {
   static _resolveSingleAttack(attack, bs, log) {
     const target = bs[attack.targetId];
 
+    // ── 闪避判定 ──
     if (target.evasions.length > 0) {
       const best = target.evasions.reduce((b, e) => e.speed > b.speed ? e : b);
 
       if (best.speed > attack.speed) {
+        // 迅闪：闪避速度 > 攻击速度
         log.push({ kind: 'EVADE', attackerId: attack.actorId, dodgerId: attack.targetId, atkSpeed: attack.speed, dodgeSpeed: best.speed, dodgePts: best.pts, atkPts: attack.pts });
       } else if (best.speed < attack.speed) {
+        // 迅攻：闪避速度 < 攻击速度
         bs[attack.targetId].dmgReceived += 1;
         log.push({ kind: 'SWIFT_STRIKE', attackerId: attack.actorId, dodgerId: attack.targetId, atkSpeed: attack.speed, dodgeSpeed: best.speed, dodgePts: best.pts, atkPts: attack.pts });
       } else {
+        // 同速对比点数
         if (best.pts > attack.pts) {
+          // 规避：闪避点数 > 攻击点数
           log.push({ kind: 'DODGE_OUTMANEUVERED', attackerId: attack.actorId, dodgerId: attack.targetId, speed: best.speed, dodgePts: best.pts, atkPts: attack.pts });
         } else if (best.pts < attack.pts) {
+          // 阔击：闪避点数 < 攻击点数
           bs[attack.targetId].dmgReceived += 1;
           log.push({ kind: 'ATTACK_OVERPOWERS', attackerId: attack.actorId, dodgerId: attack.targetId, speed: best.speed, dodgePts: best.pts, atkPts: attack.pts });
         } else {
+          // 侥幸：同速同点数，无事发生（零伤害）
           log.push({ kind: 'MUTUAL_HIT', attackerId: attack.actorId, dodgerId: attack.targetId, speed: best.speed, dodgePts: best.pts, atkPts: attack.pts });
         }
       }
       return;
     }
 
+    // ── 守备判定：必须守备速度 ≥ 攻击速度 才能进入稳固/破甲，否则为突击 ──
     if (target.shields.length > 0) {
       const best = target.shields.reduce((b, s) => s.pts > b.pts ? s : b);
-      if (best.pts >= attack.pts) {
-        log.push({ kind: 'FORTIFY', attackerId: attack.actorId, defenderId: attack.targetId, shieldPts: best.pts, shieldSpeed: best.speed, atkPts: attack.pts, atkSpeed: attack.speed });
+      if (best.speed >= attack.speed) {
+        // 守备速度 ≥ 攻击速度
+        if (best.pts >= attack.pts) {
+          // 稳固：守备点数 ≥ 攻击点数
+          log.push({ kind: 'FORTIFY', attackerId: attack.actorId, defenderId: attack.targetId, shieldPts: best.pts, shieldSpeed: best.speed, atkPts: attack.pts, atkSpeed: attack.speed });
+        } else {
+          // 破甲：守备点数 < 攻击点数
+          bs[attack.targetId].dmgReceived += 1;
+          log.push({ kind: 'BREAK', attackerId: attack.actorId, defenderId: attack.targetId, shieldPts: best.pts, shieldSpeed: best.speed, atkPts: attack.pts, atkSpeed: attack.speed });
+        }
       } else {
+        // 突击：守备速度 < 攻击速度
         bs[attack.targetId].dmgReceived += 1;
-        log.push({ kind: 'BREAK', attackerId: attack.actorId, defenderId: attack.targetId, shieldPts: best.pts, shieldSpeed: best.speed, atkPts: attack.pts, atkSpeed: attack.speed });
+        log.push({ kind: 'RAID', attackerId: attack.actorId, defenderId: attack.targetId, shieldPts: best.pts, shieldSpeed: best.speed, atkPts: attack.pts, atkSpeed: attack.speed });
       }
       return;
     }
@@ -190,7 +208,7 @@ export class JudgeLayer {
       return this._zero(Clash.MUTUAL_STANDBY, `${prefix}战场陷入僵持——什么也没有发生。`);
 
     if (p1Act === Action.GUARD && p2Act === Action.GUARD)
-      return this._zero(Clash.ACCUMULATE, `${prefix}战场陷入僵持。`);
+      return this._zero(Clash.STABILITY, `${prefix}战场陷入僵持。`);
 
     if (p1Act === Action.DODGE && p2Act === Action.DODGE)
       return this._zero(Clash.RETREAT, `${prefix}互相后撤。`);
@@ -205,11 +223,15 @@ export class JudgeLayer {
     if (p2Act === Action.ATTACK && p1Act === Action.STANDBY)
       return this._withExecute(Clash.ONE_SIDE_ATTACK, `${prefix}敌方的攻击成功命中！`, rawDmgP1, rawDmgP2, p1State, p2State, p1EntryEffective, p2EntryEffective);
 
-    if (p1Act !== Action.ATTACK && p2Act === Action.STANDBY) {
-      return this._zero(Clash.WASTED_ACTION, `${prefix}行动毫无意义。`);
+    // ── 盈势：一方蓄势，另一方守备或闪避 ──
+    if ((p1Act === Action.STANDBY && (p2Act === Action.GUARD || p2Act === Action.DODGE)) ||
+        (p2Act === Action.STANDBY && (p1Act === Action.GUARD || p1Act === Action.DODGE))) {
+      return this._zero(Clash.FULLNESS, `${prefix}无事发生。【盈势】`);
     }
 
-    if (p2Act !== Action.ATTACK && p1Act === Action.STANDBY) {
+    // ── 落空：其他无意义组合 ──
+    if ((p1Act !== Action.ATTACK && p2Act === Action.STANDBY) ||
+        (p2Act !== Action.ATTACK && p1Act === Action.STANDBY)) {
       return this._zero(Clash.WASTED_ACTION, `${prefix}行动毫无意义。`);
     }
 
@@ -411,16 +433,16 @@ export class JudgeLayer {
     clash, clashDesc, damageToP1, damageToP2, executeP1, executeP2,
     p1ExposedEffects, p2ExposedEffects
   ) {
-    // 命数结算：检测 HP 青溢出和象鼻负溢出
+    // 命数结算
     const rawP1Hp = p1State.hp - damageToP1;
     const rawP2Hp = p2State.hp - damageToP2;
     const newP1Hp = Math.max(0, rawP1Hp);
     const newP2Hp = Math.max(0, rawP2Hp);
-    // 命数负溢出：象鼻伤害超过剩余命数时，过额部分转入 hpDrain，在下回合行动期开始时（类似创伤）额外扣除
+    // 命数负溢出：伤害超过剩余命数
     const p1HpOverkill = rawP1Hp < 0 ? -rawP1Hp : 0;
     const p2HpOverkill = rawP2Hp < 0 ? -rawP2Hp : 0;
 
-    // 命数正溢出（回血超上限）：过额部分到下一回合开始时 HP+1
+    // 命数正溢出（回血超上限）
     const rawP1HealedHp = (rawP1Hp < 0 ? 0 : rawP1Hp) + (p1State.hpBonus || 0);
     const p1HpOverflow = rawP1HealedHp > DefaultStats.MAX_HP ? rawP1HealedHp - DefaultStats.MAX_HP : 0;
     const finalP1Hp = Math.min(DefaultStats.MAX_HP, rawP1HealedHp);
@@ -428,13 +450,35 @@ export class JudgeLayer {
     const p2HpOverflow = rawP2HealedHp > DefaultStats.MAX_HP ? rawP2HealedHp - DefaultStats.MAX_HP : 0;
     const finalP2Hp = Math.min(DefaultStats.MAX_HP, rawP2HealedHp);
 
-    // 精力正溢出（staminaBonus 超过上限）：转为本回合行动成本 -1
+    // 精力结算
     const rawP1Stamina = p1State.stamina + (p1State.staminaBonus || 0);
     const newP1Stamina = Math.min(DefaultStats.MAX_STAMINA, Math.max(0, rawP1Stamina));
     const p1StaminaBonusOverflow = rawP1Stamina > DefaultStats.MAX_STAMINA ? rawP1Stamina - DefaultStats.MAX_STAMINA : 0;
+    const p1StaminaUnderflow = rawP1Stamina < 0 ? Math.abs(rawP1Stamina) : 0;
     const rawP2Stamina = p2State.stamina + (p2State.staminaBonus || 0);
     const newP2Stamina = Math.min(DefaultStats.MAX_STAMINA, Math.max(0, rawP2Stamina));
     const p2StaminaBonusOverflow = rawP2Stamina > DefaultStats.MAX_STAMINA ? rawP2Stamina - DefaultStats.MAX_STAMINA : 0;
+    const p2StaminaUnderflow = rawP2Stamina < 0 ? Math.abs(rawP2Stamina) : 0;
+
+    const p1NewState = this._buildPlayerNewState(p1State, finalP1Hp, newP1Stamina, p1StaminaBonusOverflow, p1HpOverkill, p1HpOverflow);
+    const p2NewState = this._buildPlayerNewState(p2State, finalP2Hp, newP2Stamina, p2StaminaBonusOverflow, p2HpOverkill, p2HpOverflow);
+
+    // ── 溢出管道：将所有溢出字段转化为下回合 pendingEffects ──
+    // 先写入从负溢出等中获取的字段
+    p1NewState.hpUnderflow = p1HpOverkill;
+    p1NewState.hpOverflow = p1HpOverflow;
+    p1NewState.staminaOverflow = (p1NewState.staminaOverflow || 0) + p1StaminaBonusOverflow;
+    p1NewState.staminaUnderflow = (p1NewState.staminaUnderflow || 0) + p1StaminaUnderflow;
+    // 攻击/守备/闪避/动速溢出字段已由 effect.js processPreEffects 填充
+
+    p2NewState.hpUnderflow = p2HpOverkill;
+    p2NewState.hpOverflow = p2HpOverflow;
+    p2NewState.staminaOverflow = (p2NewState.staminaOverflow || 0) + p2StaminaBonusOverflow;
+    p2NewState.staminaUnderflow = (p2NewState.staminaUnderflow || 0) + p2StaminaUnderflow;
+
+    // 统一收集溢出并转换为 pendingEffects
+    collectOverflows(p1NewState, turn);
+    collectOverflows(p2NewState, turn);
 
     return {
       turn, p1Action: { ...p1Ctx }, p2Action: { ...p2Ctx },
@@ -442,8 +486,8 @@ export class JudgeLayer {
       damageToP1, damageToP2, executeP1, executeP2,
       p1ExposedEffects, p2ExposedEffects,
       newState: {
-        p1: this._buildPlayerNewState(p1State, finalP1Hp, newP1Stamina, p1StaminaBonusOverflow, p1HpOverkill, p1HpOverflow),
-        p2: this._buildPlayerNewState(p2State, finalP2Hp, newP2Stamina, p2StaminaBonusOverflow, p2HpOverkill, p2HpOverflow),
+        p1: p1NewState,
+        p2: p2NewState,
       },
     };
   }

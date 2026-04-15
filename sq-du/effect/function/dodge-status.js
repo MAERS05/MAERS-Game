@@ -1,6 +1,6 @@
 'use strict';
 
-import { Action } from '../base/constants.js';
+import { Action } from '../../base/constants.js';
 import { createStatusEffect } from './status-factory.js';
 
 export const SideStepEffect = createStatusEffect({

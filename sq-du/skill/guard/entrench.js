@@ -1,7 +1,7 @@
 'use strict';
 
 import { Action, EffectId } from '../../base/constants.js';
-import { createSkillEffect } from '../../effect/skill-factory.js';
+import { createSkillEffect } from '../../effect/function/skill-factory.js';
 import { EffectLayer } from '../../main/effect.js';
 
 export const EntrenchEffect = createSkillEffect({

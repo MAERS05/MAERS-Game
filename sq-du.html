@@ -5,6 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>博弈战斗系统 UI 演示</title>
+  <link rel="icon" href="data:,">
   <link href="font/base/fonts.css" rel="stylesheet">
   <style>
     /* ─── CSS 变量 ────────────────────────────────── */
@@ -1825,7 +1826,7 @@
     <!-- 主动洞察 + 取消行动 -->
     <div class="insight-row">
       <button class="insight-btn" id="insightBtn">
-        <img src="sq-du/effect/eye.svg" style="width: 1.2em; height: 1.2em;">
+        <img src="sq-du/effect/ui/eye.svg" style="width: 1.2em; height: 1.2em;">
         洞察对方
       </button>
       <button class="cancel-action-btn" id="cancelActionBtn">✕ 取消行动</button>
@@ -1894,8 +1895,8 @@
     </div>
   </div>
 
-  <!-- ═══ 交互逻辑（由 sq-du/ui.js 负责） ═══ -->
-  <script type="module" src="./sq-du/ui.js"></script>
+  <!-- ═══ 交互逻辑（由 sq-du/main/ui.js 负责） ═══ -->
+  <script type="module" src="./sq-du/main/ui.js"></script>
 
   <style>
     #globalPauseBtn {

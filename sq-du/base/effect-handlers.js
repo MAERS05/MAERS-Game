@@ -12,12 +12,12 @@
  */
 
 import { EffectId } from './constants.js';
-import { SluggishEffect, RejuvenatedEffect, ExhaustedEffect, ExcitedEffect } from '../effect/energy.js';
-import { HeavyEffect, LightEffect, ShackledEffect, InsightfulEffect, DullEffect, BlindedEffect } from '../effect/combat-status.js';
-import { FortifiedEffect, WoundedEffect } from '../effect/combat-identity.js';
-import { PowerEffect, WeakEffect, BrokenBladeEffect, ChainlockEffect } from '../effect/attack-status.js';
-import { SolidEffect, CrackedArmorEffect, BrokenArmorEffect } from '../effect/defense-status.js';
-import { SideStepEffect, ClumsyEffect, ShackledDodgeEffect } from '../effect/dodge-status.js';
+import { SluggishEffect, RejuvenatedEffect, ExhaustedEffect, ExcitedEffect } from '../effect/function/energy.js';
+import { HeavyEffect, LightEffect, ShackledEffect, InsightfulEffect, DullEffect, BlindedEffect } from '../effect/function/combat-status.js';
+import { FortifiedEffect, WoundedEffect } from '../effect/function/combat-identity.js';
+import { PowerEffect, WeakEffect, BrokenBladeEffect, ChainlockEffect } from '../effect/function/attack-status.js';
+import { SolidEffect, CrackedArmorEffect, BrokenArmorEffect } from '../effect/function/defense-status.js';
+import { SideStepEffect, ClumsyEffect, ShackledDodgeEffect } from '../effect/function/dodge-status.js';
 
 // ── 攻击类效果 ──
 import { WoundEffect } from '../skill/attack/wound.js';

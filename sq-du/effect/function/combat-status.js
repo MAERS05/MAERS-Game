@@ -1,6 +1,6 @@
 'use strict';
 
-import { Action } from '../base/constants.js';
+import { Action } from '../../base/constants.js';
 import { createStatusEffect } from './status-factory.js';
 
 export const HeavyEffect = createStatusEffect({
@@ -39,7 +39,7 @@ export const InsightfulEffect = createStatusEffect({
   desc: '本回合洞察消耗精力 -1',
   applicableTo: [Action.STANDBY],
   apply(state) {
-    state.insightDebuff = Math.max(0, (state.insightDebuff || 0) + 1);
+    state.insightDebuff = Math.min(0, (state.insightDebuff || 0) - 1);
   },
 });
 
@@ -49,8 +49,7 @@ export const DullEffect = createStatusEffect({
   desc: '本回合洞察消耗精力 +1',
   applicableTo: [Action.STANDBY],
   apply(state) {
-    state.insightBlocked = state.insightBlocked || false;
-    state.insightPenalty = (state.insightPenalty || 0) + 1;
+    state.insightDebuff = (state.insightDebuff || 0) + 1;
   },
 });
 

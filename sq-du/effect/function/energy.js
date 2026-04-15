@@ -1,25 +1,33 @@
 'use strict';
 
-import { Action } from '../base/constants.js';
+import { Action, DefaultStats } from '../../base/constants.js';
 import { createStatusEffect } from './status-factory.js';
 
 export const SluggishEffect = createStatusEffect({
   id: 'sluggish',
   name: '萎靡',
-  desc: '下回合开始时精力 -1',
+  desc: '精力 -1',
   applicableTo: [Action.STANDBY],
   apply(state) {
-    state.staminaDebuff = (state.staminaDebuff || 0) + 1;
+    if ((state.stamina || 0) > 0) {
+      state.stamina--;
+    } else {
+      state.staminaUnderflow = (state.staminaUnderflow || 0) + 1;
+    }
   },
 });
 
 export const RejuvenatedEffect = createStatusEffect({
   id: 'rejuvenated',
   name: '振奋',
-  desc: '下回合开始时精力 +1',
+  desc: '精力 +1',
   applicableTo: [Action.STANDBY],
   apply(state) {
-    state.staminaOverflow = Math.max(0, (state.staminaOverflow || 0) + 1);
+    if ((state.stamina || 0) < DefaultStats.MAX_STAMINA) {
+      state.stamina = (state.stamina || 0) + 1;
+    } else {
+      state.staminaOverflow = (state.staminaOverflow || 0) + 1;
+    }
   },
 });
 

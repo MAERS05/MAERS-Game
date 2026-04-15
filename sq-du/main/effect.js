@@ -12,6 +12,7 @@ import {
 } from '../base/constants.js';
 import { EffectTimingLayer } from '../effect/timing.js';
 import { EffectHandlers } from '../base/effect-handlers.js';
+import { clampPts } from '../effect/function/overflow-manager.js';
 
 export class EffectLayer {
   static canExposeOpponentRuntime(observer, opponent, unlocked = false) {
@@ -67,6 +68,15 @@ export class EffectLayer {
         this._applyActionStartHpDrain(p2);
       }
     }
+
+    // 行动期结束后、结算期开始前：所有效果 n 值向 0 衰减 1
+    if (phaseEvent === EngineEvent.ACTION_END) {
+      const p1 = players?.[PlayerId.P1];
+      const p2 = players?.[PlayerId.P2];
+      if (p1) this.decayAllStatusEffects(p1);
+      if (p2) this.decayAllStatusEffects(p2);
+    }
+
     EffectTimingLayer.dispatch(phaseEvent, payload, players, engine);
   }
 
@@ -93,69 +103,54 @@ export class EffectLayer {
       }
     }
 
-    if (cp1.action === Action.ATTACK && p1State.chargeBoost) {
-      cp1.pts += p1State.chargeBoost;
-    }
-    if (cp2.action === Action.ATTACK && p2State.chargeBoost) {
-      cp2.pts += p2State.chargeBoost;
-    }
-
+    // ── 攻击点数：应用力量(chargeBoost)和虚弱(ptsDebuff) ──
     if (cp1.action === Action.ATTACK) {
-      const raw = (cp1.pts || 0) - (p1State.ptsDebuff || 0);
-      cp1.pts = Math.max(0, raw);
-      p1State.ptsDebuff = raw < 0 ? Math.abs(raw) : 0;
-    } else {
-      p1State.ptsDebuff = Math.max(0, (p1State.ptsDebuff || 0) - 1);
+      const raw = (cp1.pts || 0) + (p1State.chargeBoost || 0) - (p1State.ptsDebuff || 0);
+      cp1.pts = clampPts(raw, 'attackPtsOverflow', 'attackPtsUnderflow', p1State);
     }
-
     if (cp2.action === Action.ATTACK) {
-      const raw = (cp2.pts || 0) - (p2State.ptsDebuff || 0);
-      cp2.pts = Math.max(0, raw);
-      p2State.ptsDebuff = raw < 0 ? Math.abs(raw) : 0;
-    } else {
-      p2State.ptsDebuff = Math.max(0, (p2State.ptsDebuff || 0) - 1);
+      const raw = (cp2.pts || 0) + (p2State.chargeBoost || 0) - (p2State.ptsDebuff || 0);
+      cp2.pts = clampPts(raw, 'attackPtsOverflow', 'attackPtsUnderflow', p2State);
     }
 
+    // ── 守备点数：应用坚固(guardBoost)和碎甲(guardDebuff) ──
     if (cp1.action === Action.GUARD) {
       const raw = (cp1.pts || 0) + (p1State.guardBoost || 0) - (p1State.guardDebuff || 0);
-      cp1.pts = Math.max(0, raw);
-      p1State.guardDebuff = raw < 0 ? Math.abs(raw) : 0;
-    } else {
-      p1State.guardDebuff = Math.max(0, (p1State.guardDebuff || 0) - 1);
+      cp1.pts = clampPts(raw, 'guardPtsOverflow', 'guardPtsUnderflow', p1State);
     }
-
     if (cp2.action === Action.GUARD) {
       const raw = (cp2.pts || 0) + (p2State.guardBoost || 0) - (p2State.guardDebuff || 0);
-      cp2.pts = Math.max(0, raw);
-      p2State.guardDebuff = raw < 0 ? Math.abs(raw) : 0;
-    } else {
-      p2State.guardDebuff = Math.max(0, (p2State.guardDebuff || 0) - 1);
+      cp2.pts = clampPts(raw, 'guardPtsOverflow', 'guardPtsUnderflow', p2State);
     }
 
+    // ── 闪避点数：应用侧身(dodgeBoost)和僵硬(dodgeDebuff) ──
     if (cp1.action === Action.DODGE) {
       const raw = (cp1.pts || 0) + (p1State.dodgeBoost || 0) - (p1State.dodgeDebuff || 0);
-      cp1.pts = Math.max(0, raw);
-      p1State.dodgeDebuff = raw < 0 ? Math.abs(raw) : 0;
-    } else {
-      p1State.dodgeDebuff = Math.max(0, (p1State.dodgeDebuff || 0) - 1);
+      cp1.pts = clampPts(raw, 'dodgePtsOverflow', 'dodgePtsUnderflow', p1State);
     }
-
     if (cp2.action === Action.DODGE) {
       const raw = (cp2.pts || 0) + (p2State.dodgeBoost || 0) - (p2State.dodgeDebuff || 0);
-      cp2.pts = Math.max(0, raw);
-      p2State.dodgeDebuff = raw < 0 ? Math.abs(raw) : 0;
-    } else {
-      p2State.dodgeDebuff = Math.max(0, (p2State.dodgeDebuff || 0) - 1);
+      cp2.pts = clampPts(raw, 'dodgePtsOverflow', 'dodgePtsUnderflow', p2State);
     }
 
+    // ── 动速：应用轻盈(agilityBoost)和沉重(agilityDebuff) ──
     const p1SpeedRaw = (cp1.speed || DefaultStats.BASE_SPEED) + (p1State.agilityBoost || 0) - (p1State.agilityDebuff || 0);
-    cp1.speed = Math.max(0, p1SpeedRaw);
-    p1State.agilityDebuff = p1SpeedRaw < 0 ? Math.abs(p1SpeedRaw) : 0;
+    if (p1SpeedRaw > 0) {
+      cp1.speed = p1SpeedRaw;
+    } else {
+      cp1.speed = 0;
+      p1State.speedUnderflow = (p1State.speedUnderflow || 0) + Math.abs(p1SpeedRaw);
+    }
 
     const p2SpeedRaw = (cp2.speed || DefaultStats.BASE_SPEED) + (p2State.agilityBoost || 0) - (p2State.agilityDebuff || 0);
-    cp2.speed = Math.max(0, p2SpeedRaw);
-    p2State.agilityDebuff = p2SpeedRaw < 0 ? Math.abs(p2SpeedRaw) : 0;
+    if (p2SpeedRaw > 0) {
+      cp2.speed = p2SpeedRaw;
+    } else {
+      cp2.speed = 0;
+      p2State.speedUnderflow = (p2State.speedUnderflow || 0) + Math.abs(p2SpeedRaw);
+    }
 
+    // ── 消费本回合一次性 boost/debuff（已应用到 pts/speed，清零等待衰减填充下回合） ──
     p1State.chargeBoost = 0;
     p1State.guardBoost = 0;
     p1State.dodgeBoost = 0;
@@ -174,6 +169,28 @@ export class EffectLayer {
       p1TriggeredEffects: this._collectTriggeredEffects(cp1),
       p2TriggeredEffects: this._collectTriggeredEffects(cp2),
     };
+  }
+
+  /**
+   * 统一效果衰减：行动期结束后、结算期开始前
+   * 所有带 n 值的效果字段向 0 衰减 1，直到为 0 消失
+   */
+  static decayAllStatusEffects(state) {
+    if (!state) return;
+    const decayFields = [
+      'ptsDebuff', 'chargeBoost',
+      'guardBoost', 'guardDebuff',
+      'dodgeBoost', 'dodgeDebuff',
+      'agilityBoost', 'agilityDebuff',
+      'staminaPenalty', 'staminaDiscount',
+      'insightDebuff',
+      'restRecoverBonus', 'restRecoverPenalty',
+    ];
+    for (const field of decayFields) {
+      const val = state[field] || 0;
+      if (val > 0) state[field] = val - 1;
+      else if (val < 0) state[field] = val + 1;
+    }
   }
 
   static _rewriteBlockedAction(ctx, state) {
@@ -251,7 +268,7 @@ export class EffectLayer {
     const failByClash = new Set([
       Clash.MUTUAL_STANDBY,
       Clash.CONFRONT,
-      Clash.ACCUMULATE,
+      Clash.STABILITY,
       Clash.RETREAT,
       Clash.PROBE,
       Clash.EVADE,
@@ -259,6 +276,7 @@ export class EffectLayer {
       Clash.MUTUAL_HIT,
       Clash.INSIGHT_CLASH,
       Clash.WASTED_ACTION,
+      Clash.FULLNESS,
     ]);
 
     if (failByClash.has(clash)) {

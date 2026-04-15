@@ -1,7 +1,7 @@
 'use strict';
 
 import { Action } from '../../base/constants.js';
-import { createSkillEffect } from '../../effect/skill-factory.js';
+import { createSkillEffect } from '../../effect/function/skill-factory.js';
 
 export const Restore = createSkillEffect({
   id: 'restore',
