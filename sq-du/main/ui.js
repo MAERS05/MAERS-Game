@@ -115,6 +115,7 @@ const ui = {
   effectPicker: $('effectPicker'),
   effectPickerClose: $('effectPickerClose'),
   effectPickerList: $('effectPickerList'),
+  pickerBackdrop: $('pickerBackdrop'),
   // 全局控制
   globalPauseBtn: $('globalPauseBtn'),
   // 阶段显示
@@ -136,6 +137,7 @@ let matchHistory = [];    // 战事录
 let isGameOver = false;
 let pendingInsightAction = null; // 主动洞察结果，等对方就绪后才揭示
 let enemyInfoUnlocked = false;    // 本回合是否已通过洞察解锁敌方就绪后信息
+let _pickerScrollPos = {};        // 各行动技能表的滚动位置记忆（key: action）
 let enemyFogState = {
   hp: 3, // 默认初始命数
   stamina: 3, // 默认初始精力
@@ -1149,7 +1151,6 @@ function refreshEquipSlots() {
 /** 打开效果库弹窗，供指定 (action, slot) 选择 */
 function openEffectPicker(action, slot) {
   _pickCtx = { action, slot };
-  ui.effectPickerList.scrollTop = 0; // 切换动作或槽位时，重置列表滚动位置
   ui.effectPickerList.innerHTML = '';
 
   const snap = engine.getSnapshot();
@@ -1180,8 +1181,7 @@ function openEffectPicker(action, slot) {
 
     item.addEventListener('click', () => {
       engine.assignEffect(PlayerId.P1, action, slot, effectId);
-      ui.effectPicker.classList.remove('show');
-      _pickCtx = null;
+      closePicker();
       refreshEquipSlots();
     });
 
@@ -1194,20 +1194,29 @@ function openEffectPicker(action, slot) {
   clearItem.innerHTML = `<div class="effect-item-main"><div class="effect-item-name" style="color:#64748b">清空此槽</div></div>`;
   clearItem.addEventListener('click', () => {
     engine.assignEffect(PlayerId.P1, action, slot, null);
-    ui.effectPicker.classList.remove('show');
-    _pickCtx = null;
+    closePicker();
     refreshEquipSlots();
   });
   ui.effectPickerList.appendChild(clearItem);
 
   ui.effectPicker.classList.add('show');
+  ui.pickerBackdrop.classList.add('show');
+  // 恢复或重置滚动位置：同行动保留记忆，切换行动时回到顶部
+  ui.effectPickerList.scrollTop = _pickerScrollPos[action] ?? 0;
+}
+
+// 关闭技能表帆(封装成函数方便复用)
+function closePicker() {
+  if (_pickCtx?.action) _pickerScrollPos[_pickCtx.action] = ui.effectPickerList.scrollTop;
+  ui.effectPicker.classList.remove('show');
+  ui.pickerBackdrop.classList.remove('show');
+  _pickCtx = null;
 }
 
 // 效果库关闭按钮
-ui.effectPickerClose.addEventListener('click', () => {
-  ui.effectPicker.classList.remove('show');
-  _pickCtx = null;
-});
+ui.effectPickerClose.addEventListener('click', closePicker);
+// 点击遗罩关闭（不传回结果）
+ui.pickerBackdrop.addEventListener('click', closePicker);
 
 // 执行两个槽位的效果互换
 function swapEffects(action, slotA, slotB) {

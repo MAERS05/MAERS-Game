@@ -336,33 +336,33 @@ export const EffectId = Object.freeze({
   CRACKED_ARMOR: 'cracked_armor',
   BROKEN_ARMOR: 'broken_armor',
   SIDE_STEP: 'side_step',
-  BODY_SIDE: 'body-side',
+  LIGHTFOOT: 'lightfoot',
   CLUMSY: 'clumsy',
   SHACKLED_DODGE: 'shackled_dodge',
   // ── 既有效果 ──
-  WOUND: 'wound',
+  REND: 'rend',
   BREAK_QI: 'break_qi',
   CHARGE: 'charge',
   POUNCE: 'pounce',
   RECKLESS: 'reckless',
-  ENERGIZE: 'energize',
-  ABSORB: 'absorb',
+  CAUTIOUS: 'cautious',
+  DRAIN: 'drain',
   CHAINLOCK: 'chainlock',
-  MONBLINDING: 'monblinding',
-  AURA_SHIELD: 'aura_shield',
-  DEFLECT: 'deflect',
-  ENTRENCH: 'entrench',
+  OBSCURE: 'obscure',
+  BLOOD_SHIELD: 'blood_shield',
+  REDIRECT: 'redirect',
+  BASTION: 'bastion',
   IRON_WALL: 'iron_wall',
-  PHALANX: 'phalanx',
-  INSPIRE: 'inspire',
-  PARALYSIS: 'paralysis',
+  RIGID: 'rigid',
+  ABSORB_QI: 'absorb_qi',
+  INTERCEPT: 'intercept',
   RESTORE: 'restore',
-  SHATTER: 'shatter',
+  SHOCKWAVE: 'shockwave',
   AGILITY: 'agility',
-  AFTERIMAGE: 'afterimage',
+  ABANDON: 'abandon',
   MOMENTUM: 'momentum',
   DISARM: 'disarm',
-  DEPRESS: 'depress',
+  DISRUPT: 'disrupt',
   HIDE: 'hide',
   LURE: 'lure',
   SEE_THROUGH: 'see-through',
@@ -386,8 +386,8 @@ export const EffectId = Object.freeze({
  * 目前保留空壳结构，引擎按 EffectId 分支处理时若找不到定义则跳过。
  */
 export const EffectDefs = Object.freeze({
-  [EffectId.WOUND]: {
-    id: EffectId.WOUND, name: '附伤',
+  [EffectId.REND]: {
+    id: EffectId.REND, name: '撕裂',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.BREAK_QI]: {
@@ -407,41 +407,41 @@ export const EffectDefs = Object.freeze({
     id: EffectId.RECKLESS, name: '舍身',
     applicableTo: [Action.ATTACK],
   },
-  [EffectId.ENERGIZE]: {
-    id: EffectId.ENERGIZE, name: '蓄能',
+  [EffectId.CAUTIOUS]: {
+    id: EffectId.CAUTIOUS, name: '谨慎',
     applicableTo: [Action.ATTACK],
   },
-  [EffectId.AURA_SHIELD]: {
-    id: EffectId.AURA_SHIELD, name: '御气',
+  [EffectId.BLOOD_SHIELD]: {
+    id: EffectId.BLOOD_SHIELD, name: '血盾',
     applicableTo: [Action.GUARD],
     hpCost: 1,
   },
-  [EffectId.DEFLECT]: {
-    id: EffectId.DEFLECT, name: '卸力',
+  [EffectId.REDIRECT]: {
+    id: EffectId.REDIRECT, name: '化劲',
     applicableTo: [Action.GUARD],
   },
-  [EffectId.ENTRENCH]: {
-    id: EffectId.ENTRENCH, name: '固守',
+  [EffectId.BASTION]: {
+    id: EffectId.BASTION, name: '磐石',
     applicableTo: [Action.GUARD],
   },
   [EffectId.IRON_WALL]: {
     id: EffectId.IRON_WALL, name: '铁壁',
     applicableTo: [Action.GUARD],
   },
-  [EffectId.PHALANX]: {
-    id: EffectId.PHALANX, name: '步阵',
+  [EffectId.RIGID]: {
+    id: EffectId.RIGID, name: '硬体',
     applicableTo: [Action.GUARD],
   },
-  [EffectId.INSPIRE]: {
-    id: EffectId.INSPIRE, name: '振奋',
+  [EffectId.ABSORB_QI]: {
+    id: EffectId.ABSORB_QI, name: '纳气',
     applicableTo: [Action.GUARD],
   },
   [EffectId.AGILITY]: {
     id: EffectId.AGILITY, name: '灵巧',
     applicableTo: [Action.DODGE],
   },
-  [EffectId.AFTERIMAGE]: {
-    id: EffectId.AFTERIMAGE, name: '残影',
+  [EffectId.ABANDON]: {
+    id: EffectId.ABANDON, name: '弃身',
     applicableTo: [Action.DODGE],
     hpCost: 1,
   },
@@ -449,40 +449,40 @@ export const EffectDefs = Object.freeze({
     id: EffectId.MOMENTUM, name: '借势',
     applicableTo: [Action.DODGE],
   },
-  [EffectId.BODY_SIDE]: {
-    id: EffectId.BODY_SIDE, name: '倾身',
+  [EffectId.LIGHTFOOT]: {
+    id: EffectId.LIGHTFOOT, name: '轻身',
     applicableTo: [Action.DODGE],
   },
   [EffectId.DISARM]: {
     id: EffectId.DISARM, name: '解甲',
     applicableTo: [Action.DODGE],
   },
-  [EffectId.DEPRESS]: {
-    id: EffectId.DEPRESS, name: '低落',
+  [EffectId.DISRUPT]: {
+    id: EffectId.DISRUPT, name: '乱心',
     applicableTo: [Action.DODGE],
   },
-  [EffectId.ABSORB]: {
-    id: EffectId.ABSORB, name: '吸收',
+  [EffectId.DRAIN]: {
+    id: EffectId.DRAIN, name: '汲取',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.CHAINLOCK]: {
     id: EffectId.CHAINLOCK, name: '锁链',
     applicableTo: [Action.ATTACK],
   },
-  [EffectId.MONBLINDING]: {
-    id: EffectId.MONBLINDING, name: '蒙蔽',
+  [EffectId.OBSCURE]: {
+    id: EffectId.OBSCURE, name: '障目',
     applicableTo: [Action.ATTACK],
   },
-  [EffectId.PARALYSIS]: {
-    id: EffectId.PARALYSIS, name: '麻痹',
+  [EffectId.INTERCEPT]: {
+    id: EffectId.INTERCEPT, name: '截脉',
     applicableTo: [Action.GUARD],
   },
   [EffectId.RESTORE]: {
     id: EffectId.RESTORE, name: '恢复',
     applicableTo: [Action.GUARD],
   },
-  [EffectId.SHATTER]: {
-    id: EffectId.SHATTER, name: '震碎',
+  [EffectId.SHOCKWAVE]: {
+    id: EffectId.SHOCKWAVE, name: '崩震',
     applicableTo: [Action.GUARD],
   },
   [EffectId.HIDE]: {

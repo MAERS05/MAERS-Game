@@ -102,22 +102,22 @@ export class AIExtraLayer {
         : -5,
       [EffectId.POUNCE]: action === Action.ATTACK ? (playerLowHp ? 2.4 : 1.5) : -5,
       [EffectId.RECKLESS]: action === Action.ATTACK ? (playerLowHp ? 2.0 : 1.0) : -5,
-      [EffectId.ENERGIZE]: action === Action.ATTACK ? (playerLowStamina ? 0.6 : 1.4) : -5,
-      [EffectId.WOUND]: action === Action.ATTACK ? (playerLowStamina ? 0.8 : 1.8) : -5,
+      [EffectId.CAUTIOUS]: action === Action.ATTACK ? (playerLowStamina ? 0.6 : 1.4) : -5,
+      [EffectId.REND]: action === Action.ATTACK ? (playerLowStamina ? 0.8 : 1.8) : -5,
 
-      [EffectId.AURA_SHIELD]: action === Action.GUARD ? (aiLowHp ? 2.2 : 0.8) : -5,
-      [EffectId.DEFLECT]: action === Action.GUARD ? 1.8 : -5,
-      [EffectId.ENTRENCH]: action === Action.GUARD ? 1.2 : -5,
+      [EffectId.BLOOD_SHIELD]: action === Action.GUARD ? (aiLowHp ? 2.2 : 0.8) : -5,
+      [EffectId.REDIRECT]: action === Action.GUARD ? 1.8 : -5,
+      [EffectId.BASTION]: action === Action.GUARD ? 1.2 : -5,
       [EffectId.IRON_WALL]: action === Action.GUARD ? 1.4 : -5,
-      [EffectId.PHALANX]: action === Action.GUARD ? 1.3 : -5,
-      [EffectId.INSPIRE]: action === Action.GUARD ? (ai.stamina <= 2 ? 2.5 : 1.1) : -5,
+      [EffectId.RIGID]: action === Action.GUARD ? 1.3 : -5,
+      [EffectId.ABSORB_QI]: action === Action.GUARD ? (ai.stamina <= 2 ? 2.5 : 1.1) : -5,
 
       [EffectId.AGILITY]: action === Action.DODGE ? 1.4 : -5,
-      [EffectId.AFTERIMAGE]: action === Action.DODGE ? (aiLowHp ? 0.4 : 1.5) : -5,
+      [EffectId.ABANDON]: action === Action.DODGE ? (aiLowHp ? 0.4 : 1.5) : -5,
       [EffectId.MOMENTUM]: action === Action.DODGE ? (ai.stamina <= 2 ? 2.6 : 1.3) : -5,
-      [EffectId.SIDE_STEP]: action === Action.DODGE ? 1.1 : -5,
+      [EffectId.LIGHTFOOT]: action === Action.DODGE ? 1.1 : -5,
       [EffectId.DISARM]: action === Action.DODGE ? 1.3 : -5,
-      [EffectId.DEPRESS]: action === Action.DODGE ? (playerLowStamina ? 0.5 : 1.9) : -5,
+      [EffectId.DISRUPT]: action === Action.DODGE ? (playerLowStamina ? 0.5 : 1.9) : -5,
     };
 
     let total = score + (byId[id] ?? 0);

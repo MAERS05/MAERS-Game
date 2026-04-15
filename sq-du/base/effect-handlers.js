@@ -20,34 +20,34 @@ import { SolidEffect, CrackedArmorEffect, BrokenArmorEffect } from '../effect/fu
 import { SideStepEffect, ClumsyEffect, ShackledDodgeEffect } from '../effect/function/dodge-status.js';
 
 // ── 攻击类效果 ──
-import { InflictEffect } from '../skill/attack/inflict.js';
+import { RendEffect } from '../skill/attack/rend.js';
 import { BreakQiEffect } from '../skill/attack/break_qi.js';
 import { ChargeEffect } from '../skill/attack/charge.js';
 import { PounceEffect } from '../skill/attack/pounce.js';
 import { RecklessEffect } from '../skill/attack/reckless.js';
-import { EnergizeEffect } from '../skill/attack/energize.js';
-import { Absorb } from '../skill/attack/absorb.js';
+import { CautiousEffect } from '../skill/attack/cautious.js';
+import { DrainEffect } from '../skill/attack/drain.js';
 import { ChainLock } from '../skill/attack/chainlock.js';
-import { Monblinding } from '../skill/attack/monblinding.js';
+import { ObscureEffect } from '../skill/attack/obscure.js';
 
 // ── 守备类效果 ──
-import { AuraShieldEffect } from '../skill/guard/aura_shield.js';
-import { DeflectEffect } from '../skill/guard/deflect.js';
-import { EntrenchEffect } from '../skill/guard/entrench.js';
+import { BloodShieldEffect } from '../skill/guard/blood_shield.js';
+import { RedirectEffect } from '../skill/guard/redirect.js';
+import { BastionEffect } from '../skill/guard/bastion.js';
 import { IronWallEffect } from '../skill/guard/iron_wall.js';
-import { PhalanxEffect } from '../skill/guard/phalanx.js';
-import { InspireEffect } from '../skill/guard/inspire.js';
-import { Paralysis } from '../skill/guard/paralysis.js';
+import { RigidEffect } from '../skill/guard/rigid.js';
+import { AbsorbQiEffect } from '../skill/guard/absorb_qi.js';
+import { InterceptEffect } from '../skill/guard/intercept.js';
 import { Restore } from '../skill/guard/restore.js';
-import { Shatter } from '../skill/guard/shatter.js';
+import { ShockwaveEffect } from '../skill/guard/shockwave.js';
 
 // ── 闪避类效果 ──
 import { AgilityEffect } from '../skill/dodge/agility.js';
-import { AfterimageEffect } from '../skill/dodge/afterimage.js';
+import { AbandonEffect } from '../skill/dodge/abandon.js';
 import { MomentumEffect } from '../skill/dodge/momentum.js';
-import { SideStepEffect as BodySideEffect } from '../skill/dodge/body-side.js';
+import { LightfootEffect } from '../skill/dodge/lightfoot.js';
 import { DisarmEffect } from '../skill/dodge/disarm.js';
-import { DepressEffect } from '../skill/dodge/depress.js';
+import { DisruptEffect } from '../skill/dodge/disrupt.js';
 import { Hide } from '../skill/dodge/hide.js';
 import { Lure } from '../skill/dodge/lure.js';
 import { SeeThrough } from '../skill/dodge/see-through.js';
@@ -61,30 +61,30 @@ import { SeeThrough } from '../skill/dodge/see-through.js';
  *   onPhase(args)                              → void（阶段接口触发时机）
  */
 const RawEffectHandlers = {
-  [EffectId.WOUND]: InflictEffect,
+  [EffectId.REND]: RendEffect,
   [EffectId.BREAK_QI]: BreakQiEffect,
   [EffectId.CHARGE]: ChargeEffect,
-  [EffectId.AURA_SHIELD]: AuraShieldEffect,
-  [EffectId.DEFLECT]: DeflectEffect,
-  [EffectId.ENTRENCH]: EntrenchEffect,
+  [EffectId.BLOOD_SHIELD]: BloodShieldEffect,
+  [EffectId.REDIRECT]: RedirectEffect,
+  [EffectId.BASTION]: BastionEffect,
   [EffectId.AGILITY]: AgilityEffect,
-  [EffectId.AFTERIMAGE]: AfterimageEffect,
+  [EffectId.ABANDON]: AbandonEffect,
   [EffectId.MOMENTUM]: MomentumEffect,
-  [EffectId.BODY_SIDE]: BodySideEffect,
+  [EffectId.LIGHTFOOT]: LightfootEffect,
   [EffectId.DISARM]: DisarmEffect,
   [EffectId.IRON_WALL]: IronWallEffect,
-  [EffectId.PHALANX]: PhalanxEffect,
+  [EffectId.RIGID]: RigidEffect,
   [EffectId.POUNCE]: PounceEffect,
   [EffectId.RECKLESS]: RecklessEffect,
-  [EffectId.INSPIRE]: InspireEffect,
-  [EffectId.DEPRESS]: DepressEffect,
-  [EffectId.ENERGIZE]: EnergizeEffect,
-  [EffectId.ABSORB]: Absorb,
+  [EffectId.ABSORB_QI]: AbsorbQiEffect,
+  [EffectId.DISRUPT]: DisruptEffect,
+  [EffectId.CAUTIOUS]: CautiousEffect,
+  [EffectId.DRAIN]: DrainEffect,
   [EffectId.CHAINLOCK]: ChainLock,
-  [EffectId.MONBLINDING]: Monblinding,
-  [EffectId.PARALYSIS]: Paralysis,
+  [EffectId.OBSCURE]: ObscureEffect,
+  [EffectId.INTERCEPT]: InterceptEffect,
   [EffectId.RESTORE]: Restore,
-  [EffectId.SHATTER]: Shatter,
+  [EffectId.SHOCKWAVE]: ShockwaveEffect,
   [EffectId.HIDE]: Hide,
   [EffectId.LURE]: Lure,
   [EffectId.SEE_THROUGH]: SeeThrough,

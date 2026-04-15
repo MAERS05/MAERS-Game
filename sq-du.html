@@ -1484,6 +1484,20 @@
       display: block;
     }
 
+
+    /* 技能表模态遗罩 */
+    .picker-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 299;
+      cursor: default;
+    }
+    .picker-backdrop.show {
+      display: block;
+    }
+
     .effect-picker-header {
       display: flex;
       justify-content: space-between;
@@ -1820,6 +1834,8 @@
       </div>
     </div>
 
+    <!-- 技能表模态遗罩 -->
+    <div class="picker-backdrop" id="pickerBackdrop"></div>
     <!-- 效果库弹窗 -->
     <div class="effect-picker" id="effectPicker">
       <div class="effect-picker-header">
