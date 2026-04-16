@@ -1006,9 +1006,13 @@ function updateStatusIcons(playerId, state) {
 
       document.querySelectorAll('.status-tooltip').forEach(el => el.classList.remove('show'));
       const timingLabel = timingKey ? (EffectTimingLabel[timingKey] || timingKey) : null;
-      tooltip.textContent = timingLabel
-        ? `时机：${timingLabel} 效果：${effectText}`
-        : `效果：${effectText}`;
+      // 三段式：名称 / 效果 / 时机
+      const parts = effectText.split('：');
+      const effName = parts[0] || '';
+      const effDetail = parts.slice(1).join('：') || '';
+      tooltip.innerHTML = timingLabel
+        ? `<strong>${effName}</strong><br>效果：${effDetail}<br>时机：${timingLabel}`
+        : `<strong>${effName}</strong><br>效果：${effDetail}`;
       tooltip.classList.add('show');
 
       tooltip._timeoutId = setTimeout(() => {

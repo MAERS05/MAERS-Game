@@ -421,19 +421,25 @@
                 </div>
             </div>`;
 
-                // 绑定说明书按钮事件（直接拉取静态 txt 文件，无需后端）
+                // 绑定说明书按钮事件
                 const btn = el.querySelector('.manual-btn');
                 if (btn) {
                     btn.addEventListener('click', async (e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         try {
-                            const mdPath = `data/manuals/${encodeURIComponent(m.filename.replace(/\.html$/, '.txt'))}`;
-                            const res = await fetch(mdPath);
-                            const text = res.ok ? await res.text() : '';
-                            BriefModal.show(m.name, text);
+                            // 尝试通过 API 获取说明书分类列表
+                            const dir = m.filename.replace(/\.html$/, '');
+                            const res = await fetch(`/api/list-manuals?filename=${encodeURIComponent(m.filename)}`);
+                            if (res.ok) {
+                                const data = await res.json();
+                                BriefModal.show(m.name, m.filename, data.manuals || []);
+                            } else {
+                                // API 不可用时回退：尝试直接拉取旧路径
+                                BriefModal.show(m.name, m.filename, []);
+                            }
                         } catch (err) {
-                            BriefModal.show(m.name, '');
+                            BriefModal.show(m.name, m.filename, []);
                         }
                     });
                 }

@@ -803,47 +803,80 @@ export class BattleEngine {
 
     const p1 = this._players[PlayerId.P1];
     const p2 = this._players[PlayerId.P2];
+    // 行动精力消耗延迟到 ACTION_END 结算：
+    // 决策期 _reconcileActionCostDelta 已预扣精力（grossCost 分三部分：discount + stamina + debuff），
+    // 此处完整逆转，让 resolve 使用决策前的精力/折扣值
+    const p1Snap = { ...p1 };
+    const p2Snap = { ...p2 };
+    const calcGross = (ctx, penalty) =>
+      (!ctx || ctx.action === Action.STANDBY || ctx.action === Action.READY) ? 0 : 1 + (ctx.enhance || 0) + (penalty || 0);
+    // P1 逆转
+    const p1Gross = calcGross(p1.actionCtx, p1.staminaPenalty);
+    const p1DiscSpent = p1.actionDiscountSpent || 0;
+    const p1Debuff = p1.staminaDebuff || 0;  // staminaDebuff 在 _beginTurn 已重置为 0，此处值全是 reconcile 产生的
+    const p1StaDeducted = Math.max(0, p1Gross - p1DiscSpent - p1Debuff);
+    p1Snap.stamina = (p1.stamina || 0) + p1StaDeducted;
+    p1Snap.staminaDiscount = (p1.staminaDiscount || 0) + p1DiscSpent;
+    p1Snap.staminaDebuff = 0;  // debuff 是成本溢出产物，还原后不应存在
+    // P2 逆转
+    const p2Gross = calcGross(p2.actionCtx, p2.staminaPenalty);
+    const p2DiscSpent = p2.actionDiscountSpent || 0;
+    const p2Debuff = p2.staminaDebuff || 0;
+    const p2StaDeducted = Math.max(0, p2Gross - p2DiscSpent - p2Debuff);
+    p2Snap.stamina = (p2.stamina || 0) + p2StaDeducted;
+    p2Snap.staminaDiscount = (p2.staminaDiscount || 0) + p2DiscSpent;
+    p2Snap.staminaDebuff = 0;
     const result = resolve(
       p1.actionCtx ?? createActionCtx(),
       p2.actionCtx ?? createActionCtx(),
-      { ...p1 }, { ...p2 },
+      p1Snap, p2Snap,
       bothInsighted,
       this._turn
     );
 
-    this._applyResolveResult(result);
-    // 结算后立即同步状态到 UI，确保 onPre 产生的 hp/stamina 变化（如血盾的自伤）
-    // 在行动期开始时就可见，而不是延迟到 ACTION_END（3s 后）才刷新
+    // ── ACTION_START：消费 onPre 即时效果（delta 模式） ──
+    // 只应用 onPre 实际产生的变化量，不覆盖绝对值（避免退回的精力值误写入）
+    if (result._immediateState) {
+      const imm = result._immediateState;
+      if (imm.p1.hpDelta)      this._players[PlayerId.P1].hp      += imm.p1.hpDelta;
+      if (imm.p1.staminaDelta) this._players[PlayerId.P1].stamina += imm.p1.staminaDelta;
+      if (imm.p2.hpDelta)      this._players[PlayerId.P2].hp      += imm.p2.hpDelta;
+      if (imm.p2.staminaDelta) this._players[PlayerId.P2].stamina += imm.p2.staminaDelta;
+      // 写入闪烁标记
+      this._players[PlayerId.P1]._flashEffects = imm.p1._flashEffects || [];
+      this._players[PlayerId.P2]._flashEffects = imm.p2._flashEffects || [];
+      delete result._immediateState;
+    }
     this._bus.emit(EngineEvent.PHASE_STATE_SYNC, {
       phaseEvent: EngineEvent.ACTION_START,
       state: this.getSnapshot(),
     });
-    // 闪烁标记仅供本次 sync 读取一次，立即清除防止 ACTION_END 再次触发
     this._players[PlayerId.P1]._flashEffects = [];
     this._players[PlayerId.P2]._flashEffects = [];
     this._bus.emit(EngineEvent.ACTION_PHASE_START, {});
 
     setTimeout(() => {
       if (this._state !== EngineState.RESOLVING) return;
-      this._emitPhaseEffectEvent(EngineEvent.ACTION_END, {});
 
-      // ── 延迟后置处理：在行动期结束后、结算期开始前执行 onPost 效果 ──
-      // onPost 基于攻击/守备/闪避成败触发，必须在此时才暴露给 UI
+      // ── 1. 写入结算结果（hp/stamina/处决等资源变化在此时生效） ──
+      this._applyResolveResult(result);
+
+      // ── 2. 执行 onPost 效果（基于攻击/守备/闪避成败触发） ──
       if (result._postEffectData) {
         const d = result._postEffectData;
         EffectLayer.processPostEffects(
           d.p1CtxEff, d.p2CtxEff,
           this._players[PlayerId.P1], this._players[PlayerId.P2],
           d.p1TriggeredEffects, d.p2TriggeredEffects,
-          d.p1DmgReceived, d.p2DmgReceived
+          d.p1DmgReceived, d.p2DmgReceived,
+          result
         );
-        // 同步一次状态到 UI，让 onPost 产生的效果图标在此时可见
-        this._bus.emit(EngineEvent.PHASE_STATE_SYNC, {
-          phaseEvent: EngineEvent.ACTION_END,
-          state: this.getSnapshot(),
-        });
         delete result._postEffectData;
       }
+
+      // ── 3. ACTION_END：效果衰减 + EffectTimingLayer 消费 pendingEffects + PHASE_STATE_SYNC ──
+      // 必须在 _applyResolveResult 之后，否则 decay 会被 result 的值覆盖
+      this._emitPhaseEffectEvent(EngineEvent.ACTION_END, {});
 
       this._emitPhaseEffectEvent(EngineEvent.RESOLVE_START, {});
       this._bus.emit(EngineEvent.TURN_RESOLVED, result);
@@ -1028,6 +1061,9 @@ export class BattleEngine {
    * @param {import('./constants.js').ResolveResult} result
    */
   _applyResolveResult(result) {
+    // 闪烁标记已在 ACTION_START 阶段消费并同步给 UI，此处清除防止后续 PHASE_STATE_SYNC 重复闪烁
+    if (result.newState?.p1) result.newState.p1._flashEffects = [];
+    if (result.newState?.p2) result.newState.p2._flashEffects = [];
     this._applyPlayerResult(this._players[PlayerId.P1], result.newState.p1);
     this._applyPlayerResult(this._players[PlayerId.P2], result.newState.p2);
 
@@ -1252,6 +1288,9 @@ export class BattleEngine {
       phaseEvent,
       state: this.getSnapshot(),
     });
+    // 闪烁标记仅随当次同步发送一次，立即清除防止后续阶段重复显示
+    this._players[PlayerId.P1]._flashEffects = [];
+    this._players[PlayerId.P2]._flashEffects = [];
   }
 
   _emitExposeEndOnce(playerId) {

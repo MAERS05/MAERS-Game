@@ -11,7 +11,7 @@ import { DefaultStats, EngineEvent } from '../../base/constants.js';
  * 溢出规则：
  *  - 命数正溢出 → 下回合开始 旺盛(n)
  *  - 命数负溢出 → 下回合行动期后 创伤(n)
- *  - 精力正溢出 → 下回合开始 振奋(n)
+ *  - 精力正溢出 → 下回合开始 兴奋(n)
  *  - 精力负溢出 → 下回合开始 疲惫(n)
  *  - 动速正溢出 → 下回合开始 轻盈(n)
  *  - 动速负溢出 → 下回合开始 沉重(n)
@@ -42,7 +42,7 @@ const OVERFLOW_MAP = Object.freeze({
   stamina: {
     overflowField: 'staminaOverflow',
     underflowField: 'staminaUnderflow',
-    positiveEffect: 'rejuvenated',      // 振奋
+    positiveEffect: 'excited',          // 兴奋
     negativeEffect: 'exhausted',        // 疲惫
     positiveTiming: EngineEvent.TURN_START_PHASE,
     negativeTiming: EngineEvent.TURN_START_PHASE,

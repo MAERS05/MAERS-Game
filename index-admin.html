@@ -419,6 +419,88 @@
             min-height: 18px;
         }
 
+        /* ─── 说明书分类 Tab ─── */
+        .manual-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .manual-tab {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 6px 16px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-family: 'Noto Sans SC', sans-serif;
+            transition: all 0.2s;
+            letter-spacing: 0.5px;
+        }
+        .manual-tab:hover {
+            border-color: var(--border-hover);
+            color: var(--text-main);
+            background: rgba(255,255,255,0.08);
+        }
+        .manual-tab.active {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(245,158,11,0.08);
+        }
+        .manual-tab.dragging {
+            opacity: 0.5;
+            border-style: dashed;
+            border-color: var(--accent);
+        }
+        .manual-tab-add {
+            background: transparent;
+            border: 1px dashed var(--border);
+            color: var(--text-muted);
+            padding: 6px 14px;
+            cursor: pointer;
+            font-size: 1rem;
+            line-height: 1;
+            transition: all 0.2s;
+        }
+        .manual-tab-add:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        /* ─── Tab 右键菜单 ─── */
+        .tab-ctx-menu {
+            position: fixed;
+            z-index: 2000;
+            background: #0a0a0c;
+            border: 1px solid var(--border);
+            min-width: 120px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.8);
+            display: none;
+        }
+        .tab-ctx-menu.show { display: block; }
+        .tab-ctx-item {
+            display: block;
+            width: 100%;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 8px 16px;
+            font-size: 0.8rem;
+            font-family: 'Noto Sans SC', sans-serif;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .tab-ctx-item:hover {
+            background: rgba(255,255,255,0.06);
+            color: var(--text-main);
+        }
+        .tab-ctx-item.danger:hover {
+            color: #ef4444;
+        }
+
         @media (max-width: 768px) {
             header { flex-direction: column; align-items: flex-start; gap: 10px; }
             .sys-info { text-align: left; }
@@ -477,6 +559,10 @@
                 <label for="inputDesc">简介</label>
                 <textarea id="inputDesc" placeholder="一句话描述这个模块的内容…"></textarea>
             </div>
+            <div class="form-group" id="manualFieldGroup">
+                <label for="inputManual">游戏说明书 *</label>
+                <input type="text" id="inputManual" placeholder="例：基础机制" maxlength="64" autocomplete="off">
+            </div>
             <!-- 编辑模式下才显示的重命名选项 -->
             <div class="form-group" id="renameGroup" style="display:none;">
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -492,13 +578,23 @@
         </div>
     </div>
 
-    <!-- 独立说明书编辑弹窗 -->
+    <!-- Tab 右键菜单 -->
+    <div class="tab-ctx-menu" id="tabCtxMenu">
+        <button class="tab-ctx-item" id="ctxRenameManual">✎ 重命名</button>
+        <button class="tab-ctx-item danger" id="ctxDeleteManual">✕ 删除</button>
+    </div>
+
+    <!-- 独立说明书编辑弹窗（多分类 Tab） -->
     <div class="modal-overlay" id="manualOverlay">
         <div class="modal" style="width: 600px; max-width: 95%;">
-            <h3 id="manualModalTitle">// MANUAL EDITOR</h3>
+            <h3 id="manualModalTitle">// MANUALS</h3>
             <input type="hidden" id="manualFilename">
+            <div class="manual-tabs" id="manualTabs">
+                <!-- 动态生成分类按钮 -->
+                <button class="manual-tab-add" id="manualAddTab" title="新建分类">+</button>
+            </div>
             <div class="form-group">
-                <textarea id="inputManualText" placeholder="在此编写游戏简介与游玩说明，支持多行..."></textarea>
+                <textarea id="inputManualText" placeholder="选择一个分类后在此编写内容…"></textarea>
             </div>
             <div class="modal-actions">
                 <button class="btn-cancel" id="btnCancelManual">关闭</button>
@@ -534,6 +630,16 @@
     const inputManualText = document.getElementById('inputManualText');
     const btnCancelManual = document.getElementById('btnCancelManual');
     const btnSaveManual = document.getElementById('btnSaveManual');
+    const manualTabs = document.getElementById('manualTabs');
+    const manualAddTab = document.getElementById('manualAddTab');
+    const inputManual = document.getElementById('inputManual');
+    const manualFieldGroup = document.getElementById('manualFieldGroup');
+    const tabCtxMenu = document.getElementById('tabCtxMenu');
+    const ctxRenameManual = document.getElementById('ctxRenameManual');
+    const ctxDeleteManual = document.getElementById('ctxDeleteManual');
+
+    let currentManualTab = null; // 当前选中的说明书分类名
+    let ctxTargetTab = null;     // 右键菜单当前指向的 Tab 名
 
     // ── 页面加载：从注册表渲染所有模块 ──────────
     async function loadModules() {
@@ -563,11 +669,13 @@
         inputName.value     = '';
         inputType.value     = '';
         inputDesc.value     = '';
+        inputManual.value   = '';
         modalError.textContent = '';
         btnConfirm.textContent = 'CREATE';
         btnConfirm.disabled    = false;
         modalTitle.textContent = '// NEW MODULE';
         renameGroup.style.display = 'none';
+        manualFieldGroup.style.display = '';
         overlay.classList.add('show');
         setTimeout(() => inputName.focus(), 100);
     }
@@ -585,6 +693,7 @@
         const safe = m.name.replace(/[^\w\u4e00-\u9fff\-]/g, '-');
         previewFile.textContent = safe + '.html';
         renameGroup.style.display = '';
+        manualFieldGroup.style.display = 'none';
         overlay.classList.add('show');
         setTimeout(() => inputName.focus(), 100);
     }
@@ -613,6 +722,14 @@
             return;
         }
 
+        // 新建时需要校验说明书名称
+        const manual = inputManual ? inputManual.value.trim() : '';
+        if (!isEdit && !manual) {
+            modalError.textContent = '游戏说明书名称不能为空。';
+            inputManual.focus();
+            return;
+        }
+
         btnConfirm.disabled    = true;
         btnConfirm.textContent = isEdit ? 'SAVING...' : 'CREATING...';
         modalError.textContent = '';
@@ -638,7 +755,7 @@
                 res  = await fetch('/api/create-module', {
                     method:  'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body:    JSON.stringify({ name, gameType, description }),
+                    body:    JSON.stringify({ name, gameType, description, manual }),
                 });
                 data = await res.json();
                 if (!res.ok) throw new Error(data.error);
@@ -659,37 +776,232 @@
         });
     });
 
-    // ── 说明书编辑逻辑 ────────────────────────
+    // ── 说明书多分类编辑逻辑 ────────────────────
     function closeManualModal() {
         manualOverlay.classList.remove('show');
+        currentManualTab = null;
     }
-    
+
     btnCancelManual.addEventListener('click', closeManualModal);
     manualOverlay.addEventListener('click', e => { if (e.target === manualOverlay) closeManualModal(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeManualModal(); });
-    
+
+    /** 加载分类列表并渲染 Tab 栏 */
+    async function loadManualTabs(filename) {
+        try {
+            const res = await fetch(`/api/list-manuals?filename=${encodeURIComponent(filename)}`);
+            const data = await res.json();
+            const names = data.manuals || [];
+
+            // 清空旧 Tab（保留 + 按钮）
+            manualTabs.querySelectorAll('.manual-tab').forEach(t => t.remove());
+
+            names.forEach(name => {
+                const tab = document.createElement('button');
+                tab.className = 'manual-tab';
+                tab.textContent = name;
+                tab.draggable = true; // 开启拖拽
+                
+                tab.addEventListener('click', () => selectManualTab(filename, name));
+                
+                tab.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    ctxTargetTab = name;
+                    tabCtxMenu.style.left = e.clientX + 'px';
+                    tabCtxMenu.style.top = e.clientY + 'px';
+                    tabCtxMenu.classList.add('show');
+                });
+
+                // ── 拖拽排序逻辑 ──
+                tab.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.effectAllowed = 'move';
+                    tab.classList.add('dragging');
+                    e.dataTransfer.setData('text/plain', name);
+                });
+                
+                tab.addEventListener('dragend', () => {
+                    tab.classList.remove('dragging');
+                });
+                
+                tab.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                });
+                
+                tab.addEventListener('drop', async (e) => {
+                    e.preventDefault();
+                    const draggedName = e.dataTransfer.getData('text/plain');
+                    if(draggedName === name) return; // 放到自己身上
+                    
+                    const allTabs = Array.from(manualTabs.querySelectorAll('.manual-tab'));
+                    const draggedIdx = allTabs.findIndex(t => t.textContent === draggedName);
+                    const dropIdx = allTabs.findIndex(t => t.textContent === name);
+                    
+                    if (draggedIdx === -1 || dropIdx === -1) return;
+
+                    const draggedTab = allTabs[draggedIdx];
+                    if (draggedIdx < dropIdx) {
+                        manualTabs.insertBefore(draggedTab, tab.nextSibling);
+                    } else {
+                        manualTabs.insertBefore(draggedTab, tab);
+                    }
+                    
+                    // 收集新的顺序并发请求
+                    const newOrder = Array.from(manualTabs.querySelectorAll('.manual-tab')).map(t => t.textContent);
+                    try {
+                        const res = await fetch('/api/reorder-manuals', {
+                            method: 'PUT',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ filename, order: newOrder })
+                        });
+                        if (!res.ok) Toast.error('重排保存失败');
+                    } catch(err) {
+                        Toast.error('排序请求失败：' + err.message);
+                    }
+                });
+
+                manualTabs.insertBefore(tab, manualAddTab);
+            });
+
+            // 默认选中第一个
+            if (names.length > 0) {
+                selectManualTab(filename, names[0]);
+            } else {
+                currentManualTab = null;
+                inputManualText.value = '';
+                inputManualText.placeholder = '请先点击 + 号创建一个分类…';
+            }
+        } catch (err) {
+            console.error('[MAERS] 加载说明书分类失败', err);
+        }
+    }
+
+    /** 选中某个分类 Tab */
+    async function selectManualTab(filename, name) {
+        // 视觉激活
+        manualTabs.querySelectorAll('.manual-tab').forEach(t => {
+            t.classList.toggle('active', t.textContent === name);
+        });
+        currentManualTab = name;
+        inputManualText.value = 'Loading...';
+
+        try {
+            const res = await fetch(`/api/get-manual?filename=${encodeURIComponent(filename)}&manual=${encodeURIComponent(name)}`);
+            const data = await res.json();
+            inputManualText.value = res.ok ? (data.text || '') : '';
+        } catch (err) {
+            inputManualText.value = '';
+        }
+    }
+
+    /** + 号创建新分类 */
+    manualAddTab.addEventListener('click', async () => {
+        const name = prompt('请输入简介名称：');
+        if (!name || !name.trim()) return;
+
+        const filename = manualFilename.value;
+        try {
+            const res = await fetch('/api/create-manual', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename, manual: name.trim() }),
+            });
+            const data = await res.json();
+            if (!res.ok) { Toast.error(data.error || '创建失败'); return; }
+            Toast.success(`说明书「${name.trim()}」创建成功`);
+            await loadManualTabs(filename);
+            // 选中新创建的分类
+            selectManualTab(filename, name.trim());
+        } catch (err) {
+            Toast.error('创建失败：' + err.message);
+        }
+    });
+
+    /** 保存当前 Tab 的内容 */
     btnSaveManual.addEventListener('click', async () => {
         const fn = manualFilename.value;
         const text = inputManualText.value;
-        
+
+        if (!currentManualTab) {
+            Toast.error('请先选择一个分类');
+            return;
+        }
+
         btnSaveManual.disabled = true;
         btnSaveManual.textContent = 'SAVING...';
-        
+
         try {
             const res = await fetch('/api/update-manual', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filename: fn, text: text })
+                body: JSON.stringify({ filename: fn, manual: currentManualTab, text: text })
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
             Toast.success('说明书已保存');
-            closeManualModal();
         } catch (err) {
             Toast.error('保存失败：' + err.message);
         } finally {
             btnSaveManual.disabled = false;
             btnSaveManual.textContent = 'SAVE';
+        }
+    });
+
+    // ── Tab 右键菜单逻辑 ─────────────────────
+    document.addEventListener('click', () => tabCtxMenu.classList.remove('show'));
+    document.addEventListener('contextmenu', (e) => {
+        if (!e.target.closest('.manual-tab')) tabCtxMenu.classList.remove('show');
+    });
+
+    ctxRenameManual.addEventListener('click', async () => {
+        tabCtxMenu.classList.remove('show');
+        if (!ctxTargetTab) return;
+
+        const newName = prompt('请输入新名称：', ctxTargetTab);
+        if (!newName || !newName.trim() || newName.trim() === ctxTargetTab) return;
+
+        const filename = manualFilename.value;
+        try {
+            const res = await fetch('/api/rename-manual', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename, oldName: ctxTargetTab, newName: newName.trim() }),
+            });
+            const data = await res.json();
+            if (!res.ok) { Toast.error(data.error || '重命名失败'); return; }
+            Toast.success(`已重命名为「${newName.trim()}」`);
+            // 如果当前选中的就是被重命名的，更新 currentManualTab
+            if (currentManualTab === ctxTargetTab) currentManualTab = newName.trim();
+            await loadManualTabs(filename);
+            if (currentManualTab) selectManualTab(filename, currentManualTab);
+        } catch (err) {
+            Toast.error('重命名失败：' + err.message);
+        }
+    });
+
+    ctxDeleteManual.addEventListener('click', async () => {
+        tabCtxMenu.classList.remove('show');
+        if (!ctxTargetTab) return;
+        if (!confirm(`确定删除说明书「${ctxTargetTab}」？\n此操作不可恢复。`)) return;
+
+        const filename = manualFilename.value;
+        try {
+            const res = await fetch('/api/delete-manual', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename, manual: ctxTargetTab }),
+            });
+            const data = await res.json();
+            if (!res.ok) { Toast.error(data.error || '删除失败'); return; }
+            Toast.success(`说明书「${ctxTargetTab}」已删除`);
+            // 如果删的是当前选中的，清空文本框
+            if (currentManualTab === ctxTargetTab) {
+                currentManualTab = null;
+                inputManualText.value = '';
+            }
+            await loadManualTabs(filename);
+        } catch (err) {
+            Toast.error('删除失败：' + err.message);
         }
     });
 
@@ -791,17 +1103,11 @@
             manBtn.addEventListener('click', async (e) => {
                 e.stopPropagation(); e.preventDefault();
                 manualFilename.value = m.filename;
-                manualModalTitle.textContent = `// MANUAL: ${m.name}`;
-                inputManualText.value = 'Loading...';
+                manualModalTitle.textContent = `// MANUALS：${m.name}`;
+                inputManualText.value = '';
+                currentManualTab = null;
                 manualOverlay.classList.add('show');
-                
-                try {
-                    const res = await fetch(`/api/get-manual?filename=${encodeURIComponent(m.filename)}`);
-                    const data = await res.json();
-                    inputManualText.value = res.ok ? (data.text || '') : '';
-                } catch (err) {
-                    inputManualText.value = '';
-                }
+                await loadManualTabs(m.filename);
             });
         }
 

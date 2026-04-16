@@ -56,21 +56,16 @@ export class EffectLayer {
   }
 
   static dispatchPhaseEffects(phaseEvent, payload, players, engine) {
-    // 行动期开始：先结算上回合遗留的 hpDrain（创伤）和蓄气回复
+    // 行动期开始：结算上回合遗留的 hpDrain（创伤扣血）
     if (phaseEvent === EngineEvent.ACTION_START) {
       const p1 = players?.[PlayerId.P1];
       const p2 = players?.[PlayerId.P2];
-      if (p1) {
-        this._applyActionStartRestRecovery(p1);
-        this._applyActionStartHpDrain(p1);
-      }
-      if (p2) {
-        this._applyActionStartRestRecovery(p2);
-        this._applyActionStartHpDrain(p2);
-      }
+      if (p1) this._applyActionStartHpDrain(p1);
+      if (p2) this._applyActionStartHpDrain(p2);
     }
 
     // 行动期结束后、结算期开始前：所有效果 n 值向 0 衰减 1
+    // 注：蓄势/就绪精力恢复已移至 judge.js _buildResultObj 中统一结算
     if (phaseEvent === EngineEvent.ACTION_END) {
       const p1 = players?.[PlayerId.P1];
       const p2 = players?.[PlayerId.P2];
@@ -248,9 +243,9 @@ export class EffectLayer {
     return Math.max(0, pts);
   }
 
-  static _bridgeLegacyOnPre() {}
+  static _bridgeLegacyOnPre() { }
 
-  static _bridgeLegacyOnPost() {}
+  static _bridgeLegacyOnPost() { }
 
   static _evaluateAttackOutcome(result, ownerId) {
     const clash = result?.clash;
@@ -364,7 +359,7 @@ export class EffectLayer {
 
   static rewriteTimeoutAction() {
     return {
-      action: Action.STANDBY,
+      action: Action.READY,
       enhance: 0,
       speed: DefaultStats.BASE_SPEED,
       pts: 0,
@@ -405,24 +400,39 @@ export class EffectLayer {
     }
   }
 
-  static processPostEffects(p1CtxEff, p2CtxEff, p1State, p2State, p1TriggeredEffects, p2TriggeredEffects, p1DmgReceived, p2DmgReceived) {
-    // P1 的技能 onPost 钩子（以自身视角：selfCtx, selfState, oppState, selfDmg, oppDmg, oppCtx）
+  static processPostEffects(p1CtxEff, p2CtxEff, p1State, p2State, p1TriggeredEffects, p2TriggeredEffects, p1DmgReceived, p2DmgReceived, result) {
+    // 计算双方的攻击/守备/闪避是否成功（侥幸 MUTUAL_HIT 时全部为 false）
+    const p1Flags = result ? this._deriveTriggerFlags(result, PlayerId.P1, p1CtxEff, p2CtxEff, p1DmgReceived, p2DmgReceived) : null;
+    const p2Flags = result ? this._deriveTriggerFlags(result, PlayerId.P2, p2CtxEff, p1CtxEff, p2DmgReceived, p1DmgReceived) : null;
+
+    // P1 的技能 onPost 钩子
     for (const effectId of (p1TriggeredEffects || [])) {
       const handler = EffectHandlers[effectId];
-      if (handler?.onPost) {
-        handler.onPost(p1CtxEff, p1State, p2State, p1DmgReceived, p2DmgReceived, p2CtxEff);
+      if (!handler?.onPost) continue;
+      // 按行动类型检查是否成功，不成功则跳过
+      if (p1Flags) {
+        const act = p1CtxEff?.action;
+        if (act === Action.ATTACK && !p1Flags.attackSuccess) continue;
+        if (act === Action.DODGE && !p1Flags.dodgeSuccess) continue;
+        if (act === Action.GUARD && !p1Flags.guardSuccess) continue;
       }
+      handler.onPost(p1CtxEff, p1State, p2State, p1DmgReceived, p2DmgReceived, p2CtxEff);
     }
     // P2 的技能 onPost 钩子
     for (const effectId of (p2TriggeredEffects || [])) {
       const handler = EffectHandlers[effectId];
-      if (handler?.onPost) {
-        handler.onPost(p2CtxEff, p2State, p1State, p2DmgReceived, p1DmgReceived, p1CtxEff);
+      if (!handler?.onPost) continue;
+      if (p2Flags) {
+        const act = p2CtxEff?.action;
+        if (act === Action.ATTACK && !p2Flags.attackSuccess) continue;
+        if (act === Action.DODGE && !p2Flags.dodgeSuccess) continue;
+        if (act === Action.GUARD && !p2Flags.guardSuccess) continue;
       }
+      handler.onPost(p2CtxEff, p2State, p1State, p2DmgReceived, p1DmgReceived, p1CtxEff);
     }
   }
 
-  static _processPendingEffectQueue() {}
+  static _processPendingEffectQueue() { }
 
   static queueEffect(owner, effectId, options = {}) {
     if (!owner) return;

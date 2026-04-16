@@ -38,6 +38,10 @@ export function resolve(p1Ctx, p2Ctx, p1State, p2State, bothInsighted, turn) {
   }
 
   // ── 1. 基础层提交 draft，效果层统一改写后回传 ─────────
+  // 先记录 onPre 前的 hp/stamina，用于计算 delta
+  const preP1Hp = p1State.hp, preP1Stamina = p1State.stamina;
+  const preP2Hp = p2State.hp, preP2Stamina = p2State.stamina;
+
   const rewritten = EffectLayer.rewriteRoundDraft({ p1Ctx, p2Ctx, p1State, p2State });
   const {
     p1Ctx: p1CtxEff,
@@ -45,6 +49,22 @@ export function resolve(p1Ctx, p2Ctx, p1State, p2State, bothInsighted, turn) {
     p1TriggeredEffects,
     p2TriggeredEffects,
   } = rewritten;
+
+  // ── 1.2 捕获 onPre 即时效果的变化量 ─────────
+  // 只记录 delta，engine 在 ACTION_START 用 delta 修正玩家实际状态
+  // （避免绝对值覆盖时把退回的精力值误写入）
+  const immediateState = {
+    p1: {
+      hpDelta: p1State.hp - preP1Hp,
+      staminaDelta: p1State.stamina - preP1Stamina,
+      _flashEffects: Array.isArray(p1State._flashEffects) ? [...p1State._flashEffects] : [],
+    },
+    p2: {
+      hpDelta: p2State.hp - preP2Hp,
+      staminaDelta: p2State.stamina - preP2Stamina,
+      _flashEffects: Array.isArray(p2State._flashEffects) ? [...p2State._flashEffects] : [],
+    },
+  };
 
   // ── 1.5 快照本回合有效精力（前置处理后 discount/penalty 已确定，后置处理前尚未污染）─────────
   // 处决检测必须用这一帧的数值，避免 onPost 写入的"下回合修正"干扰判断
@@ -65,6 +85,9 @@ export function resolve(p1Ctx, p2Ctx, p1State, p2State, bothInsighted, turn) {
     derived, false, p1TriggeredEffects, p2TriggeredEffects,
     p1EntryEffective, p2EntryEffective
   );
+
+  // 附带 onPre 即时状态（engine 在 ACTION_START 消费）
+  result._immediateState = immediateState;
 
   // 附带后置处理所需数据（engine 将在 ACTION_END 后消费）
   result._postEffectData = {

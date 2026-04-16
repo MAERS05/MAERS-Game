@@ -1,6 +1,7 @@
 /**
  * MAERS Brief Modal
  * 用于纯净、解耦地显示和挂载游戏说明书内容
+ * 支持多分类 Tab 切换
  */
 
 const BriefModal = (() => {
@@ -76,6 +77,38 @@ const BriefModal = (() => {
             color: #ef4444;
         }
 
+        .brief-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 12px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .brief-tab {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(60,65,75,0.6);
+            color: rgba(100,116,139,0.8);
+            padding: 4px 14px;
+            cursor: pointer;
+            font-size: 0.78rem;
+            font-family: 'Noto Sans SC', sans-serif;
+            transition: all 0.2s;
+            letter-spacing: 0.5px;
+        }
+
+        .brief-tab:hover {
+            border-color: rgba(150,155,165,0.8);
+            color: #e2e8f0;
+            background: rgba(255,255,255,0.08);
+        }
+
+        .brief-tab.active {
+            border-color: #f59e0b;
+            color: #f59e0b;
+            background: rgba(245,158,11,0.08);
+        }
+
         .brief-body {
             padding: 24px 20px;
             overflow-y: auto;
@@ -98,8 +131,12 @@ const BriefModal = (() => {
 
     let overlay = null;
     let titleEl = null;
+    let tabsEl  = null;
     let bodyEl  = null;
     let styleInjected = false;
+
+    // 当前状态
+    let currentModule = null;
 
     function init() {
         if (overlay) return;
@@ -120,6 +157,7 @@ const BriefModal = (() => {
                     <h3 class="brief-title" id="maers-brief-title"></h3>
                     <button class="brief-close" id="maers-brief-close">✕</button>
                 </div>
+                <div class="brief-tabs" id="maers-brief-tabs"></div>
                 <div class="brief-body" id="maers-brief-body"></div>
             </div>
         `;
@@ -127,6 +165,7 @@ const BriefModal = (() => {
         document.body.appendChild(overlay);
 
         titleEl = document.getElementById('maers-brief-title');
+        tabsEl  = document.getElementById('maers-brief-tabs');
         bodyEl  = document.getElementById('maers-brief-body');
 
         document.getElementById('maers-brief-close').addEventListener('click', hide);
@@ -140,16 +179,55 @@ const BriefModal = (() => {
 
     function hide() {
         if (overlay) overlay.classList.remove('show');
+        currentModule = null;
+    }
+
+    /** 选中某个分类 Tab 并加载内容 */
+    async function selectTab(moduleName, tabName) {
+        tabsEl.querySelectorAll('.brief-tab').forEach(t => {
+            t.classList.toggle('active', t.textContent === tabName);
+        });
+
+        bodyEl.textContent = '加载中…';
+        try {
+            const dir = moduleName.replace(/\.html$/, '');
+            const mdPath = `${encodeURIComponent(dir)}/manuals/${encodeURIComponent(tabName)}.txt`;
+            const res = await fetch(mdPath);
+            const text = res.ok ? await res.text() : '';
+            bodyEl.textContent = text || '【暂无数据：未包含相关的说明档案】';
+        } catch (err) {
+            bodyEl.textContent = '【加载失败】';
+        }
     }
 
     /**
      * @param {string} title 模块名称
-     * @param {string} text 说明书内容
+     * @param {string} filename 模块文件名（如 sq-du.html）
+     * @param {string[]} manuals 分类名列表
      */
-    function show(title, text) {
+    function show(title, filename, manuals) {
         init();
-        titleEl.textContent = `// MANUAL: ${title}`;
-        bodyEl.textContent = text || '【暂无数据：未包含相关的说明档案】';
+        currentModule = filename;
+        titleEl.textContent = `// MANUALS：${title}`;
+
+        // 渲染 Tab
+        tabsEl.innerHTML = '';
+        if (manuals && manuals.length > 0) {
+            manuals.forEach(name => {
+                const tab = document.createElement('button');
+                tab.className = 'brief-tab';
+                tab.textContent = name;
+                tab.addEventListener('click', () => selectTab(filename, name));
+                tabsEl.appendChild(tab);
+            });
+            tabsEl.style.display = '';
+            // 默认选中第一个
+            selectTab(filename, manuals[0]);
+        } else {
+            tabsEl.style.display = 'none';
+            bodyEl.textContent = '【暂无数据：未包含相关的说明档案】';
+        }
+
         overlay.classList.add('show');
     }
 

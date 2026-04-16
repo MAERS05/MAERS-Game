@@ -481,12 +481,17 @@ export class JudgeLayer {
     const p2HpOverflow = rawP2HealedHp > DefaultStats.MAX_HP ? rawP2HealedHp - DefaultStats.MAX_HP : 0;
     const finalP2Hp = Math.min(DefaultStats.MAX_HP, rawP2HealedHp);
 
-    // 精力结算
-    const rawP1Stamina = p1State.stamina + (p1State.staminaBonus || 0);
+    // 精力结算（行动精力消耗在此处统一扣除，resolve 接收的是扣费前精力）
+    // 仅蓄势恢复精力，就绪不恢复
+    const p1Recovery = (p1Ctx.action === Action.STANDBY)
+      ? Math.max(0, 1 + (p1State.restRecoverBonus || 0) - (p1State.restRecoverPenalty || 0)) : 0;
+    const p2Recovery = (p2Ctx.action === Action.STANDBY)
+      ? Math.max(0, 1 + (p2State.restRecoverBonus || 0) - (p2State.restRecoverPenalty || 0)) : 0;
+    const rawP1Stamina = p1State.stamina - (p1Ctx.cost || 0) + (p1State.staminaBonus || 0) + p1Recovery;
     const newP1Stamina = Math.min(DefaultStats.MAX_STAMINA, Math.max(0, rawP1Stamina));
     const p1StaminaBonusOverflow = rawP1Stamina > DefaultStats.MAX_STAMINA ? rawP1Stamina - DefaultStats.MAX_STAMINA : 0;
     const p1StaminaUnderflow = rawP1Stamina < 0 ? Math.abs(rawP1Stamina) : 0;
-    const rawP2Stamina = p2State.stamina + (p2State.staminaBonus || 0);
+    const rawP2Stamina = p2State.stamina - (p2Ctx.cost || 0) + (p2State.staminaBonus || 0) + p2Recovery;
     const newP2Stamina = Math.min(DefaultStats.MAX_STAMINA, Math.max(0, rawP2Stamina));
     const p2StaminaBonusOverflow = rawP2Stamina > DefaultStats.MAX_STAMINA ? rawP2Stamina - DefaultStats.MAX_STAMINA : 0;
     const p2StaminaUnderflow = rawP2Stamina < 0 ? Math.abs(rawP2Stamina) : 0;
@@ -494,18 +499,45 @@ export class JudgeLayer {
     const p1NewState = this._buildPlayerNewState(p1State, finalP1Hp, newP1Stamina, p1StaminaBonusOverflow, p1HpOverkill, p1HpOverflow);
     const p2NewState = this._buildPlayerNewState(p2State, finalP2Hp, newP2Stamina, p2StaminaBonusOverflow, p2HpOverkill, p2HpOverflow);
 
-    // ── 溢出管道：将所有溢出字段转化为下回合 pendingEffects ──
-    // 先写入从负溢出等中获取的字段
-    p1NewState.hpUnderflow = p1HpOverkill;
-    p1NewState.hpOverflow = p1HpOverflow;
-    p1NewState.staminaOverflow = (p1NewState.staminaOverflow || 0) + p1StaminaBonusOverflow;
-    p1NewState.staminaUnderflow = (p1NewState.staminaUnderflow || 0) + p1StaminaUnderflow;
-    // 攻击/守备/闪避/动速溢出字段已由 effect.js processPreEffects 填充
+    // 蓄势已消费 restRecoverBonus/Penalty，在 newState 中清零防止下回合重复使用
+    if (p1Recovery > 0 || p1Ctx.action === Action.STANDBY) {
+      p1NewState.restRecoverBonus = 0;
+      p1NewState.restRecoverPenalty = 0;
+    }
+    if (p2Recovery > 0 || p2Ctx.action === Action.STANDBY) {
+      p2NewState.restRecoverBonus = 0;
+      p2NewState.restRecoverPenalty = 0;
+    }
 
+    // ── 溢出管道：将所有溢出字段转化为下回合 pendingEffects ──
+    // 命数溢出
+    p1NewState.hpUnderflow = p1HpOverkill;
+    p1NewState.hpOverflow  = p1HpOverflow;
     p2NewState.hpUnderflow = p2HpOverkill;
-    p2NewState.hpOverflow = p2HpOverflow;
-    p2NewState.staminaOverflow = (p2NewState.staminaOverflow || 0) + p2StaminaBonusOverflow;
-    p2NewState.staminaUnderflow = (p2NewState.staminaUnderflow || 0) + p2StaminaUnderflow;
+    p2NewState.hpOverflow  = p2HpOverflow;
+    // 精力溢出（直接赋值，_buildPlayerNewState 已初始化过 staminaOverflow，此处覆盖避免双重计算）
+    p1NewState.staminaOverflow  = p1StaminaBonusOverflow;
+    p1NewState.staminaUnderflow = p1StaminaUnderflow;
+    p2NewState.staminaOverflow  = p2StaminaBonusOverflow;
+    p2NewState.staminaUnderflow = p2StaminaUnderflow;
+    // 攻击/守备/闪避/动速溢出（由 effect.js processPreEffects → clampPts 写入 p1State/p2State，
+    // _buildPlayerNewState 创建的是新对象不含这些字段，必须手动复制）
+    p1NewState.attackPtsOverflow  = p1State.attackPtsOverflow  || 0;
+    p1NewState.attackPtsUnderflow = p1State.attackPtsUnderflow || 0;
+    p1NewState.guardPtsOverflow   = p1State.guardPtsOverflow   || 0;
+    p1NewState.guardPtsUnderflow  = p1State.guardPtsUnderflow  || 0;
+    p1NewState.dodgePtsOverflow   = p1State.dodgePtsOverflow   || 0;
+    p1NewState.dodgePtsUnderflow  = p1State.dodgePtsUnderflow  || 0;
+    p1NewState.speedOverflow      = p1State.speedOverflow      || 0;
+    p1NewState.speedUnderflow     = p1State.speedUnderflow     || 0;
+    p2NewState.attackPtsOverflow  = p2State.attackPtsOverflow  || 0;
+    p2NewState.attackPtsUnderflow = p2State.attackPtsUnderflow || 0;
+    p2NewState.guardPtsOverflow   = p2State.guardPtsOverflow   || 0;
+    p2NewState.guardPtsUnderflow  = p2State.guardPtsUnderflow  || 0;
+    p2NewState.dodgePtsOverflow   = p2State.dodgePtsOverflow   || 0;
+    p2NewState.dodgePtsUnderflow  = p2State.dodgePtsUnderflow  || 0;
+    p2NewState.speedOverflow      = p2State.speedOverflow      || 0;
+    p2NewState.speedUnderflow     = p2State.speedUnderflow     || 0;
 
     // 统一收集溢出并转换为 pendingEffects
     collectOverflows(p1NewState, turn);
