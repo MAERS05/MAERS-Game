@@ -19,38 +19,40 @@ import { PowerEffect, WeakEffect, BrokenBladeEffect, ChainlockEffect } from '../
 import { SolidEffect, CrackedArmorEffect, BrokenArmorEffect } from '../effect/function/defense-status.js';
 import { SideStepEffect, ClumsyEffect, ShackledDodgeEffect } from '../effect/function/dodge-status.js';
 
-// ── 攻击类效果 ──
-import { RendEffect } from '../skill/attack/rend.js';
-import { BreakQiEffect } from '../skill/attack/break_qi.js';
-import { ChargeEffect } from '../skill/attack/charge.js';
-import { PounceEffect } from '../skill/attack/pounce.js';
-import { RecklessEffect } from '../skill/attack/reckless.js';
-import { CautiousEffect } from '../skill/attack/cautious.js';
-import { DrainEffect } from '../skill/attack/drain.js';
-import { ChainLock } from '../skill/attack/chainlock.js';
-import { ObscureEffect } from '../skill/attack/obscure.js';
+// ── 共享技能（skill/all/）──
+import { RendEffect } from '../skill/all/rend.js';
+import { BreakQiEffect } from '../skill/all/break_qi.js';
+import { ChargeEffect } from '../skill/all/charge.js';
+import { PounceEffect } from '../skill/all/pounce.js';
+import { RecklessEffect } from '../skill/all/reckless.js';
+import { CautiousEffect } from '../skill/all/cautious.js';
+import { DrainEffect } from '../skill/all/drain.js';
+import { ChainLock } from '../skill/all/chainlock.js';
+import { ObscureEffect } from '../skill/all/obscure.js';
+import { BloodShieldEffect } from '../skill/all/blood_shield.js';
+import { RedirectEffect } from '../skill/all/redirect.js';
+import { BastionEffect } from '../skill/all/bastion.js';
+import { IronWallEffect } from '../skill/all/iron_wall.js';
+import { RigidEffect } from '../skill/all/rigid.js';
+import { AbsorbQiEffect } from '../skill/all/absorb_qi.js';
+import { InterceptEffect } from '../skill/all/intercept.js';
+import { Restore } from '../skill/all/restore.js';
+import { ShockwaveEffect } from '../skill/all/shockwave.js';
 
-// ── 守备类效果 ──
-import { BloodShieldEffect } from '../skill/guard/blood_shield.js';
-import { RedirectEffect } from '../skill/guard/redirect.js';
-import { BastionEffect } from '../skill/guard/bastion.js';
-import { IronWallEffect } from '../skill/guard/iron_wall.js';
-import { RigidEffect } from '../skill/guard/rigid.js';
-import { AbsorbQiEffect } from '../skill/guard/absorb_qi.js';
-import { InterceptEffect } from '../skill/guard/intercept.js';
-import { Restore } from '../skill/guard/restore.js';
-import { ShockwaveEffect } from '../skill/guard/shockwave.js';
+// ── 玩家闪避技能（skill/player-dodge/）──
+import { AgilityEffect } from '../skill/player-dodge/agility.js';
+import { AbandonEffect } from '../skill/player-dodge/abandon.js';
+import { MomentumEffect } from '../skill/player-dodge/momentum.js';
+import { LightfootEffect } from '../skill/player-dodge/lightfoot.js';
+import { DisarmEffect } from '../skill/player-dodge/disarm.js';
+import { DisruptEffect } from '../skill/player-dodge/disrupt.js';
+import { Hide } from '../skill/player-dodge/hide.js';
+import { Lure } from '../skill/player-dodge/lure.js';
+import { SeeThrough } from '../skill/player-dodge/see-through.js';
 
-// ── 闪避类效果 ──
-import { AgilityEffect } from '../skill/dodge/agility.js';
-import { AbandonEffect } from '../skill/dodge/abandon.js';
-import { MomentumEffect } from '../skill/dodge/momentum.js';
-import { LightfootEffect } from '../skill/dodge/lightfoot.js';
-import { DisarmEffect } from '../skill/dodge/disarm.js';
-import { DisruptEffect } from '../skill/dodge/disrupt.js';
-import { Hide } from '../skill/dodge/hide.js';
-import { Lure } from '../skill/dodge/lure.js';
-import { SeeThrough } from '../skill/dodge/see-through.js';
+// ── AI 专属技能 ──
+import { BloodDrinkEffect } from '../skill/ai-attack/blood_drink.js';
+import { IronGuardEffect } from '../skill/ai-guard/iron_guard.js';
 
 /**
  * 效果处理器映射表（EffectId → handler）
@@ -88,6 +90,9 @@ const RawEffectHandlers = {
   [EffectId.HIDE]: Hide,
   [EffectId.LURE]: Lure,
   [EffectId.SEE_THROUGH]: SeeThrough,
+  // ── AI 专属技能 ──
+  [EffectId.BLOOD_DRINK]: BloodDrinkEffect,
+  [EffectId.IRON_GUARD]: IronGuardEffect,
   sluggish: SluggishEffect,
   rejuvenated: RejuvenatedEffect,
   exhausted: ExhaustedEffect,

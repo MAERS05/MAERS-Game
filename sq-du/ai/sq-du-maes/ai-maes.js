@@ -49,6 +49,7 @@ const MAES_ATTACK_EFFECTS = [
   EffectId.DRAIN,         // 汲取
   EffectId.CHAINLOCK,     // 锁链
   EffectId.OBSCURE,       // 障目
+  EffectId.BLOOD_DRINK,   // 饮血（AI 专属）
 ];
 
 /** MAES AI 守备技能池 */
@@ -62,6 +63,7 @@ const MAES_GUARD_EFFECTS = [
   EffectId.INTERCEPT,     // 截脉
   EffectId.RESTORE,       // 恢复
   EffectId.SHOCKWAVE,     // 崩震
+  EffectId.IRON_GUARD,    // 强防（AI 专属）
 ];
 
 /** MAES AI 闪避技能池（已禁用闪避行为，保留空池备用） */

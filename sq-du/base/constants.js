@@ -366,6 +366,9 @@ export const EffectId = Object.freeze({
   HIDE: 'hide',
   LURE: 'lure',
   SEE_THROUGH: 'see-through',
+  // ── AI 专属技能 ──
+  BLOOD_DRINK: 'blood_drink',
+  IRON_GUARD: 'iron_guard',
 });
 
 
@@ -496,6 +499,15 @@ export const EffectDefs = Object.freeze({
   [EffectId.SEE_THROUGH]: {
     id: EffectId.SEE_THROUGH, name: '看破',
     applicableTo: [Action.DODGE],
+  },
+  // ── AI 专属技能 ──
+  [EffectId.BLOOD_DRINK]: {
+    id: EffectId.BLOOD_DRINK, name: '饮血',
+    applicableTo: [Action.ATTACK],
+  },
+  [EffectId.IRON_GUARD]: {
+    id: EffectId.IRON_GUARD, name: '强防',
+    applicableTo: [Action.GUARD],
   },
 });
 
