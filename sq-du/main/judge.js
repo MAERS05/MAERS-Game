@@ -482,16 +482,20 @@ export class JudgeLayer {
     const finalP2Hp = Math.min(DefaultStats.MAX_HP, rawP2HealedHp);
 
     // 精力结算（行动精力消耗在此处统一扣除，resolve 接收的是扣费前精力）
-    // 仅蓄势恢复精力，就绪不恢复
-    const p1Recovery = (p1Ctx.action === Action.STANDBY)
+    // 识破时行动被取消，不扣除行动精力
+    const isInsightClash = clash === Clash.INSIGHT_CLASH;
+    const p1ActionCost = isInsightClash ? 0 : (p1Ctx.cost || 0);
+    const p2ActionCost = isInsightClash ? 0 : (p2Ctx.cost || 0);
+    // 仅蓄势恢复精力，就绪不恢复；识破时行动取消，蓄势也不生效
+    const p1Recovery = (!isInsightClash && p1Ctx.action === Action.STANDBY)
       ? Math.max(0, 1 + (p1State.restRecoverBonus || 0) - (p1State.restRecoverPenalty || 0)) : 0;
-    const p2Recovery = (p2Ctx.action === Action.STANDBY)
+    const p2Recovery = (!isInsightClash && p2Ctx.action === Action.STANDBY)
       ? Math.max(0, 1 + (p2State.restRecoverBonus || 0) - (p2State.restRecoverPenalty || 0)) : 0;
-    const rawP1Stamina = p1State.stamina - (p1Ctx.cost || 0) + (p1State.staminaBonus || 0) + p1Recovery;
+    const rawP1Stamina = p1State.stamina - p1ActionCost + (p1State.staminaBonus || 0) + p1Recovery;
     const newP1Stamina = Math.min(DefaultStats.MAX_STAMINA, Math.max(0, rawP1Stamina));
     const p1StaminaBonusOverflow = rawP1Stamina > DefaultStats.MAX_STAMINA ? rawP1Stamina - DefaultStats.MAX_STAMINA : 0;
     const p1StaminaUnderflow = rawP1Stamina < 0 ? Math.abs(rawP1Stamina) : 0;
-    const rawP2Stamina = p2State.stamina - (p2Ctx.cost || 0) + (p2State.staminaBonus || 0) + p2Recovery;
+    const rawP2Stamina = p2State.stamina - p2ActionCost + (p2State.staminaBonus || 0) + p2Recovery;
     const newP2Stamina = Math.min(DefaultStats.MAX_STAMINA, Math.max(0, rawP2Stamina));
     const p2StaminaBonusOverflow = rawP2Stamina > DefaultStats.MAX_STAMINA ? rawP2Stamina - DefaultStats.MAX_STAMINA : 0;
     const p2StaminaUnderflow = rawP2Stamina < 0 ? Math.abs(rawP2Stamina) : 0;
@@ -553,5 +557,52 @@ export class JudgeLayer {
         p2: p2NewState,
       },
     };
+  }
+
+  /**
+   * 胜负判定（纯规则，不涉及状态转换）
+   * @param {Object} result - _buildResultObj 返回的结算包裹
+   * @returns {{ isOver: boolean, winner: string|null, reason: string }}
+   */
+  static judgeGameOver(result) {
+    const p1Dead = result.newState.p1.hp <= 0;
+    const p2Dead = result.newState.p2.hp <= 0;
+
+    if (!p1Dead && !p2Dead) return { isOver: false, winner: null, reason: '' };
+
+    // 自伤来源：directDamage（泣命等 onPre）+ hpDebuff（效果结算期扣血）
+    const p1SelfHarm = (result.newState.p1.directDamage || 0) + (result.p1CtxEff?.hpDebuff || 0);
+    const p2SelfHarm = (result.newState.p2.directDamage || 0) + (result.p2CtxEff?.hpDebuff || 0);
+    // 反推行动前 HP：finalHp + 受到的总伤害（对方伤害 + 自伤）
+    const p1OrigHp = result.newState.p1.hp + (result.damageToP1 || 0) + p1SelfHarm;
+    const p2OrigHp = result.newState.p2.hp + (result.damageToP2 || 0) + p2SelfHarm;
+    const p1Suicide = p1SelfHarm >= p1OrigHp && p1SelfHarm > 0;
+    const p2Suicide = p2SelfHarm >= p2OrigHp && p2SelfHarm > 0;
+
+    let winner = null, reason = '';
+
+    if (p1Dead && p2Dead) {
+      reason = '【同归】双方同归于尽。';
+    } else if (p1Dead) {
+      winner = PlayerId.P2;
+      if (p1Suicide) {
+        reason = '【自刎】你耗尽了自己的命数。';
+      } else if (result.executeP1) {
+        reason = '【处决】你精力耗尽，遭到致命一击！';
+      } else {
+        reason = '【战终】你的命数已空。';
+      }
+    } else {
+      winner = PlayerId.P1;
+      if (p2Suicide) {
+        reason = '【自刎】敌方耗尽了自己的命数。';
+      } else if (result.executeP2) {
+        reason = '【处决】敌方精力耗尽，被你一击终结！';
+      } else {
+        reason = '【战终】敌方命数已空。';
+      }
+    }
+
+    return { isOver: true, winner, reason };
   }
 }

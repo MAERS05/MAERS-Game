@@ -5,7 +5,7 @@ import { createStatusEffect } from './status-factory.js';
 
 export const FortifiedEffect = createStatusEffect({
   id: 'fortified',
-  name: '旺盛',
+  name: '治愈',
   desc: '命数 +1',
   applicableTo: [Action.ATTACK, Action.GUARD, Action.DODGE],
   apply(state) {

@@ -1494,6 +1494,7 @@
       z-index: 299;
       cursor: default;
     }
+
     .picker-backdrop.show {
       display: block;
     }
@@ -1598,14 +1599,16 @@
     .status-tooltip {
       position: absolute;
       top: calc(100% + 26px);
-      left: 50%;
-      transform: translateX(-50%);
+      left: 0;
       background: #ffffff;
       color: #000000;
-      padding: 4px 8px;
+      padding: 6px 8px;
       border-radius: 2px;
       font-size: 0.65rem;
-      white-space: nowrap;
+      white-space: normal;
+      min-width: 160px;
+      max-width: 220px;
+      line-height: 1.6;
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
       z-index: 100;
       pointer-events: none;
@@ -1622,9 +1625,17 @@
     }
 
     @keyframes flashShow {
-      0%   { opacity: 1; }
-      99%  { opacity: 1; }
-      100% { opacity: 0; }
+      0% {
+        opacity: 1;
+      }
+
+      99% {
+        opacity: 1;
+      }
+
+      100% {
+        opacity: 0;
+      }
     }
   </style>
 </head>

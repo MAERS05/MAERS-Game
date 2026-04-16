@@ -9,7 +9,7 @@ import { DefaultStats, EngineEvent } from '../../base/constants.js';
  * 当基础资源的值超出上下限时，溢出部分转化为下回合对应效果。
  *
  * 溢出规则：
- *  - 命数正溢出 → 下回合开始 旺盛(n)
+ *  - 命数正溢出 → 下下回合开始后，装配期开始前 治愈(n)
  *  - 命数负溢出 → 下回合行动期后 创伤(n)
  *  - 精力正溢出 → 下回合开始 兴奋(n)
  *  - 精力负溢出 → 下回合开始 疲惫(n)
@@ -33,9 +33,10 @@ const OVERFLOW_MAP = Object.freeze({
   hp: {
     overflowField: 'hpOverflow',        // 正溢出存储字段
     underflowField: 'hpUnderflow',      // 负溢出存储字段
-    positiveEffect: 'fortified',        // 旺盛
+    positiveEffect: 'fortified',        // 治愈
     negativeEffect: 'wounded',          // 创伤
     positiveTiming: EngineEvent.TURN_START_PHASE,   // 回合开始后
+    positiveTurnDelay: 2,               // 下下回合才生效
     negativeTiming: EngineEvent.ACTION_END,          // 行动期结束后
   },
   // 精力溢出
@@ -108,7 +109,7 @@ export function collectOverflows(state, baseTurn) {
           source: 'overflow',
           readyAt: {
             phaseEvent: mapping.positiveTiming,
-            turn: nextTurn,
+            turn: (baseTurn || 0) + (mapping.positiveTurnDelay || 1),
             ownerId: state.id,
           },
         });

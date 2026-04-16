@@ -38,9 +38,8 @@ import { DualTimer } from './timer.js';
 import { EffectLayer } from '../main/effect.js';
 import { resolve } from './resolver.js';
 import { collectOverflows } from '../effect/function/overflow-manager.js';
-import { scheduleAI, scheduleAIRedecide } from '../ai/ai-scheduler.js';
-import '../ai/ai-manual.js'; // 初始化 ManualAI 测试工具挂载到 window
-import { applyCustomization as applyMaesAI } from '../ai/sq-du-maes/ai-maes.js';
+import { JudgeLayer } from '../main/judge.js';
+import { scheduleAI, scheduleAIRedecide, applyCustomization as applyMaesAI } from '../ai/sq-du-maes/ai-maes.js';
 
 // ─────────────────────────────────────────────
 // 事件总线（内部工具类）
@@ -1164,30 +1163,16 @@ export class BattleEngine {
 
 
   /**
-   * 胜负检查
-   * @param {import('./constants.js').ResolveResult} result
+   * 胜负检查（规则判定委托给 JudgeLayer，引擎只做状态转换）
+   * @param {Object} result - 结算包裹
    * @returns {boolean} 是否游戏结束
    */
   _checkGameOver(result) {
-    const p1Dead = result.newState.p1.hp <= 0;
-    const p2Dead = result.newState.p2.hp <= 0;
-
-    if (!p1Dead && !p2Dead) return false;
+    const verdict = JudgeLayer.judgeGameOver(result);
+    if (!verdict.isOver) return false;
 
     this._setState(EngineState.GAME_OVER);
-
-    let winner = null, reason = '';
-    if (p1Dead && p2Dead) {
-      reason = '【同归于尽】双方同时命数耗尽。';
-    } else if (p1Dead) {
-      winner = PlayerId.P2;
-      reason = result.executeP1 ? '【处决】你精力耗尽，遭到致命一击！' : '【败北】你的命数已空。';
-    } else {
-      winner = PlayerId.P1;
-      reason = result.executeP2 ? '【处决】敌方精力耗尽，被你一击终结！' : '【胜利】敌方命数已空。';
-    }
-
-    this._bus.emit(EngineEvent.GAME_OVER, { winner, reason });
+    this._bus.emit(EngineEvent.GAME_OVER, { winner: verdict.winner, reason: verdict.reason });
     return true;
   }
 

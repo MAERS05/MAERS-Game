@@ -1,16 +1,29 @@
 /**
  * @file ai-maes.js
- * @description AI 定制化配置 — MAES
+ * @description AI 定制化入口 — MAES
  *
- * 本模块为 MAES AI 提供专属定制化调整。
- * 所有定制通过 applyCustomization() 一次性作用于 AI 的 PlayerState，
- * 其中的永久修正量不参与每回合衰减，在整局对战中持续生效。
+ * 本模块是 MAES AI 的唯一对外接口。
+ * 引擎及其他外部模块只需引用本文件即可接入完整的 AI 功能，
+ * 基础 AI 行为层（调度、评估、策略等）均由本文件统一引入并转导出。
  *
  * 定制化清单：
  *  - 永久攻击点数 +1（attackPtsBonus）
  */
 
 'use strict';
+
+// ── 基础 AI 行为层：统一引入并转导出 ─────────────
+export { scheduleAI, scheduleAIRedecide } from '../ai-scheduler.js';
+import '../ai-manual.js'; // 初始化 ManualAI 测试工具挂载到 window
+
+// 以下按需转导出，供未来扩展或外部直接访问
+export { AIBaseLogic } from '../ai-base.js';
+export { AIJudgeLayer } from '../ai-judge.js';
+export { AIExtraLayer } from '../ai-extra.js';
+export { AIStrategyLayer } from '../ai-strategy.js';
+export { AIEnhanceLayer } from '../ai-enhance.js';
+
+// ── MAES 定制化配置 ──────────────────────────────
 
 /** MAES AI 定制化配置表 */
 export const MaesProfile = {

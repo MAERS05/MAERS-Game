@@ -20,6 +20,7 @@ export const EffectTiming = Object.freeze({
 
 /** 时机常量 → 中文显示标签 */
 export const EffectTimingLabel = Object.freeze({
+  TURN_PHASE: '回合开始后，结算期开始前',
   TURN_START: '回合开始后，装配期开始前',
   EQUIP_START: '装配期开始后，装配期结束前',
   EQUIP_END: '装配期结束后，决策期开始前',
