@@ -9,6 +9,15 @@
       "url": "/sq-du.html",
       "status": "active",
       "cover": "sq-du/background/combat-bg.jpg"
+    },
+    {
+      "filename": "test.html",
+      "name": "test",
+      "gameType": "未分类",
+      "description": "暂无简介",
+      "url": "/test.html",
+      "status": "offline",
+      "cover": ""
     }
   ]
 }

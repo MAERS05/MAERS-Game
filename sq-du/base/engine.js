@@ -156,6 +156,9 @@ function createPlayerState(id, overrides = {}) {
     agilityBoost: 0,                              // 动速增益
     chargeBoost: 0,                               // 攻击点数增益
     attackPtsBonus: 0,                             // 永久攻击点数加值（不衰减）
+    guardPtsBonus: 0,                              // 永久守备点数加值（不衰减）
+    dodgePtsBonus: 0,                              // 永久闪避点数加值（不衰减）
+    speedBonus: 0,                                 // 永久动速加值（不衰减）
     ptsDebuff: 0,                                 // 攻击点数减益
     guardBoost: 0,                                // 守备点数增益
     guardDebuff: 0,                               // 守备点数减益
@@ -175,6 +178,18 @@ function createPlayerState(id, overrides = {}) {
     standbyBlockNextTurn: false,                  // 下回合禁蓄势预约
     actionBlocked: [],                            // 本回合禁用动作列表（Action 值）
     actionBlockNextTurn: [],                      // 下回合禁用动作预约
+    // ── 永久禁用（不衰减、不清零，由 AI/玩家定制文件写入） ──
+    permInsightBlocked: false,                    // 永久禁洞察
+    permRedecideBlocked: false,                   // 永久禁重筹
+    permSpeedAdjustBlocked: false,                // 永久禁提速/降速
+    permReadyBlocked: false,                      // 永久禁手动就绪
+    permStandbyBlocked: false,                    // 永久禁蓄势
+    permActionBlocked: [],                        // 永久禁用动作列表（Action 值）
+    permSlotBlocked: {                             // 永久禁用槽位（每个行动下的指定槽位）
+      [Action.ATTACK]: [false, false, false],
+      [Action.GUARD]: [false, false, false],
+      [Action.DODGE]: [false, false, false],
+    },
     slotBlocked: {
       [Action.ATTACK]: [false, false, false],
       [Action.GUARD]: [false, false, false],
@@ -711,22 +726,33 @@ export class BattleEngine {
         p.speedDiscountSpent = 0;
         p.actionDiscountSpent = 0;
         // 回合门禁：把“下回合预约”转为本回合生效，再清理预约标记
-        p.insightBlocked = !!p.insightBlockNextTurn;
+        p.insightBlocked = !!p.insightBlockNextTurn || !!p.permInsightBlocked;
         p.insightBlockNextTurn = false;
-        p.redecideBlocked = !!p.redecideBlockNextTurn;
+        p.redecideBlocked = !!p.redecideBlockNextTurn || !!p.permRedecideBlocked;
         p.redecideBlockNextTurn = false;
-        p.speedAdjustBlocked = !!p.speedAdjustBlockNextTurn;
+        p.speedAdjustBlocked = !!p.speedAdjustBlockNextTurn || !!p.permSpeedAdjustBlocked;
         p.speedAdjustBlockNextTurn = false;
-        p.readyBlocked = !!p.readyBlockNextTurn;
+        p.readyBlocked = !!p.readyBlockNextTurn || !!p.permReadyBlocked;
         p.readyBlockNextTurn = false;
-        p.standbyBlocked = !!p.standbyBlockNextTurn;
+        p.standbyBlocked = !!p.standbyBlockNextTurn || !!p.permStandbyBlocked;
         p.standbyBlockNextTurn = false;
-        p.actionBlocked = Array.isArray(p.actionBlockNextTurn) ? [...p.actionBlockNextTurn] : [];
+        const permActions = Array.isArray(p.permActionBlocked) ? p.permActionBlocked : [];
+        p.actionBlocked = [
+          ...(Array.isArray(p.actionBlockNextTurn) ? p.actionBlockNextTurn : []),
+          ...permActions,
+        ];
         p.actionBlockNextTurn = [];
+        const permSlots = p.permSlotBlocked || {};
         p.slotBlocked = {
-          [Action.ATTACK]: [...(p.slotBlockNextTurn?.[Action.ATTACK] || [false, false, false])],
-          [Action.GUARD]: [...(p.slotBlockNextTurn?.[Action.GUARD] || [false, false, false])],
-          [Action.DODGE]: [...(p.slotBlockNextTurn?.[Action.DODGE] || [false, false, false])],
+          [Action.ATTACK]: (p.slotBlockNextTurn?.[Action.ATTACK] || [false, false, false]).map(
+            (v, i) => v || !!(permSlots[Action.ATTACK] || [])[i]
+          ),
+          [Action.GUARD]: (p.slotBlockNextTurn?.[Action.GUARD] || [false, false, false]).map(
+            (v, i) => v || !!(permSlots[Action.GUARD] || [])[i]
+          ),
+          [Action.DODGE]: (p.slotBlockNextTurn?.[Action.DODGE] || [false, false, false]).map(
+            (v, i) => v || !!(permSlots[Action.DODGE] || [])[i]
+          ),
         };
         p.slotBlockNextTurn = {
           [Action.ATTACK]: [false, false, false],

@@ -111,29 +111,29 @@ export class EffectLayer {
 
     // ── 守备点数：应用坚固(guardBoost)和碎甲(guardDebuff) ──
     if (cp1.action === Action.GUARD) {
-      const raw = (cp1.pts || 0) + (p1State.guardBoost || 0) - (p1State.guardDebuff || 0);
+      const raw = (cp1.pts || 0) + (p1State.guardBoost || 0) + (p1State.guardPtsBonus || 0) - (p1State.guardDebuff || 0);
       cp1.pts = clampPts(raw, 'guardPtsOverflow', 'guardPtsUnderflow', p1State);
     }
     if (cp2.action === Action.GUARD) {
-      const raw = (cp2.pts || 0) + (p2State.guardBoost || 0) - (p2State.guardDebuff || 0);
+      const raw = (cp2.pts || 0) + (p2State.guardBoost || 0) + (p2State.guardPtsBonus || 0) - (p2State.guardDebuff || 0);
       cp2.pts = clampPts(raw, 'guardPtsOverflow', 'guardPtsUnderflow', p2State);
     }
 
     // ── 闪避点数：应用侧身(dodgeBoost)和僵硬(dodgeDebuff) ──
     if (cp1.action === Action.DODGE) {
-      const raw = (cp1.pts || 0) + (p1State.dodgeBoost || 0) - (p1State.dodgeDebuff || 0);
+      const raw = (cp1.pts || 0) + (p1State.dodgeBoost || 0) + (p1State.dodgePtsBonus || 0) - (p1State.dodgeDebuff || 0);
       cp1.pts = clampPts(raw, 'dodgePtsOverflow', 'dodgePtsUnderflow', p1State);
     }
     if (cp2.action === Action.DODGE) {
-      const raw = (cp2.pts || 0) + (p2State.dodgeBoost || 0) - (p2State.dodgeDebuff || 0);
+      const raw = (cp2.pts || 0) + (p2State.dodgeBoost || 0) + (p2State.dodgePtsBonus || 0) - (p2State.dodgeDebuff || 0);
       cp2.pts = clampPts(raw, 'dodgePtsOverflow', 'dodgePtsUnderflow', p2State);
     }
 
     // ── 动速：应用轻盈(agilityBoost)和沉重(agilityDebuff)，并裁剪上下限 ──
-    const p1SpeedRaw = (cp1.speed || DefaultStats.BASE_SPEED) + (p1State.agilityBoost || 0) - (p1State.agilityDebuff || 0);
+    const p1SpeedRaw = (cp1.speed || DefaultStats.BASE_SPEED) + (p1State.agilityBoost || 0) + (p1State.speedBonus || 0) - (p1State.agilityDebuff || 0);
     cp1.speed = clampPts(p1SpeedRaw, 'speedOverflow', 'speedUnderflow', p1State);
 
-    const p2SpeedRaw = (cp2.speed || DefaultStats.BASE_SPEED) + (p2State.agilityBoost || 0) - (p2State.agilityDebuff || 0);
+    const p2SpeedRaw = (cp2.speed || DefaultStats.BASE_SPEED) + (p2State.agilityBoost || 0) + (p2State.speedBonus || 0) - (p2State.agilityDebuff || 0);
     cp2.speed = clampPts(p2SpeedRaw, 'speedOverflow', 'speedUnderflow', p2State);
 
     // ── 消费本回合一次性 boost/debuff（已应用到 pts/speed，清零等待衰减填充下回合） ──
@@ -236,9 +236,9 @@ export class EffectLayer {
     if (ctx.action === Action.ATTACK) {
       pts = pts + (playerState?.chargeBoost || 0) + (playerState?.attackPtsBonus || 0) - (playerState?.ptsDebuff || 0);
     } else if (ctx.action === Action.GUARD) {
-      pts = pts + (playerState?.guardBoost || 0) - (playerState?.guardDebuff || 0);
+      pts = pts + (playerState?.guardBoost || 0) + (playerState?.guardPtsBonus || 0) - (playerState?.guardDebuff || 0);
     } else if (ctx.action === Action.DODGE) {
-      pts = pts + (playerState?.dodgeBoost || 0) - (playerState?.dodgeDebuff || 0);
+      pts = pts + (playerState?.dodgeBoost || 0) + (playerState?.dodgePtsBonus || 0) - (playerState?.dodgeDebuff || 0);
     }
     return Math.max(0, pts);
   }
