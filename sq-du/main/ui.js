@@ -990,7 +990,7 @@ function updateStatusIcons(playerId, state) {
   // 清理过期闪烁效果
   pruneFlashEffects(playerId);
 
-  const addIcon = (filename, effectText, timingKey) => {
+  const addIcon = (filename, effectText, timingKey, turnLabel) => {
     const img = document.createElement('img');
     img.className = 'status-icon';
     img.src = `sq-du/effect/ui/${filename}`;
@@ -1006,13 +1006,14 @@ function updateStatusIcons(playerId, state) {
 
       document.querySelectorAll('.status-tooltip').forEach(el => el.classList.remove('show'));
       const timingLabel = timingKey ? (EffectTimingLabel[timingKey] || timingKey) : null;
-      // 三段式：名称 / 效果 / 时期
+      // 四段式：名称 / 效果 / 回合 / 时期
       const parts = effectText.split('：');
       const effName = parts[0] || '';
       const effDetail = parts.slice(1).join('：') || '';
-      tooltip.innerHTML = timingLabel
-        ? `<strong>${effName}</strong><br>效果：${effDetail}<br>时期：${timingLabel}`
-        : `<strong>${effName}</strong><br>效果：${effDetail}`;
+      let html = `<strong>${effName}</strong><br>效果：${effDetail}`;
+      if (turnLabel) html += `<br>回合：${turnLabel}`;
+      if (timingLabel) html += `<br>时期：${timingLabel}`;
+      tooltip.innerHTML = html;
       tooltip.classList.add('show');
 
       tooltip._timeoutId = setTimeout(() => {
@@ -1023,30 +1024,42 @@ function updateStatusIcons(playerId, state) {
     tray.appendChild(img);
   };
 
-  // ── 从 pendingEffects 队列聚合：按 (effectId, phaseEvent) 分组计数 ──
+  // ── 从 pendingEffects 队列聚合：按 (effectId, phaseEvent, turn) 分组计数 ──
   const pending = Array.isArray(state.pendingEffects) ? state.pendingEffects : [];
-  const groups = new Map(); // key = "effectId|phaseEvent" → { effectId, phaseEvent, n }
+  const currentTurn = engine.getSnapshot().turn || 0;
+  const groups = new Map(); // key = "effectId|phaseEvent|turn" → { effectId, phaseEvent, turn, n }
 
   for (const entry of pending) {
     const eid = entry.effectId;
     const phase = entry.readyAt?.phaseEvent || '';
-    const key = `${eid}|${phase}`;
+    const turn = entry.readyAt?.turn ?? null;
+    const key = `${eid}|${phase}|${turn}`;
     if (groups.has(key)) {
       groups.get(key).n += 1;
     } else {
-      groups.set(key, { effectId: eid, phaseEvent: phase, n: 1 });
+      groups.set(key, { effectId: eid, phaseEvent: phase, turn, n: 1 });
     }
   }
+
+  /** 回合差 → 中文标签 */
+  const getTurnLabel = (targetTurn) => {
+    if (targetTurn == null) return null;
+    const delta = targetTurn - currentTurn;
+    if (delta <= 0) return '本回合';
+    if (delta === 1) return '下回合';
+    if (delta === 2) return '下下回合';
+    return `${delta}回合后`;
+  };
 
   // 已渲染的 effectId 集合（跨 pending 和 flat 去重）
   const rendered = new Set();
 
-  // ── 1. 渲染 pending 效果图标（动态时机 + 动态 n 值） ──
+  // ── 1. 渲染 pending 效果图标（动态时期 + 动态 n 值） ──
   for (const [, group] of groups) {
     const meta = EFFECT_ICON_META[group.effectId];
     if (!meta) continue;
     const label = formatEffectLabel(meta, group.n);
-    addIcon(meta.icon, label, group.phaseEvent);
+    addIcon(meta.icon, label, group.phaseEvent, getTurnLabel(group.turn));
     rendered.add(group.effectId);
   }
 
