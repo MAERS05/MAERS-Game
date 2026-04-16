@@ -101,11 +101,11 @@ export class EffectLayer {
 
     // ── 攻击点数：应用力量(chargeBoost)和虚弱(ptsDebuff) ──
     if (cp1.action === Action.ATTACK) {
-      const raw = (cp1.pts || 0) + (p1State.chargeBoost || 0) - (p1State.ptsDebuff || 0);
+      const raw = (cp1.pts || 0) + (p1State.chargeBoost || 0) + (p1State.attackPtsBonus || 0) - (p1State.ptsDebuff || 0);
       cp1.pts = clampPts(raw, 'attackPtsOverflow', 'attackPtsUnderflow', p1State);
     }
     if (cp2.action === Action.ATTACK) {
-      const raw = (cp2.pts || 0) + (p2State.chargeBoost || 0) - (p2State.ptsDebuff || 0);
+      const raw = (cp2.pts || 0) + (p2State.chargeBoost || 0) + (p2State.attackPtsBonus || 0) - (p2State.ptsDebuff || 0);
       cp2.pts = clampPts(raw, 'attackPtsOverflow', 'attackPtsUnderflow', p2State);
     }
 
@@ -234,7 +234,7 @@ export class EffectLayer {
 
     let pts = ctx.pts || 0;
     if (ctx.action === Action.ATTACK) {
-      pts = pts + (playerState?.chargeBoost || 0) - (playerState?.ptsDebuff || 0);
+      pts = pts + (playerState?.chargeBoost || 0) + (playerState?.attackPtsBonus || 0) - (playerState?.ptsDebuff || 0);
     } else if (ctx.action === Action.GUARD) {
       pts = pts + (playerState?.guardBoost || 0) - (playerState?.guardDebuff || 0);
     } else if (ctx.action === Action.DODGE) {

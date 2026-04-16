@@ -40,6 +40,7 @@ import { resolve } from './resolver.js';
 import { collectOverflows } from '../effect/function/overflow-manager.js';
 import { scheduleAI, scheduleAIRedecide } from '../ai/ai-scheduler.js';
 import '../ai/ai-manual.js'; // 初始化 ManualAI 测试工具挂载到 window
+import { applyCustomization as applyMaesAI } from '../ai/sq-du-maes/ai-maes.js';
 
 // ─────────────────────────────────────────────
 // 事件总线（内部工具类）
@@ -155,6 +156,7 @@ function createPlayerState(id, overrides = {}) {
     agilityDebuff: 0,                             // 动速减益
     agilityBoost: 0,                              // 动速增益
     chargeBoost: 0,                               // 攻击点数增益
+    attackPtsBonus: 0,                             // 永久攻击点数加值（不衰减）
     ptsDebuff: 0,                                 // 攻击点数减益
     guardBoost: 0,                                // 守备点数增益
     guardDebuff: 0,                               // 守备点数减益
@@ -233,6 +235,8 @@ export class BattleEngine {
       [PlayerId.P1]: createPlayerState(PlayerId.P1),
       [PlayerId.P2]: createPlayerState(PlayerId.P2),
     };
+    // 应用 AI 定制化
+    applyMaesAI(this._players[PlayerId.P2]);
 
     // 初始化计时器（回调绑定到引擎方法）
     this._timer = new DualTimer({
@@ -639,6 +643,8 @@ export class BattleEngine {
       [PlayerId.P1]: createPlayerState(PlayerId.P1),
       [PlayerId.P2]: createPlayerState(PlayerId.P2),
     };
+    // 重新应用 AI 定制化
+    applyMaesAI(this._players[PlayerId.P2]);
 
     this._bus.emit(EngineEvent.STATE_CHANGED, { state: EngineState.IDLE });
     this.startGame();
