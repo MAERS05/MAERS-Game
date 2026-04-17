@@ -91,8 +91,8 @@ function buildMaesInventory() {
 
   return {
     [Action.ATTACK]: validate(MAES_ATTACK_EFFECTS, Action.ATTACK),
-    [Action.GUARD]:  validate(MAES_GUARD_EFFECTS,  Action.GUARD),
-    [Action.DODGE]:  validate(MAES_DODGE_EFFECTS,  Action.DODGE),
+    [Action.GUARD]: validate(MAES_GUARD_EFFECTS, Action.GUARD),
+    [Action.DODGE]: validate(MAES_DODGE_EFFECTS, Action.DODGE),
   };
 }
 
@@ -107,9 +107,9 @@ export const MaesProfile = {
 
   // ── 数值修正（{ value, turns } 格式：turns=Infinity 永久，turns=N 持续N回合） ──
   attackPtsBonus: { value: 1, turns: Infinity },  // 攻击点数 +1（永久）
-  guardPtsBonus:  { value: 1, turns: Infinity },  // 守备点数 +1（永久）
-  dodgePtsBonus:  0,                              // 闪避点数加值
-  speedBonus:     0,                              // 动速加值
+  guardPtsBonus: { value: 1, turns: Infinity },  // 守备点数 +1（永久）
+  dodgePtsBonus: 0,                              // 闪避点数加值
+  speedBonus: 0,                              // 动速加值
 
   // ── 永久禁用（true = 整局禁用，不受回合衰减影响） ──
   permInsightBlocked: false,      // 永久禁洞察
@@ -126,12 +126,14 @@ export const MaesProfile = {
 
   // ── MAES 行为调优（注入 AI 状态，被 ai-base / ai-scheduler 读取） ──
   tuning: {
-    attackBias:        0.5,   // 攻击权重偏移（正=更好斗）
-    guardBias:         0.0,   // 守备权重偏移
-    insightThreshold:  0.8,   // 洞察评分阈值（低=更积极洞察；默认 1.8）
-    insightMaxProb:    0.90,  // 洞察最大概率（默认 0.65）
-    redecideBias:      0.20,  // 重决策概率偏移（加到各情境概率上）
-    speedBoostBias:    0.15,  // 提速概率偏移（正=更爱提速）
+    attackBias: 0.5,   // 攻击权重偏移（正=更好斗）
+    guardBias: 0.2,   // 守备权重偏移
+    dodgeBias: 0.1,   // 闪避权重偏移
+    insightThreshold: 0.8,   // 洞察评分阈值（低=更积极洞察；默认 1.8）
+    insightMaxProb: 0.90,  // 洞察最大概率（默认 0.65）
+    redecideBias: 0.20,  // 重决策概率偏移（加到各情境概率上）
+    speedBoostBias: 0.15,  // 提速概率偏移（正=更爱提速）
+    passiveExploitBias: 1.8,   // 对手被动行为时攻击加成（蓄势/疗愈=白给）
   },
 };
 
@@ -152,17 +154,17 @@ export function applyCustomization(state) {
     state[field] = (state[field] || 0) + val;                 // 有限数字 = 叠加
   };
   addBonus('attackPtsBonus', MaesProfile.attackPtsBonus);
-  addBonus('guardPtsBonus',  MaesProfile.guardPtsBonus);
-  addBonus('dodgePtsBonus',  MaesProfile.dodgePtsBonus);
-  addBonus('speedBonus',     MaesProfile.speedBonus);
+  addBonus('guardPtsBonus', MaesProfile.guardPtsBonus);
+  addBonus('dodgePtsBonus', MaesProfile.dodgePtsBonus);
+  addBonus('speedBonus', MaesProfile.speedBonus);
 
   // ── 永久禁用 ──
-  state.permInsightBlocked     = state.permInsightBlocked     || MaesProfile.permInsightBlocked;
-  state.permRedecideBlocked    = state.permRedecideBlocked    || MaesProfile.permRedecideBlocked;
+  state.permInsightBlocked = state.permInsightBlocked || MaesProfile.permInsightBlocked;
+  state.permRedecideBlocked = state.permRedecideBlocked || MaesProfile.permRedecideBlocked;
   state.permSpeedAdjustBlocked = state.permSpeedAdjustBlocked || MaesProfile.permSpeedAdjustBlocked;
-  state.permReadyBlocked       = state.permReadyBlocked       || MaesProfile.permReadyBlocked;
-  state.permStandbyBlocked     = state.permStandbyBlocked     || MaesProfile.permStandbyBlocked;
-  state.permActionBlocked      = [
+  state.permReadyBlocked = state.permReadyBlocked || MaesProfile.permReadyBlocked;
+  state.permStandbyBlocked = state.permStandbyBlocked || MaesProfile.permStandbyBlocked;
+  state.permActionBlocked = [
     ...(state.permActionBlocked || []),
     ...MaesProfile.permActionBlocked,
   ];
@@ -210,8 +212,8 @@ export function maesConstrainDecision(decision, scene) {
     d.action !== Action.HEAL &&
     !killWindow && !executeWindow
   ) {
-    d.action  = Action.GUARD;
-    d.speed   = DefaultStats.BASE_SPEED;
+    d.action = Action.GUARD;
+    d.speed = DefaultStats.BASE_SPEED;
     d.enhance = 0;
   }
 

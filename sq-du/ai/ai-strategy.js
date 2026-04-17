@@ -16,7 +16,7 @@
 
 'use strict';
 
-import { Action, DefaultStats } from '../base/constants.js';
+import { Action, DefaultStats, readBonus } from '../base/constants.js';
 import { AIBaseLogic } from './ai-base.js';
 
 export class AIStrategyLayer {
@@ -32,12 +32,18 @@ export class AIStrategyLayer {
    */
   static buildCounterDecision(revealed, snap, ai, effectiveStamina, indicators) {
     const revealedAct = revealed?.action ?? Action.STANDBY;
-    const revealedPts = revealed?.pts ?? (1 + (revealed?.enhance ?? 0));
+    // 对手的有效点数（含 bonus）
+    const revealedBasePts = 1 + (revealed?.enhance ?? 0);
+    const revealedBonus = revealedAct === Action.ATTACK ? snap.playerAttackBonus
+                        : revealedAct === Action.GUARD  ? snap.playerGuardBonus
+                        : revealedAct === Action.DODGE  ? snap.playerDodgeBonus
+                        : 0;
+    const revealedPts = revealedBasePts + revealedBonus;
     const revealedSpd = revealed?.speed ?? DefaultStats.BASE_SPEED;
 
     const action     = this._pickAction(revealedAct, revealedPts, revealedSpd, snap, ai, effectiveStamina, indicators);
     const speedRaw   = this._pickSpeed(revealedAct, revealedSpd, snap, action, effectiveStamina);
-    const enhanceRaw = this._pickEnhance(revealedAct, revealedPts, snap, action, effectiveStamina, indicators);
+    const enhanceRaw = this._pickEnhance(revealedAct, revealedPts, snap, action, ai, effectiveStamina, indicators);
 
     return { action, speedRaw, enhanceRaw };
   }
@@ -54,10 +60,10 @@ export class AIStrategyLayer {
 
     switch (revealedAct) {
       case Action.ATTACK:
-        return this._counterAttack(revealedPts, revealedSpd, snap, effectiveStamina);
+        return this._counterAttack(revealedPts, revealedSpd, snap, ai, effectiveStamina);
 
       case Action.GUARD:
-        return this._counterGuard(revealedPts, snap, effectiveStamina);
+        return this._counterGuard(revealedPts, snap, ai, effectiveStamina);
 
       case Action.DODGE:
         // 对手闪避时：攻击可能被闪开，关键在于动速
@@ -84,22 +90,46 @@ export class AIStrategyLayer {
    * - 高速攻击（≥BASE+1）：选闪避或守备随机（两者都需要加速）
    * - 常规：6:4 偏守备
    */
-  static _counterAttack(revealedPts, revealedSpd, snap, effectiveStamina) {
+  static _counterAttack(revealedPts, revealedSpd, snap, ai, effectiveStamina) {
     if (effectiveStamina < 1) return Action.STANDBY;
 
-    // 濒死优先闪避
-    if (snap.aiHpRatio <= 0.20) return Action.DODGE;
+    // 检查行动禁用
+    const blocked = [
+      ...(Array.isArray(ai.actionBlocked) ? ai.actionBlocked : []),
+      ...(Array.isArray(ai.permActionBlocked) ? ai.permActionBlocked : []),
+    ];
+    const canDodge = !blocked.includes(Action.DODGE);
+    const canGuard = !blocked.includes(Action.GUARD);
+
+    // 激死优先闪避（若可用）
+    if (snap.aiHpRatio <= 0.20) {
+      if (canDodge) return Action.DODGE;
+      if (canGuard) return Action.GUARD;
+      return Action.STANDBY;
+    }
+
+    // AI 守备有 bonus 时，守备更强，偏向守备
+    const aiGuardPts = 1 + snap.aiGuardBonus;
+    const aiDodgePts = 1 + snap.aiDodgeBonus;
 
     // 高点数：守备强
-    if (revealedPts >= 3) return Action.GUARD;
+    if (revealedPts >= 3 && canGuard) return Action.GUARD;
 
     // 高速：闪避更灵活
     if (revealedSpd >= DefaultStats.BASE_SPEED + 1) {
-      return Math.random() < 0.55 ? Action.DODGE : Action.GUARD;
+      if (canDodge && canGuard) return Math.random() < 0.55 ? Action.DODGE : Action.GUARD;
+      if (canDodge) return Action.DODGE;
+      if (canGuard) return Action.GUARD;
     }
 
-    // 常规：守备略优
-    return Math.random() < 0.60 ? Action.GUARD : Action.DODGE;
+    // 常规：根据 bonus 点数优势决定
+    if (canGuard && canDodge) {
+      const guardPref = aiGuardPts >= aiDodgePts ? 0.65 : 0.50;
+      return Math.random() < guardPref ? Action.GUARD : Action.DODGE;
+    }
+    if (canGuard) return Action.GUARD;
+    if (canDodge) return Action.DODGE;
+    return Action.STANDBY;
   }
 
   /**
@@ -107,12 +137,16 @@ export class AIStrategyLayer {
    * - 有足够精力可以强化后打穿：攻击
    * - 对手守备点数很高（≥3）而自身精力不足强化：待命
    */
-  static _counterGuard(revealedPts, snap, effectiveStamina) {
+  static _counterGuard(revealedPts, snap, ai, effectiveStamina) {
+    // AI 攻击有效点数（含 bonus）
+    const aiAttackPts = 1 + snap.aiAttackBonus;
     if (effectiveStamina >= 2) {
-      // 对手守备极高、自身精力不够强化打穿：等下一回合
-      if (revealedPts >= 3 && effectiveStamina < 4) return Action.STANDBY;
+      // 对手守备极高且 AI 攻击 +强化 仍不足以打穿：等下一回合
+      if (revealedPts >= 3 && aiAttackPts + 1 < revealedPts && effectiveStamina < 4) return Action.STANDBY;
       return Action.ATTACK;
     }
+    // 精力不足但 base 已能打穿：仍可攻击
+    if (effectiveStamina >= 1 && aiAttackPts > revealedPts) return Action.ATTACK;
     return Action.STANDBY;
   }
 
@@ -167,25 +201,28 @@ export class AIStrategyLayer {
    *  - 闪避 vs 攻击：需要躲开（pts > 对手攻击 pts）
    *  - 斩杀窗口：强化攻击
    */
-  static _pickEnhance(revealedAct, revealedPts, snap, action, effectiveStamina, indicators) {
+  static _pickEnhance(revealedAct, revealedPts, snap, action, ai, effectiveStamina, indicators) {
     if (action === Action.STANDBY) return 0;
-    if (effectiveStamina < 2) return 0; // 需要至少2点有效精力才能强化
+    if (effectiveStamina < 2) return 0;
 
-    // 攻击 vs 守备：must 强化以打穿（基础攻击pts=1，守备pts≥1时无法穿透）
+    // AI 当前行动的有效基础点数（含 bonus）
+    const aiBasePts = 1 + (action === Action.ATTACK ? snap.aiAttackBonus
+                        :  action === Action.GUARD  ? snap.aiGuardBonus
+                        :                             snap.aiDodgeBonus);
+
+    // 攻击 vs 守备：只有基础点数不足以打穿时才强化
     if (action === Action.ATTACK && revealedAct === Action.GUARD) {
-      // 对手守备pts为1时强化到2可打穿，pts≥2时需要2强化（但我们只支持1级强化）
-      if (revealedPts >= 1) return 1;
+      if (aiBasePts <= revealedPts) return 1;
     }
 
-    // 守备 vs 攻击：强化守备点数以确保扛住
+    // 守备 vs 攻击：只有基础点数不足以挡住时才强化
     if (action === Action.GUARD && revealedAct === Action.ATTACK) {
-      // 对手pts≥2时，强化守备到2以平衡（基础守备pts=1不够）
-      if (revealedPts >= 2) return 1;
+      if (aiBasePts < revealedPts) return 1;
     }
 
-    // 闪避 vs 攻击：强化闪避「躲开」点数使点数更高
+    // 闪避 vs 攻击：只有基础点数不足以躲开时才强化
     if (action === Action.DODGE && revealedAct === Action.ATTACK) {
-      if (revealedPts >= 2 && effectiveStamina >= 2) return 1;
+      if (aiBasePts < revealedPts && effectiveStamina >= 2) return 1;
     }
 
     // 斩杀窗口：强化攻击扩大伤害

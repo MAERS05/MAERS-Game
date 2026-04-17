@@ -144,6 +144,29 @@ export class AIExtraLayer {
     if (hpCost > 0 && aiLowHp) total -= 2.0;
     if (scene?.isRedecide && revealed?.action === Action.ATTACK && action === Action.GUARD) total += 0.5;
     if (scene?.isRedecide && revealed?.action === Action.STANDBY && action === Action.ATTACK) total += 0.5;
+
+    // ── P3：对手已有 debuff 时同类效果效益递减 ──
+    if (player) {
+      const debuffMap = {
+        [EffectId.HEAVY_PRESS]: 'ptsDebuff',       // 重压 → 攻击减益
+        [EffectId.BRUTE_FORCE]: 'guardDebuff',      // 蛮力 → 守备减益
+        [EffectId.DISRUPT]:     'dodgeDebuff',       // 干扰 → 闪避减益
+        [EffectId.INTERCEPT]:   'staminaPenalty',    // 截击 → 精力惩罚
+        [EffectId.DRAIN]:       'staminaPenalty',    // 吸气 → 精力惩罚
+      };
+      const targetField = debuffMap[id];
+      if (targetField && (player[targetField] || 0) > 0) total -= 0.6;
+    }
+    // AI 已有增益时，同类 buff 效益递减
+    const boostMap = {
+      [EffectId.MOMENTUM]:  'chargeBoost',    // 蓄势 → 蓄力增益
+      [EffectId.STEADY]:    'guardBoost',     // 稳固 → 守备增益
+      [EffectId.DEFERRED]:  'agilityBoost',   // 延迟 → 动速增益
+      [EffectId.AGILITY]:   'agilityBoost',   // 灵敏 → 动速增益
+    };
+    const boostField = boostMap[id];
+    if (boostField && (ai[boostField] || 0) > 0) total -= 0.5;
+
     total += Math.random() * 0.3;
     return total;
   }

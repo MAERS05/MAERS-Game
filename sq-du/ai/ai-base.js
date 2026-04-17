@@ -14,7 +14,7 @@
 
 'use strict';
 
-import { Action, DefaultStats } from '../base/constants.js';
+import { Action, DefaultStats, readBonus } from '../base/constants.js';
 
 export class AIBaseLogic {
   static TUNING = {
@@ -48,8 +48,9 @@ export class AIBaseLogic {
       snap.playerStaminaRatio <= 0.34 &&
       aiEffectiveStamina >= 2
     ) ? 1 : 0;
-    // 使用有效精力（含 penalty/discount 修正）判定处决窗口，而非原始精力
-    const executeWindow = (snap.playerEffectiveStamina ?? snap.playerStamina) <= 0 ? 1 : 0;
+    // 处决窗口基于真实精力（非有效精力），
+    // 疲惫等临时惩罚不应触发处决判定（玩家仍可蓄势/疗愈恢复）
+    const executeWindow = snap.playerStamina <= 0 ? 1 : 0;
     const antiAttackNeed = this.clamp01((snap.oppAggression - 0.45) / 0.55);
 
     return { aiDanger, playerExposed, killWindow, executeWindow, antiAttackNeed };
@@ -133,6 +134,10 @@ export class AIBaseLogic {
       playerDodgeBoost: player.dodgeBoost || 0,  // 对手闪避增强 → 攻击难命中
       playerStaminaPenalty: player.staminaPenalty || 0, // 对手精力惩罚 → 对手变弱
       playerHealBlocked: !!player.healBlocked,     // 对手被禁疗愈
+      // 对手 bonus 加值（用于点数对比）
+      playerAttackBonus: readBonus(player.attackPtsBonus),
+      playerGuardBonus: readBonus(player.guardPtsBonus),
+      playerDodgeBonus: readBonus(player.dodgePtsBonus),
 
       // ── AI 自身效果感知 ──────────────────────────
       aiPtsDebuff: ai.ptsDebuff || 0,  // 攻击点数被削
@@ -144,6 +149,10 @@ export class AIBaseLogic {
       aiStaminaPenalty: ai.staminaPenalty || 0,  // 精力消耗增加
       aiHealBlocked: !!ai.healBlocked,         // 被禁疗愈
       aiSpeedBlocked: !!ai.speedAdjustBlocked,  // 被禁提速
+      // AI bonus 加值（用于点数判断和强化决策）
+      aiAttackBonus: readBonus(ai.attackPtsBonus),
+      aiGuardBonus: readBonus(ai.guardPtsBonus),
+      aiDodgeBonus: readBonus(ai.dodgePtsBonus),
 
       oppSpeedTrend,
       oppEnhanceTrend,
@@ -170,13 +179,22 @@ export class AIBaseLogic {
     const tuning = ai.aiTuning || {};
     w.attack += tuning.attackBias || 0;
     w.guard += tuning.guardBias || 0;
+    w.dodge += tuning.dodgeBias || 0;
 
-    // ── 处决窗口（对手精力耗尽）：果断出击 ──────
+    // ── 处决窗口（对手真实精力耗尽）：果断出击 ──────
     if (indicators.executeWindow > 0) {
       w.attack += 10.0;
       w.guard *= 0.05;
       w.dodge *= 0.05;
       w.standby *= 0.02;
+    }
+
+    // ── 压制窗口（对手有精力但受惩罚无法行动）：温和施压 ──
+    // 对手真实精力 > 0 但有效精力 ≤ 0 时，对手只能蓄势/疗愈，无法防御
+    if (!indicators.executeWindow && snap.playerStamina > 0 && (snap.playerEffectiveStamina ?? snap.playerStamina) <= 0) {
+      w.attack += 2.5;
+      w.guard *= 0.4;
+      w.dodge *= 0.4;
     }
 
     // ── 斩杀窗口（对手血量+精力双低）────────────
@@ -299,9 +317,14 @@ export class AIBaseLogic {
       }
       // 对手高精力：我方处于劣势，收缩
       else {
-        w.standby += 1.8;
-        w.guard += 0.8;
-        w.attack -= 0.6;
+        w.standby += 1.2;
+        w.guard += 0.5;
+        w.attack -= 0.3;
+      }
+      // 对手被动行为（蓄势/疗愈）：无防御，可施压（具体力度由 tuning 决定）
+      const passiveBias = tuning.passiveExploitBias || 0;
+      if (passiveBias > 0 && (snap.oppLastAction === Action.STANDBY || snap.oppLastAction === Action.HEAL)) {
+        w.attack += passiveBias;
       }
       // 自身低血时更优先蓄势保命
       if (snap.aiHpRatio <= 0.4) w.standby += 1.2;
@@ -420,7 +443,7 @@ export class AIBaseLogic {
 
     // 绝杀窗口无条件提速确保先手致命一击
     const killWindow = (snap.playerHpRatio <= this.TUNING.executeHpLine && snap.playerStaminaRatio <= 0.34 && aiEffectiveStamina >= 2) ? 1 : 0;
-    const executeWindow = (snap.playerEffectiveStamina ?? snap.playerStamina) <= 0 ? 1 : 0;
+    const executeWindow = snap.playerStamina <= 0 ? 1 : 0;
     if ((killWindow || executeWindow) && availableForBoost >= 1 && action === Action.ATTACK) {
       return BASE + 1;
     }
@@ -471,26 +494,31 @@ export class AIBaseLogic {
 
     const { attack: pAtk, guard: pGrd, dodge: pDodge } = snap.predictNext;
 
+    // AI 当前行动的有效基础点数（含 bonus）
+    const aiBasePts = 1 + (action === Action.ATTACK ? snap.aiAttackBonus
+                        :  action === Action.GUARD  ? snap.aiGuardBonus
+                        :                             snap.aiDodgeBonus);
+
     // 绝杀斩杀阶段：无脑拉满伤害
     const killWindow = (snap.playerHpRatio <= this.TUNING.executeHpLine && snap.playerStaminaRatio <= 0.34 && aiEffectiveStamina >= 2) ? 1 : 0;
-    const executeWindow = (snap.playerEffectiveStamina ?? snap.playerStamina) <= 0 ? 1 : 0;
+    const executeWindow = snap.playerStamina <= 0 ? 1 : 0;
     if ((killWindow || executeWindow) && action === Action.ATTACK) {
       return 1;
     }
 
-    // 攻击 vs 高概率防守：若预测对手守备大概率发生，必须强化使得攻击点数预期 > 1 打穿守备
+    // 攻击 vs 高概率防守：只有基础点数不足以打穿时才强化
     if (action === Action.ATTACK && pGrd > 0.40) {
-      // 检查我们自身是否有点数惩罚，有的话更需补正。若血量不足则不盲目强攻破防
-      if (snap.aiStaminaRatio > 0.35) return 1;
+      const oppGuardPts = 1 + snap.playerGuardBonus;
+      if (aiBasePts <= oppGuardPts && snap.aiStaminaRatio > 0.35) return 1;
     }
 
-    // 守备/闪避 vs 强力攻击：若预测对手大概率攻击，且对手有强化习惯（增加攻击点数），我方不强化将被贯穿
+    // 守备/闪避 vs 强力攻击：只有基础点数不足以挡住/躲开时才强化
     if ((action === Action.GUARD || action === Action.DODGE) && pAtk > 0.45 && snap.oppEnhanceTrend >= 0.2) {
-      // 对手有交强化的趋势，我方面对攻击时强化点数来硬抗/躲避
-      if (snap.aiStaminaRatio >= 0.35 || snap.aiHpRatio <= 0.3) return 1;
+      const oppAttackPts = 1 + snap.oppEnhanceTrend + snap.playerAttackBonus;
+      if (aiBasePts < oppAttackPts && (snap.aiStaminaRatio >= 0.35 || snap.aiHpRatio <= 0.3)) return 1;
     }
 
-    // 对手极大破绽（比如刚刚精力竭力过）：重拳出击
+    // 对手极大破绽：重拳出击
     if (action === Action.ATTACK && snap.lastOppStamina <= 1 && pAtk < 0.2) {
       return 1;
     }
