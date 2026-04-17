@@ -345,7 +345,9 @@ export class EffectLayer {
     const need = 1 + (caster.staminaPenalty || 0) + (caster.insightDebuff || 0);
     if (need <= 0) return true;
 
-    const pocket = (caster.stamina || 0) + (caster.staminaDiscount || 0);
+    // discount（兴奋）在真实精力为 0 时失效
+    const sta = caster.stamina || 0;
+    const pocket = sta + (sta >= 1 ? (caster.staminaDiscount || 0) : 0);
     return pocket > 0;
   }
 
@@ -380,7 +382,9 @@ export class EffectLayer {
   static canAdjustSpeed(player, delta) {
     if (!player || player.ready || player.speedAdjustBlocked) return false;
     if (delta > 0) {
-      return ((player.stamina || 0) + (player.staminaDiscount || 0)) > 0;
+      // discount（兴奋）在真实精力为 0 时失效
+      const sta = player.stamina || 0;
+      return (sta + (sta >= 1 ? (player.staminaDiscount || 0) : 0)) > 0;
     }
     if (delta < 0) {
       return (player.speed || DefaultStats.BASE_SPEED) > DefaultStats.BASE_SPEED;

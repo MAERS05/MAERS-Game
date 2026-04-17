@@ -227,7 +227,10 @@ function updatePips(prefix, current, max, type, playerState) {
 
 /** 当前可用于“是否还能执行一次行为/洞察”的真实剩余原始资源 */
 function getEffectiveStamina(player) {
-  return (player.stamina || 0) + (player.staminaDiscount || 0) - (player.staminaPenalty || 0);
+  const stamina = player.stamina || 0;
+  // discount（兴奋）在真实精力为 0 时失效，不能凭空创造行动能力
+  const discount = stamina >= 1 ? (player.staminaDiscount || 0) : 0;
+  return stamina + discount - (player.staminaPenalty || 0);
 }
 
 /** 统一渲染双方资源与基础状态（避免真实值/投影值显示不一致） */

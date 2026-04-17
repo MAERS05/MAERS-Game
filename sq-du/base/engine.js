@@ -385,7 +385,7 @@ export class BattleEngine {
 
       if (delta > 0) {
         // 加速：逐级扣有效精力（每级 1 精力）
-        const effectiveStamina = p.stamina + (p.staminaDiscount || 0) - (p.staminaPenalty || 0);
+        const effectiveStamina = p.stamina + (p.stamina >= 1 ? (p.staminaDiscount || 0) : 0) - (p.staminaPenalty || 0);
         const affordable = Math.min(delta, effectiveStamina);
         const actualBoost = Math.max(0, affordable);
 

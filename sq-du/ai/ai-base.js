@@ -30,7 +30,9 @@ export class AIBaseLogic {
   static clamp01(v) { return Math.max(0, Math.min(1, v)); }
 
   static getEffectiveStamina(actor) {
-    return actor.stamina + (actor.staminaDiscount || 0) - (actor.staminaPenalty || 0);
+    // discount（兴奋）在真实精力为 0 时失效
+    const discount = actor.stamina >= 1 ? (actor.staminaDiscount || 0) : 0;
+    return actor.stamina + discount - (actor.staminaPenalty || 0);
   }
 
   static getStaminaConserve(aiStaminaRatio) {
@@ -122,8 +124,8 @@ export class AIBaseLogic {
       aiStaminaRatio: this.clamp01(ai.stamina / MAX_STAMINA),
       playerStamina: player.stamina,  // 精确整数，用于处决判断
       playerStaminaRatio: this.clamp01(player.stamina / MAX_STAMINA),
-      // 对手有效精力（含 penalty/discount 修正），用于处决窗口和精确威胁评估
-      playerEffectiveStamina: Math.max(0, player.stamina + (player.staminaDiscount || 0) - (player.staminaPenalty || 0)),
+      // 对手有效精力（含 discount 修正，discount 在精力=0 时失效；不含 penalty）
+      playerEffectiveStamina: Math.max(0, player.stamina + (player.stamina >= 1 ? (player.staminaDiscount || 0) : 0) - (player.staminaPenalty || 0)),
       // 对手当前点数减益状态（用于进攻时机评估）
       playerPtsDebuff: player.ptsDebuff || 0,
       playerDodgeDebuff: player.dodgeDebuff || 0,
