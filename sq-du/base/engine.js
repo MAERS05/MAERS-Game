@@ -1249,7 +1249,7 @@ export class BattleEngine {
 
     // 计算不含折扣修正的"毛成本"（用于追踪折扣消耗量）
     const calcGrossCost = (ctx) => {
-      if (!ctx || ctx.action === Action.STANDBY || ctx.action === Action.READY) return 0;
+      if (!ctx || ctx.action === Action.STANDBY || ctx.action === Action.READY || ctx.action === Action.HEAL) return 0;
       return 1 + (ctx.enhance || 0) + (player.staminaPenalty || 0);
     };
 
