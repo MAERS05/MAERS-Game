@@ -95,31 +95,34 @@ export class AIExtraLayer {
     const playerLowStamina = player ? player.stamina <= 1 : false;
     const score = 1;
 
+    // ── 基础权重（B）：所有技能拉平至 1.3~1.5 ──
+    // ── 调优权重（T）：基于场景条件的额外加成 ──
+    const B = 1.4; // 基准线
     const byId = {
-      // ── 共享攻击技能 ──
-      [EffectId.REND]: action === Action.ATTACK ? (playerLowStamina ? 1.0 : 2.0) : -5,
-      [EffectId.BREAK_QI]: action === Action.ATTACK ? (playerLowHp ? 2.6 : 0.9) : -5,
-      [EffectId.RECKLESS]: action === Action.ATTACK ? (playerLowHp ? 2.0 : 1.0) : -5,
-      [EffectId.DRAIN]: action === Action.ATTACK ? (playerLowStamina ? 1.3 : 1.9) : -5,
-      [EffectId.OBSCURE]: action === Action.ATTACK ? 1.4 : -5,
+      // ── 共享攻击技能 ──                       基础    调优
+      [EffectId.REND]:         action === Action.ATTACK ? B + 0.1 + (playerLowHp ? 0.4 : 0) : -5,
+      [EffectId.BREAK_QI]:     action === Action.ATTACK ? B - 0.1 + (playerLowHp ? 0.8 : 0) : -5,
+      [EffectId.RECKLESS]:     action === Action.ATTACK ? B - 0.1 + (playerLowHp ? 0.6 : 0) : -5,
+      [EffectId.DRAIN]:        action === Action.ATTACK ? B + 0.1 + (playerLowStamina ? 0.5 : 0) + (aiLowHp ? 0.4 : 0) : -5,
+      [EffectId.OBSCURE]:      action === Action.ATTACK ? B       : -5,
       // ── AI 攻击技能 ──
-      [EffectId.CHAINLOCK]: action === Action.ATTACK ? 1.5 : -5,
-      [EffectId.BLOOD_DRINK]: action === Action.ATTACK ? (aiLowHp ? 2.4 : 1.3) : -5,
-      [EffectId.PURSUIT]: action === Action.ATTACK ? 1.4 : -5,
-      [EffectId.HEAVY_PRESS]: action === Action.ATTACK ? 1.4 : -5,
-      [EffectId.BRUTE_FORCE]: action === Action.ATTACK ? 1.5 : -5,  // 蛮力
+      [EffectId.CHAINLOCK]:    action === Action.ATTACK ? B + 0.1 : -5,
+      [EffectId.BLOOD_DRINK]:  action === Action.ATTACK ? B - 0.1 + (aiLowHp ? 0.8 : 0) : -5,
+      [EffectId.PURSUIT]:      action === Action.ATTACK ? B       : -5,
+      [EffectId.HEAVY_PRESS]:  action === Action.ATTACK ? B       : -5,
+      [EffectId.BRUTE_FORCE]:  action === Action.ATTACK ? B + 0.1 : -5,
 
       // ── 共享守备技能 ──
-      [EffectId.BLOOD_SHIELD]: action === Action.GUARD ? (aiLowHp ? 1.7 : 0.7) : -5,
-      [EffectId.REDIRECT]: action === Action.GUARD ? 1.5 : -5,
-      [EffectId.BASTION]: action === Action.GUARD ? 1.2 : -5,
-      [EffectId.IRON_WALL]: action === Action.GUARD ? 1.4 : -5,
-      [EffectId.ABSORB_QI]: action === Action.GUARD ? (ai.stamina <= 2 ? 2.2 : 1.1) : -5,
-      [EffectId.INTERCEPT]: action === Action.GUARD ? (playerLowStamina ? 0.6 : 1.5) : -5,
-      [EffectId.RESTORE]: action === Action.GUARD ? (aiLowHp ? 2.0 : 1.2) : -5,
-      [EffectId.SHOCKWAVE]: action === Action.GUARD ? 1.5 : -5,
+      [EffectId.BLOOD_SHIELD]: action === Action.GUARD  ? B - 0.2 + (aiLowHp ? 0.5 : 0) : -5,
+      [EffectId.REDIRECT]:     action === Action.GUARD  ? B + 0.1 : -5,
+      [EffectId.BASTION]:      action === Action.GUARD  ? B - 0.1 : -5,
+      [EffectId.IRON_WALL]:    action === Action.GUARD  ? B       : -5,
+      [EffectId.ABSORB_QI]:    action === Action.GUARD  ? B - 0.1 + (ai.stamina <= 2 ? 0.8 : 0) : -5,
+      [EffectId.INTERCEPT]:    action === Action.GUARD  ? B + 0.1 + (playerLowStamina ? -0.6 : 0) : -5,
+      [EffectId.RESTORE]:      action === Action.GUARD  ? B - 0.1 + (aiLowHp ? 0.6 : 0) : -5,
+      [EffectId.SHOCKWAVE]:    action === Action.GUARD  ? B + 0.1 : -5,
       // ── AI 守备技能 ──
-      [EffectId.IRON_GUARD]: action === Action.GUARD ? 1.5 : -5,  // 迅防
+      [EffectId.IRON_GUARD]:   action === Action.GUARD  ? B + 0.1 : -5,  // 迅防
     };
 
     let total = score + (byId[id] ?? 0);
