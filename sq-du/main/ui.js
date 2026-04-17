@@ -20,7 +20,7 @@ import { BattleEngine } from '../base/engine.js';
 import {
   EngineEvent, EngineState, PlayerId, Action, ActionName,
   DefaultStats, TimerConfig, Phase, EngineMode,
-  EffectId, EffectDefs, EFFECT_SLOTS,
+  EffectId, EffectDefs, EFFECT_SLOTS, readBonus,
 } from '../base/constants.js';
 import { EffectHandlers } from '../base/effect-handlers.js';
 import { EffectLayer } from './effect.js';
@@ -270,9 +270,10 @@ function refreshPoints() {
   const snap = engine.getSnapshot();
   const p1 = snap.players[PlayerId.P1];
 
-  let atkPt = 1 + (selectedAction === 'attack' ? localEnhance : 0);
-  let grdPt = 1 + (selectedAction === 'guard' ? localEnhance : 0);
-  let dgePt = 1 + (selectedAction === 'dodge' ? localEnhance : 0);
+  // 点数 = 基础(1) + 强化 + 行动期前已生效的加值
+  let atkPt = 1 + (selectedAction === 'attack' ? localEnhance : 0) + readBonus(p1.attackPtsBonus);
+  let grdPt = 1 + (selectedAction === 'guard' ? localEnhance : 0) + readBonus(p1.guardPtsBonus);
+  let dgePt = 1 + (selectedAction === 'dodge' ? localEnhance : 0) + readBonus(p1.dodgePtsBonus);
 
   ui.ptAttack.textContent = Math.max(0, atkPt);
   ui.ptGuard.textContent = Math.max(0, grdPt);
@@ -315,7 +316,11 @@ function updateConfigPanel() {
 
   const snap = engine.getSnapshot();
   const p1 = snap.players[PlayerId.P1];
-  const totalPts = 1 + localEnhance; // 攻击/守备/闪避统一为 1+enhance
+  // slotPts：1 + 强化 + 行动期前已生效的加值（不含行动期内临时增益如力量/虚弱）
+  const bonusField = selectedAction === 'attack' ? 'attackPtsBonus'
+    : selectedAction === 'guard' ? 'guardPtsBonus'
+      : 'dodgePtsBonus';
+  const totalPts = Math.max(0, Math.min(EFFECT_SLOTS, 1 + localEnhance + readBonus(p1[bonusField])));
 
   ui.enhanceInfo.textContent = `✦ 强化 +${localEnhance} 点数（消耗 ${localEnhance} 精力）`;
   ui.maxEffectSlots.textContent = totalPts;
@@ -1178,6 +1183,23 @@ function updateStatusIcons(playerId, state) {
     const display = sign * val;
     addIcon(icon, `${name}：${resource} ${display > 0 ? '+' : ''}${display}`, 'ACTION_START', decayTurnLabel(val));
     rendered.add(eid);
+  }
+
+  // ── 3. bonus 字段图标（支持 { value, turns } 对象格式） ──
+  const bonusChecks = [
+    { field: 'attackPtsBonus', icon: 'strong.svg', name: '攻击强化', resource: '攻击点数和槽位' },
+    { field: 'guardPtsBonus', icon: 'shield.svg', name: '守备强化', resource: '守备点数和槽位' },
+    { field: 'dodgePtsBonus', icon: 'avoid.svg', name: '闪避强化', resource: '闪避点数和槽位' },
+    { field: 'speedBonus', icon: 'fast.svg', name: '速度强化', resource: '动速' },
+  ];
+  for (const { field, icon, name, resource } of bonusChecks) {
+    const raw = state[field];
+    const val = readBonus(raw);
+    if (val <= 0) continue;
+    // 回合标签：对象模式读 turns，纯数字模式用值本身
+    const turns = (raw && typeof raw === 'object') ? raw.turns : raw;
+    const turnLabel = !isFinite(turns) ? '永久' : decayTurnLabel(turns);
+    addIcon(icon, `${name}：${resource} +${val}`, 'TURN_PHASE', turnLabel);
   }
 
   // 洞察相关

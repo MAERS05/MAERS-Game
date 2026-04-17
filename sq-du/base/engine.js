@@ -157,10 +157,10 @@ function createPlayerState(id, overrides = {}) {
     agilityDebuff: 0,                             // 动速减益
     agilityBoost: 0,                              // 动速增益
     chargeBoost: 0,                               // 攻击点数增益
-    attackPtsBonus: 0,                             // 永久攻击点数加值（不衰减）
-    guardPtsBonus: 0,                              // 永久守备点数加值（不衰减）
-    dodgePtsBonus: 0,                              // 永久闪避点数加值（不衰减）
-    speedBonus: 0,                                 // 永久动速加值（不衰减）
+    attackPtsBonus: 0,                             // 攻击点数加值（N | { value, turns }，每回合衰减，Infinity=永久）
+    guardPtsBonus: 0,                              // 守备点数加值（N | { value, turns }，每回合衰减，Infinity=永久）
+    dodgePtsBonus: 0,                              // 闪避点数加值（N | { value, turns }，每回合衰减，Infinity=永久）
+    speedBonus: 0,                                 // 动速加值（N | { value, turns }，每回合衰减，Infinity=永久）
     ptsDebuff: 0,                                 // 攻击点数减益
     guardBoost: 0,                                // 守备点数增益
     guardDebuff: 0,                               // 守备点数减益

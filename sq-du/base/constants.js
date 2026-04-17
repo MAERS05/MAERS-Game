@@ -587,6 +587,19 @@ export function calcActionCost(ctx, playerState) {
   return Math.max(0, base + pen - dis);
 }
 
+/**
+ * 读取 bonus 字段的实际加量值。
+ * 支持两种格式：
+ *  - 纯数字 N：加量 = N（兼容旧格式，N 同时也是衰减倒计时）
+ *  - 对象 { value, turns }：加量 = value，持续 turns 回合（turns=Infinity 永久）
+ *
+ * @param {number|{value:number,turns:number}|null|undefined} val
+ * @returns {number} 实际加量（≥0）
+ */
+export function readBonus(val) {
+  if (val && typeof val === 'object') return val.value || 0;
+  return val || 0;
+}
 
 // ─────────────────────────────────────────────
 // 数据结构定义（JSDoc 类型参考）

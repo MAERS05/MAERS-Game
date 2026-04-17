@@ -7,14 +7,14 @@
 
 'use strict';
 
-import { Action, EffectDefs, EffectId } from '../base/constants.js';
+import { Action, EffectDefs, EffectId, readBonus } from '../base/constants.js';
 
 const AI_EFFECT_LOW_HP_THRESHOLD = 2;
 
 export class AIExtraLayer {
   /**
    * 从 AI 的装配池中按顺序取得本回合生效的被动效果。
-   * pts = 1 + enhance 个槽位填满，其余为 null。
+   * 1 + enhance + bonus 个槽位填满，其余为 null。
    *
    * 自残效果安全检查：
    *  - 统计所有候选效果的总 HP 消耗，不允许超过当前 HP - 1
@@ -32,7 +32,11 @@ export class AIExtraLayer {
    */
   static pickEffects(action, enhance, ai, scene = {}) {
     const EFFECT_SLOTS = 3;
-    const slots = Math.min(1 + enhance, EFFECT_SLOTS);
+    // 可用槽位 = 1 + 强化 + bonus 加值（attackPtsBonus/guardPtsBonus/dodgePtsBonus）
+    const bonusField = action === Action.ATTACK ? 'attackPtsBonus'
+                     : action === Action.GUARD  ? 'guardPtsBonus'
+                     :                            'dodgePtsBonus';
+    const slots = Math.min(1 + enhance + readBonus(ai[bonusField]), EFFECT_SLOTS);
 
     const inventory = (ai.effectInventory?.[action] ?? [])
       .filter(id => EffectDefs[id]?.applicableTo.includes(action));

@@ -9,6 +9,7 @@ import {
   EngineEvent,
   PlayerId,
   calcActionCost,
+  readBonus,
 } from '../base/constants.js';
 import { EffectTimingLayer } from '../effect/timing.js';
 import { EffectHandlers } from '../base/effect-handlers.js';
@@ -84,7 +85,21 @@ export class EffectLayer {
     let cp1 = { ...p1Ctx };
     let cp2 = { ...p2Ctx };
 
-    // ── 调用技能 onPre 钩子（基于玩家原始提交的 pts 决定哪些槽位触发）
+    // ── 记录槽位点数（含行动期前加值，不含行动期内临时增益） ──
+    // _slotPts 必须在 _collectTriggeredEffects 之前计算，
+    // 否则 bonus 扩展的槽位的 onPre 钩子不会被触发
+    const calcSlotPts = (ctx, state) => {
+      if (!ctx || ctx.action === Action.STANDBY || ctx.action === Action.READY) return 0;
+      let base = ctx.pts || 0;
+      if (ctx.action === Action.ATTACK) base += readBonus(state.attackPtsBonus);
+      else if (ctx.action === Action.GUARD) base += readBonus(state.guardPtsBonus);
+      else if (ctx.action === Action.DODGE) base += readBonus(state.dodgePtsBonus);
+      return Math.max(0, base);
+    };
+    cp1._slotPts = calcSlotPts(cp1, p1State);
+    cp2._slotPts = calcSlotPts(cp2, p2State);
+
+    // ── 调用技能 onPre 钩子（基于 _slotPts 决定哪些槽位触发）
     const p1RawTriggered = this._collectTriggeredEffects(cp1);
     for (const effectId of p1RawTriggered) {
       const handler = EffectHandlers[effectId];
@@ -105,39 +120,39 @@ export class EffectLayer {
 
     // ── 攻击点数：应用力量(chargeBoost)和虚弱(ptsDebuff) ──
     if (cp1.action === Action.ATTACK) {
-      const raw = (cp1.pts || 0) + (p1State.chargeBoost || 0) + (p1State.attackPtsBonus || 0) - (p1State.ptsDebuff || 0);
+      const raw = (cp1.pts || 0) + (p1State.chargeBoost || 0) + readBonus(p1State.attackPtsBonus) - (p1State.ptsDebuff || 0);
       cp1.pts = clampPts(raw, 'attackPtsOverflow', 'attackPtsUnderflow', p1State);
     }
     if (cp2.action === Action.ATTACK) {
-      const raw = (cp2.pts || 0) + (p2State.chargeBoost || 0) + (p2State.attackPtsBonus || 0) - (p2State.ptsDebuff || 0);
+      const raw = (cp2.pts || 0) + (p2State.chargeBoost || 0) + readBonus(p2State.attackPtsBonus) - (p2State.ptsDebuff || 0);
       cp2.pts = clampPts(raw, 'attackPtsOverflow', 'attackPtsUnderflow', p2State);
     }
 
     // ── 守备点数：应用坚固(guardBoost)和碎甲(guardDebuff) ──
     if (cp1.action === Action.GUARD) {
-      const raw = (cp1.pts || 0) + (p1State.guardBoost || 0) + (p1State.guardPtsBonus || 0) - (p1State.guardDebuff || 0);
+      const raw = (cp1.pts || 0) + (p1State.guardBoost || 0) + readBonus(p1State.guardPtsBonus) - (p1State.guardDebuff || 0);
       cp1.pts = clampPts(raw, 'guardPtsOverflow', 'guardPtsUnderflow', p1State);
     }
     if (cp2.action === Action.GUARD) {
-      const raw = (cp2.pts || 0) + (p2State.guardBoost || 0) + (p2State.guardPtsBonus || 0) - (p2State.guardDebuff || 0);
+      const raw = (cp2.pts || 0) + (p2State.guardBoost || 0) + readBonus(p2State.guardPtsBonus) - (p2State.guardDebuff || 0);
       cp2.pts = clampPts(raw, 'guardPtsOverflow', 'guardPtsUnderflow', p2State);
     }
 
     // ── 闪避点数：应用侧身(dodgeBoost)和僵硬(dodgeDebuff) ──
     if (cp1.action === Action.DODGE) {
-      const raw = (cp1.pts || 0) + (p1State.dodgeBoost || 0) + (p1State.dodgePtsBonus || 0) - (p1State.dodgeDebuff || 0);
+      const raw = (cp1.pts || 0) + (p1State.dodgeBoost || 0) + readBonus(p1State.dodgePtsBonus) - (p1State.dodgeDebuff || 0);
       cp1.pts = clampPts(raw, 'dodgePtsOverflow', 'dodgePtsUnderflow', p1State);
     }
     if (cp2.action === Action.DODGE) {
-      const raw = (cp2.pts || 0) + (p2State.dodgeBoost || 0) + (p2State.dodgePtsBonus || 0) - (p2State.dodgeDebuff || 0);
+      const raw = (cp2.pts || 0) + (p2State.dodgeBoost || 0) + readBonus(p2State.dodgePtsBonus) - (p2State.dodgeDebuff || 0);
       cp2.pts = clampPts(raw, 'dodgePtsOverflow', 'dodgePtsUnderflow', p2State);
     }
 
     // ── 动速：应用轻盈(agilityBoost)和沉重(agilityDebuff)，并裁剪上下限 ──
-    const p1SpeedRaw = (cp1.speed || DefaultStats.BASE_SPEED) + (p1State.agilityBoost || 0) + (p1State.speedBonus || 0) - (p1State.agilityDebuff || 0);
+    const p1SpeedRaw = (cp1.speed || DefaultStats.BASE_SPEED) + (p1State.agilityBoost || 0) + readBonus(p1State.speedBonus) - (p1State.agilityDebuff || 0);
     cp1.speed = clampPts(p1SpeedRaw, 'speedOverflow', 'speedUnderflow', p1State);
 
-    const p2SpeedRaw = (cp2.speed || DefaultStats.BASE_SPEED) + (p2State.agilityBoost || 0) + (p2State.speedBonus || 0) - (p2State.agilityDebuff || 0);
+    const p2SpeedRaw = (cp2.speed || DefaultStats.BASE_SPEED) + (p2State.agilityBoost || 0) + readBonus(p2State.speedBonus) - (p2State.agilityDebuff || 0);
     cp2.speed = clampPts(p2SpeedRaw, 'speedOverflow', 'speedUnderflow', p2State);
 
     // ── 消费本回合一次性 boost/debuff（已应用到 pts/speed，清零等待衰减填充下回合） ──
@@ -167,7 +182,8 @@ export class EffectLayer {
    */
   static decayAllStatusEffects(state) {
     if (!state) return;
-    const decayFields = [
+    // ── 纯数字衰减字段（N = 加量 = 倒计时） ──
+    const simpleDecayFields = [
       'ptsDebuff', 'chargeBoost',
       'guardBoost', 'guardDebuff',
       'dodgeBoost', 'dodgeDebuff',
@@ -176,10 +192,28 @@ export class EffectLayer {
       'insightDebuff',
       'restRecoverBonus', 'restRecoverPenalty',
     ];
-    for (const field of decayFields) {
+    for (const field of simpleDecayFields) {
       const val = state[field] || 0;
       if (val > 0) state[field] = val - 1;
       else if (val < 0) state[field] = val + 1;
+    }
+
+    // ── bonus 衰减字段（支持纯数字 或 { value, turns } 对象） ──
+    const bonusFields = ['attackPtsBonus', 'guardPtsBonus', 'dodgePtsBonus', 'speedBonus'];
+    for (const field of bonusFields) {
+      const raw = state[field];
+      if (!raw) continue;
+      if (typeof raw === 'object') {
+        // 对象模式：衰减 turns，到期清零
+        if (!isFinite(raw.turns)) continue;        // Infinity = 永久
+        raw.turns--;
+        if (raw.turns <= 0) state[field] = 0;
+      } else {
+        // 纯数字模式：同旧逻辑（N = 加量 = 倒计时）
+        if (!isFinite(raw)) continue;              // Infinity = 永久
+        if (raw > 0) state[field] = raw - 1;
+        else if (raw < 0) state[field] = raw + 1;
+      }
     }
   }
 
@@ -217,7 +251,8 @@ export class EffectLayer {
   static _collectTriggeredEffects(ctx) {
     if (!ctx?.effects || ctx.action === Action.STANDBY) return [];
 
-    const pts = Math.max(0, ctx.pts || 0);
+    // 使用 _slotPts（行动期前的点数）决定可触发槽位数，不受行动期内临时增益影响
+    const pts = Math.max(0, ctx._slotPts ?? ctx.pts ?? 0);
     const validSlots = Math.min(EFFECT_SLOTS, pts);
     const triggered = [];
 
@@ -238,11 +273,11 @@ export class EffectLayer {
 
     let pts = ctx.pts || 0;
     if (ctx.action === Action.ATTACK) {
-      pts = pts + (playerState?.chargeBoost || 0) + (playerState?.attackPtsBonus || 0) - (playerState?.ptsDebuff || 0);
+      pts = pts + (playerState?.chargeBoost || 0) + readBonus(playerState?.attackPtsBonus) - (playerState?.ptsDebuff || 0);
     } else if (ctx.action === Action.GUARD) {
-      pts = pts + (playerState?.guardBoost || 0) + (playerState?.guardPtsBonus || 0) - (playerState?.guardDebuff || 0);
+      pts = pts + (playerState?.guardBoost || 0) + readBonus(playerState?.guardPtsBonus) - (playerState?.guardDebuff || 0);
     } else if (ctx.action === Action.DODGE) {
-      pts = pts + (playerState?.dodgeBoost || 0) + (playerState?.dodgePtsBonus || 0) - (playerState?.dodgeDebuff || 0);
+      pts = pts + (playerState?.dodgeBoost || 0) + readBonus(playerState?.dodgePtsBonus) - (playerState?.dodgeDebuff || 0);
     }
     return Math.max(0, pts);
   }
