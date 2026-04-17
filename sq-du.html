@@ -691,9 +691,27 @@
       pointer-events: auto;
     }
 
+    /* 模式选择遮罩：全屏拦截点击，防止点透到行动按钮 */
+    .mode-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.10);
+      backdrop-filter: blur(1px);
+      -webkit-backdrop-filter: blur(1px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+      z-index: 490;
+    }
+
+    .mode-overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
     /* 模式选择容器，初始隐藏，覆盖在中心 */
     .mode-select-box {
-      position: absolute;
+      position: fixed;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%) scale(0.9);
@@ -701,7 +719,9 @@
       pointer-events: none;
       transition: opacity 0.4s ease, transform 0.4s ease;
       display: flex;
-      gap: 20px;
+      flex-direction: column;
+      align-items: center;
+      gap: 28px;
       z-index: 500;
     }
 
@@ -709,6 +729,20 @@
       opacity: 1;
       transform: translate(-50%, -50%) scale(1);
       pointer-events: auto;
+    }
+
+    .mode-select-title {
+      font-family: 'Cinzel', serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: 6px;
+      color: var(--text-muted);
+      text-indent: 6px;
+    }
+
+    .mode-select-btns {
+      display: flex;
+      gap: 20px;
     }
 
     /* 将容器内按钮设为相对定位 */
@@ -1591,7 +1625,8 @@
       padding: 2px 6px;
       font-size: 0.75rem;
       cursor: pointer;
-      margin-right: auto; /* 占据右侧剩余空间，推走关闭按钮 */
+      margin-right: auto;
+      /* 占据右侧剩余空间，推走关闭按钮 */
       transition: all 0.2s;
     }
 
@@ -1918,13 +1953,16 @@
     <!-- 重新开始按钮 -->
     <button id="restartBtn" class="game-btn" onclick="location.reload()">重新开始</button>
 
-    <!-- 开始游戏按钮 -->
-    <button id="startBtn" class="game-btn">开始游戏</button>
+    <!-- 模式选择遮罩（防点透） -->
+    <div id="modeOverlay" class="mode-overlay"></div>
 
     <!-- 模式选择面板 -->
     <div id="modeSelectBox" class="mode-select-box">
-      <button id="modeTimedBtn" class="game-btn">计时</button>
-      <button id="modeInstantBtn" class="game-btn">即时</button>
+      <div class="mode-select-title">选择模式</div>
+      <div class="mode-select-btns">
+        <button id="modeTimedBtn" class="game-btn">计时</button>
+        <button id="modeInstantBtn" class="game-btn">即时</button>
+      </div>
     </div>
 
     <!-- ═══ 装配期覆盖面板 ═══ -->
@@ -2090,7 +2128,9 @@
     }
 
     @keyframes spin {
-      100% { transform: rotate(360deg); }
+      100% {
+        transform: rotate(360deg);
+      }
     }
 
     #globalPauseBtn {
@@ -2173,21 +2213,23 @@
   <script>
     const bgm = document.getElementById('bgm');
     const bgmToggle = document.getElementById('bgmToggle');
-    const startBtn = document.getElementById('startBtn');
-    
+
     // 初始化音量
     bgm.volume = 0.5;
 
-    // 点击开始游戏时播放音乐
-    if (startBtn) {
-      startBtn.addEventListener('click', () => {
-        if (bgm.paused) {
-          bgm.play().then(() => {
-            bgmToggle.classList.add('playing');
-          }).catch(() => {});
-        }
-      });
+    // 点击模式按钮时播放音乐
+    function tryPlayBGM() {
+      if (bgm.paused) {
+        bgm.play().then(() => {
+          bgmToggle.classList.add('playing');
+        }).catch(() => { });
+      }
     }
+
+    const modeTimedBtn = document.getElementById('modeTimedBtn');
+    const modeInstantBtn = document.getElementById('modeInstantBtn');
+    if (modeTimedBtn) modeTimedBtn.addEventListener('click', tryPlayBGM);
+    if (modeInstantBtn) modeInstantBtn.addEventListener('click', tryPlayBGM);
 
     // 点击图标切换播放/暂停
     bgmToggle.addEventListener('click', () => {

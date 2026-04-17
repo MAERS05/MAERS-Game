@@ -1704,38 +1704,36 @@ if (ui.globalPauseBtn) {
 
 initUI();
 
-const startBtn = document.getElementById('startBtn');
+const modeOverlay = document.getElementById('modeOverlay');
 const modeSelectBox = document.getElementById('modeSelectBox');
 const modeInstantBtn = document.getElementById('modeInstantBtn');
 const modeTimedBtn = document.getElementById('modeTimedBtn');
 
-if (startBtn) {
-  startBtn.classList.add('show');
-  startBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    startBtn.classList.remove('show');
-    // 延迟一帧再显示模式选择，防止同一次点击穿透到下层按钮
-    requestAnimationFrame(() => {
-      modeSelectBox.classList.add('show');
-    });
-  });
-
-  modeTimedBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    gameMode = 'timed';
-    modeSelectBox.classList.remove('show');
-    engine.startGame({ instant: false });
-  });
-
-  modeInstantBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    gameMode = 'instant';
-    modeSelectBox.classList.remove('show');
-    engine.startGame({ instant: true });
-  });
-} else {
-  engine.startGame();
+/** 关闭模式选择面板和遮罩 */
+function closeModeSelect() {
+  modeSelectBox.classList.remove('show');
+  modeOverlay.classList.remove('show');
 }
+
+// 页面加载后直接展示模式选择
+requestAnimationFrame(() => {
+  modeSelectBox.classList.add('show');
+  modeOverlay.classList.add('show');
+});
+
+modeTimedBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  gameMode = 'timed';
+  closeModeSelect();
+  engine.startGame({ instant: false });
+});
+
+modeInstantBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  gameMode = 'instant';
+  closeModeSelect();
+  engine.startGame({ instant: true });
+});
 
 // 即时模式：装配期手动关闭按钮
 document.getElementById('equipCloseBtn').addEventListener('click', () => {
