@@ -580,31 +580,35 @@ export class JudgeLayer {
 
     if (!p1Dead && !p2Dead) return { isOver: false, winner: null, reason: '' };
 
-    let winner = null;
+    let finalClashName = result.clashName;
+    let finalDesc = '';
 
     if (p1Dead && p2Dead) {
-      result.clashName = '同归';
-      result.clashDesc = '双方同归于尽。';
+      finalClashName = '同归';
+      finalDesc = '双方同归于尽。';
     } else if (p1Dead) {
       winner = PlayerId.P2;
       if (result.executeP1) {
-        result.clashName = '处决';
-        result.clashDesc = '你精力耗尽，遭到致命一击！';
+        finalClashName = '处决';
+        finalDesc = '你精力耗尽，遭到致命一击！';
       } else {
-        result.clashName = '战终';
-        result.clashDesc = '你的命数已空。';
+        finalClashName = '战终';
+        finalDesc = '你的命数已空。';
       }
     } else {
       winner = PlayerId.P1;
       if (result.executeP2) {
-        result.clashName = '处决';
-        result.clashDesc = '敌方精力耗尽，被你一击终结！';
+        finalClashName = '处决';
+        finalDesc = '敌方精力耗尽，被你一击终结！';
       } else {
-        result.clashName = '战终';
-        result.clashDesc = '敌方命数已空。';
+        finalClashName = '战终';
+        finalDesc = '敌方命数已空。';
       }
     }
 
-    return { isOver: true, winner, reason: `【${result.clashName}】${result.clashDesc}` };
+    // 修改结果标题为最终战果，但保留原有的详细战斗过程（不覆盖 clashDesc）
+    result.clashName = finalClashName;
+
+    return { isOver: true, winner, reason: `【${finalClashName}】${finalDesc}` };
   }
 }

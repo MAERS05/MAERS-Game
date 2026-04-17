@@ -1510,6 +1510,29 @@
       font-size: 0.85rem;
       color: var(--text-muted);
       letter-spacing: 0.08em;
+      margin-right: 12px;
+    }
+
+    .effect-picker-compact-btn {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: var(--text-muted);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      margin-right: auto; /* 占据右侧剩余空间，推走关闭按钮 */
+      transition: all 0.2s;
+    }
+
+    .effect-picker-compact-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .effect-picker-compact-btn.active {
+      background: rgba(245, 158, 11, 0.2);
+      color: #fbd38d;
+      border-color: #f59e0b;
     }
 
     .effect-picker-close {
@@ -1526,6 +1549,27 @@
       gap: 8px;
       max-height: 280px;
       overflow-y: auto;
+    }
+
+    /* 紧凑模式样式 */
+    .effect-picker-list.compact {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .effect-picker-list.compact .effect-item {
+      padding: 8px 4px;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .effect-picker-list.compact .effect-item-desc {
+      display: none;
+    }
+
+    .effect-picker-list.compact .effect-item-main {
+      align-items: center;
     }
 
     .effect-item {
@@ -1851,6 +1895,7 @@
     <div class="effect-picker" id="effectPicker">
       <div class="effect-picker-header">
         <span class="effect-picker-title">选择技能</span>
+        <button class="effect-picker-compact-btn" id="effectPickerCompactBtn" title="简化视图">简</button>
         <button class="effect-picker-close" id="effectPickerClose">✕</button>
       </div>
       <div class="effect-picker-list" id="effectPickerList"></div>

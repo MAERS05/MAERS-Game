@@ -120,6 +120,7 @@ const ui = {
   equipOverlay: $('equipOverlay'),
   equipCountdown: $('equipCountdown'),
   effectPicker: $('effectPicker'),
+  effectPickerCompactBtn: $('effectPickerCompactBtn'),
   effectPickerClose: $('effectPickerClose'),
   effectPickerList: $('effectPickerList'),
   pickerBackdrop: $('pickerBackdrop'),
@@ -1316,6 +1317,12 @@ function closePicker() {
 ui.effectPickerClose.addEventListener('click', closePicker);
 // 点击遗罩关闭（不传回结果）
 ui.pickerBackdrop.addEventListener('click', closePicker);
+
+// 紧凑模式切换
+ui.effectPickerCompactBtn.addEventListener('click', () => {
+  ui.effectPickerCompactBtn.classList.toggle('active');
+  ui.effectPickerList.classList.toggle('compact');
+});
 
 // 执行两个槽位的效果互换
 function swapEffects(action, slotA, slotB) {
