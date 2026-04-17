@@ -582,6 +582,7 @@ export class JudgeLayer {
 
     let finalClashName = result.clashName;
     let finalDesc = '';
+    let winner = null;
 
     if (p1Dead && p2Dead) {
       finalClashName = '同归';

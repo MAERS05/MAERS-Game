@@ -103,7 +103,7 @@ export class AIExtraLayer {
       [EffectId.REND]:         action === Action.ATTACK ? B + 0.1 + (playerLowHp ? 0.4 : 0) : -5,
       [EffectId.BREAK_QI]:     action === Action.ATTACK ? B - 0.1 + (playerLowHp ? 0.8 : 0) : -5,
       [EffectId.RECKLESS]:     action === Action.ATTACK ? B - 0.1 + (playerLowHp ? 0.6 : 0) : -5,
-      [EffectId.DRAIN]:        action === Action.ATTACK ? B + 0.1 + (playerLowStamina ? 0.5 : 0) + (aiLowHp ? 0.4 : 0) : -5,
+      [EffectId.DRAIN]:        action === Action.ATTACK ? B       + (playerLowStamina ? 0.5 : 0) + (aiLowHp ? 0.4 : 0) : -5,
       [EffectId.OBSCURE]:      action === Action.ATTACK ? B       : -5,
       // ── AI 攻击技能 ──
       [EffectId.CHAINLOCK]:    action === Action.ATTACK ? B + 0.1 : -5,
