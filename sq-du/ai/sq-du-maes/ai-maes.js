@@ -126,8 +126,8 @@ export const MaesProfile = {
 
   // ── MAES 行为调优（注入 AI 状态，被 ai-base / ai-scheduler 读取） ──
   tuning: {
-    attackBias: 0.5,   // 攻击权重偏移（正=更好斗）
-    guardBias: 0.2,   // 守备权重偏移
+    attackBias: 0.6,   // 攻击权重偏移（正=更好斗）
+    guardBias: 0.3,   // 守备权重偏移
     dodgeBias: 0.1,   // 闪避权重偏移
     insightThreshold: 0.8,   // 洞察评分阈值（低=更积极洞察；默认 1.8）
     insightMaxProb: 0.90,  // 洞察最大概率（默认 0.65）
