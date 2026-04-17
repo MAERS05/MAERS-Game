@@ -17,6 +17,7 @@
 'use strict';
 
 import { Action, DefaultStats, EffectId, EffectDefs } from '../../base/constants.js';
+import { AIExtraLayer } from '../ai-extra.js';
 
 // ── 基础 AI 行为层：统一引入并转导出 ─────────────
 export { scheduleAI, scheduleAIRedecide, accelerateAI } from '../ai-scheduler.js';
@@ -134,6 +135,7 @@ export const MaesProfile = {
     redecideBias: 0.20,  // 重决策概率偏移（加到各情境概率上）
     speedBoostBias: 0.15,  // 提速概率偏移（正=更爱提速）
     passiveExploitBias: 1.8,   // 对手被动行为时攻击加成（蓄势/疗愈=白给）
+    effectSkipChance: 0.10,    // 10% 概率不携带效果（轻出手）
   },
 };
 
@@ -199,10 +201,22 @@ export function applyCustomization(state) {
  */
 export function maesConstrainDecision(decision, scene) {
   const d = { ...decision };
-  const { ai, player } = scene;
+  const { ai, player, history } = scene;
   const effectiveStamina = Math.max(0, ai.stamina + (ai.staminaDiscount || 0) - (ai.staminaPenalty || 0));
   const killWindow = player.hp <= 1 || (player.hp <= 2 && player.stamina <= 1);
   const executeWindow = player.stamina <= 0;
+
+  // ── 场景0（好斗本能）：基础层在精力≤1时强制待命，但 MAES 更激进 ──
+  // 对手上回合被动行为（蓄势/疗愈）或对手精力低时，MAES 宁可拼光精力也要攻击
+  if (d.action === Action.STANDBY && effectiveStamina >= 1) {
+    const recentOpp = history?.length ? history[history.length - 1]?.opponentAction : null;
+    const oppPassive = recentOpp === Action.STANDBY || recentOpp === Action.HEAL;
+    const oppWeak = player.stamina <= 1 || player.hp <= 2;
+    if (oppPassive || oppWeak || executeWindow) {
+      d.action = Action.ATTACK;
+      d.effects = AIExtraLayer.pickEffects(Action.ATTACK, d.enhance || 0, ai, { player, isRedecide: false });
+    }
+  }
 
   // ── 场景1（血线保命）：HP=1 + 对手有精力 → 强制守备 ──
   if (
@@ -224,6 +238,7 @@ export function maesConstrainDecision(decision, scene) {
     (d.action === Action.STANDBY || d.action === Action.HEAL)
   ) {
     d.action = Action.ATTACK;
+    d.effects = AIExtraLayer.pickEffects(Action.ATTACK, d.enhance || 0, ai, { player, isRedecide: false });
   }
 
   // ── 场景3（自残保护）：HP=1 → 移除所有带 hpCost 的技能 ──

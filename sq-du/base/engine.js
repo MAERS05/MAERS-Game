@@ -1390,7 +1390,7 @@ export class BattleEngine {
    * 闪避点数已与动速解耦，动速仅影响时序
    */
   _calcPts(ctx, _playerState) {
-    if (ctx.action === Action.STANDBY || ctx.action === Action.READY) return 0;
+    if (ctx.action === Action.STANDBY || ctx.action === Action.READY || ctx.action === Action.PREPARE) return 0;
     return 1 + (ctx.enhance || 0);
   }
   // _calcCost 已移至 constants.js 的 calcActionCost 导出函数，engine 直接 import 使用

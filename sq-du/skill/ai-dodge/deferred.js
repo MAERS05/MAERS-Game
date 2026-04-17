@@ -15,6 +15,7 @@ export const DeferredEffect = createSkillEffect({
       turnDelay: 2,
       source: 'skill:deferred',
     });
-    return { ...ctx, pts: 0 };
+    // 转为蓄备：保留闪避的精力消耗，但本回合不执行闪避
+    return { ...ctx, action: Action.PREPARE };
   },
 });

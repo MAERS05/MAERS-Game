@@ -36,7 +36,13 @@ export class AIExtraLayer {
     const bonusField = action === Action.ATTACK ? 'attackPtsBonus'
                      : action === Action.GUARD  ? 'guardPtsBonus'
                      :                            'dodgePtsBonus';
-    const slots = Math.min(1 + enhance + readBonus(ai[bonusField]), EFFECT_SLOTS);
+    const slots = Math.min(Math.floor(1 + enhance + readBonus(ai[bonusField])), EFFECT_SLOTS);
+
+    // tuning 控制：有概率不携带效果（模拟"轻出手"）
+    const skipChance = ai.aiTuning?.effectSkipChance || 0;
+    if (skipChance > 0 && Math.random() < skipChance) {
+      return Array(EFFECT_SLOTS).fill(null);
+    }
 
     const inventory = (ai.effectInventory?.[action] ?? [])
       .filter(id => EffectDefs[id]?.applicableTo.includes(action));

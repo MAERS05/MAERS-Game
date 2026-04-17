@@ -217,9 +217,9 @@ export class AIBaseLogic {
     // ── AI 自身效果感知（被挂 debuff 时调整决策）────
     // 攻击被削 → 攻击效率低，转守/蓄势
     if (snap.aiPtsDebuff > 0) {
-      w.attack -= snap.aiPtsDebuff * 1.2;
-      w.guard += 0.6;
-      w.standby += 0.8;
+      w.attack -= snap.aiPtsDebuff * 0.8;
+      w.guard += 0.4;
+      w.standby += 0.5;
     }
     // 守备被削 → 守备不可靠，转闪避
     if (snap.aiGuardDebuff > 0) {
@@ -271,19 +271,19 @@ export class AIBaseLogic {
 
     // ── 自身血量压力 ─────────────────────────────
     const aiHpPressure = 1 - snap.aiHpRatio;
-    w.guard += aiHpPressure * 2.5;
-    w.dodge += aiHpPressure * 1.5;
-    w.attack -= aiHpPressure * 0.5;
+    w.guard += aiHpPressure * 1.5;
+    w.dodge += aiHpPressure * 0.8;
+    w.attack -= aiHpPressure * 0.2;
 
     // ── 对手血量压力（有精力时主动进攻）──────────
     if (aiEffectiveStamina >= 2) {
-      w.attack += (1 - snap.playerHpRatio) * 3.5;
+      w.attack += (1 - snap.playerHpRatio) * 3.0;
     }
 
     // ── 对手攻击倾向（对应防守）───────────────────
-    w.guard += snap.oppAggression * 1.5;
-    w.dodge += snap.oppAggression * 1.0;
-    w.attack -= snap.oppAggression * 0.5;
+    w.guard += snap.oppAggression * 0.8;
+    w.dodge += snap.oppAggression * 0.5;
+    w.attack -= snap.oppAggression * 0.2;
 
     // ══════════════════════════════════════════════
     // 精力管控（Phase-based Stamina Management）
@@ -315,11 +315,11 @@ export class AIBaseLogic {
         w.attack += 0.8;
         w.guard += 0.5;
       }
-      // 对手高精力：我方处于劣势，收缩
+      // 对手高精力：我方处于劣势，适度收缩
       else {
-        w.standby += 1.2;
-        w.guard += 0.5;
-        w.attack -= 0.3;
+        w.standby += 0.8;
+        w.guard += 0.3;
+        w.attack -= 0.1;
       }
       // 对手被动行为（蓄势/疗愈）：无防御，可施压（具体力度由 tuning 决定）
       const passiveBias = tuning.passiveExploitBias || 0;
@@ -372,26 +372,26 @@ export class AIBaseLogic {
 
     // 预测高度连击/攻击倾向时，规避并防守
     if (pAtk > 0.45) {
-      w.guard += pAtk * 2.5;
-      w.dodge += pAtk * 1.5;
-      w.attack -= pAtk * 1.0;
+      w.guard += pAtk * 1.5;
+      w.dodge += pAtk * 0.8;
+      w.attack -= pAtk * 0.4;
     }
     // 预测对手龟缩防守时，攒气或者强攻（精力充足时）
     if (pGrd > 0.45) {
-      if (aiEffectiveStamina >= 3) { w.attack += pGrd * 2.5; }
-      else { w.standby += pGrd * 2.5; w.attack -= pGrd * 0.5; }
+      if (aiEffectiveStamina >= 3) { w.attack += pGrd * 2.0; }
+      else { w.standby += pGrd * 1.5; w.attack -= pGrd * 0.3; }
     }
     // 预测对手灵活闪避时，避免盲目攻击导致精疲力竭，倾向防守或保留精力
     if (pDodge > 0.45) {
-      w.standby += pDodge * 1.5;
-      w.guard += pDodge * 1.0;
-      w.attack -= pDodge * 1.5;
+      w.standby += pDodge * 1.0;
+      w.guard += pDodge * 0.5;
+      w.attack -= pDodge * 0.8;
     }
 
     // ── 濒危保命 ─────────────────────────────────
-    w.guard += indicators.aiDanger * indicators.antiAttackNeed * 1.8;
-    w.dodge += indicators.aiDanger * indicators.antiAttackNeed * 1.2;
-    w.attack -= indicators.aiDanger * indicators.antiAttackNeed * 1.0;
+    w.guard += indicators.aiDanger * indicators.antiAttackNeed * 1.0;
+    w.dodge += indicators.aiDanger * indicators.antiAttackNeed * 0.6;
+    w.attack -= indicators.aiDanger * indicators.antiAttackNeed * 0.4;
 
     // ── 疗愈评估（低血量 + 未被禁止时考虑）─────────
     if (!ai.healBlocked && ai.hp < 3) {
@@ -409,7 +409,10 @@ export class AIBaseLogic {
     }
 
     // ── 行动禁用：被效果封禁的行动权重归零 ──────────
-    const blocked = Array.isArray(ai.actionBlocked) ? ai.actionBlocked : [];
+    const blocked = [
+      ...(Array.isArray(ai.actionBlocked) ? ai.actionBlocked : []),
+      ...(Array.isArray(ai.permActionBlocked) ? ai.permActionBlocked : []),
+    ];
     if (blocked.includes(Action.ATTACK)) w.attack = -Infinity;
     if (blocked.includes(Action.GUARD)) w.guard = -Infinity;
     if (blocked.includes(Action.DODGE)) w.dodge = -Infinity;

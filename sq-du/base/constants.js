@@ -44,6 +44,8 @@ export const Action = Object.freeze({
   STANDBY: 'standby',
   HEAL: 'heal',
   READY: 'ready',
+  /** 蓄力/稳重/延付等技能：保留原行动精力消耗，但本回合不执行攻防 */
+  PREPARE: 'prepare',
 });
 
 /** 行为的默认基础点数（不含强化） */
@@ -54,6 +56,7 @@ export const ActionBasePts = Object.freeze({
   [Action.STANDBY]: 0,
   [Action.HEAL]: 0,
   [Action.READY]: 0,
+  [Action.PREPARE]: 0,
 });
 
 /** 行为的显示名称（中文） */
@@ -64,6 +67,7 @@ export const ActionName = Object.freeze({
   [Action.STANDBY]: '蓄势',
   [Action.HEAL]: '疗愈',
   [Action.READY]: '就绪',
+  [Action.PREPARE]: '蓄备',
 });
 
 // ─────────────────────────────────────────────

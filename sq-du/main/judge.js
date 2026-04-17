@@ -85,6 +85,7 @@ export class JudgeLayer {
       case Action.STANDBY:
       case Action.HEAL:
       case Action.READY:
+      case Action.PREPARE:
         break;
     }
   }
@@ -188,13 +189,14 @@ export class JudgeLayer {
     if (act === Action.STANDBY) return '蓄势';
     if (act === Action.HEAL) return '疗愈';
     if (act === Action.READY) return '就绪';
+    if (act === Action.PREPARE) return '蓄备';
     return '行动';
   }
 
   static _formatAction(ctx, isP1) {
     const actName = this._getActName(ctx.action);
     const pronoun = isP1 ? '你' : '敌方';
-    if (ctx.action === Action.STANDBY || ctx.action === Action.HEAL || ctx.action === Action.READY) {
+    if (ctx.action === Action.STANDBY || ctx.action === Action.HEAL || ctx.action === Action.READY || ctx.action === Action.PREPARE) {
       return `${pronoun}执行了${actName}`;
     }
     return `${pronoun}执行了${actName}(动速${ctx.speed}，点数${ctx.pts})`;
@@ -232,12 +234,12 @@ export class JudgeLayer {
       return this._withExecute(Clash.ONE_SIDE_ATTACK, `${prefix}敌方的攻击成功命中！`, rawDmgP1, rawDmgP2, p1State, p2State, p1EntryEffective, p2EntryEffective);
 
     // ── 待命：一方或双方直接就绪（READY） ──
-    if (p1Act === Action.READY || p2Act === Action.READY) {
-      const readySide = p1Act === Action.READY ? PlayerId.P1 : PlayerId.P2;
+    if (p1Act === Action.READY || p2Act === Action.READY || p1Act === Action.PREPARE || p2Act === Action.PREPARE) {
+      const readySide = (p1Act === Action.READY || p1Act === Action.PREPARE) ? PlayerId.P1 : PlayerId.P2;
       const otherAct = readySide === PlayerId.P1 ? p2Act : p1Act;
 
       // 双方都直接就绪
-      if (p1Act === Action.READY && p2Act === Action.READY)
+      if ((p1Act === Action.READY || p1Act === Action.PREPARE) && (p2Act === Action.READY || p2Act === Action.PREPARE))
         return this._zero(Clash.IDLE, `${prefix}双方按兵不动。`);
 
       // READY vs 攻击：钳制

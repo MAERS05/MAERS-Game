@@ -12,7 +12,7 @@ export const ChargeEffect = createSkillEffect({
   onPre(ctx, state) {
     // 力量（持续2回合）：走队列，duration=2 表示连续触发2个回合
     EffectLayer.queueEffect(state, EffectId.POWER, { phaseEvent: 'TURN_START', duration: 2, source: 'skill:charge' });
-    // 转为待命（蓄力标记保留，精力仍按攻击消耗结算）
-    return { ...ctx, action: Action.READY, isCharge: true };
+    // 转为蓄备：保留攻击的精力消耗，但本回合不执行攻击
+    return { ...ctx, action: Action.PREPARE };
   },
 });

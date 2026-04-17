@@ -15,6 +15,7 @@ export const SteadyEffect = createSkillEffect({
       turnDelay: 2,
       source: 'skill:steady',
     });
-    return { ...ctx, pts: 0 };
+    // 转为蓄备：保留守备的精力消耗，但本回合不执行守备
+    return { ...ctx, action: Action.PREPARE };
   },
 });
