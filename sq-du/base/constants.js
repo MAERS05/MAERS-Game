@@ -42,6 +42,7 @@ export const Action = Object.freeze({
   GUARD: 'guard',
   DODGE: 'dodge',
   STANDBY: 'standby',
+  HEAL: 'heal',
   READY: 'ready',
 });
 
@@ -51,6 +52,7 @@ export const ActionBasePts = Object.freeze({
   [Action.GUARD]: 1,
   [Action.DODGE]: 1,
   [Action.STANDBY]: 0,
+  [Action.HEAL]: 0,
   [Action.READY]: 0,
 });
 
@@ -60,6 +62,7 @@ export const ActionName = Object.freeze({
   [Action.GUARD]: '守备',
   [Action.DODGE]: '闪避',
   [Action.STANDBY]: '蓄势',
+  [Action.HEAL]: '疗愈',
   [Action.READY]: '就绪',
 });
 
@@ -115,8 +118,6 @@ export const Clash = Object.freeze({
   OTHER: 'OTHER',                             // 其它
   /** 双方都开启洞察，回合直接结束 */
   INSIGHT_CLASH: 'INSIGHT_CLASH',             // 识破
-  /** 行动落空（无意义的行为组合） */
-  WASTED_ACTION: 'WASTED_ACTION',             // 落空
 });
 
 /** 情形的中文名称 */
@@ -144,7 +145,6 @@ export const ClashName = Object.freeze({
   [Clash.PINNED]: '钳制',
   [Clash.OTHER]: '其它',
   [Clash.INSIGHT_CLASH]: '识破',
-  [Clash.WASTED_ACTION]: '落空',
 });
 
 // ─────────────────────────────────────────────
@@ -533,6 +533,7 @@ export const EFFECT_SLOTS = 3;
 export function calcActionCost(ctx, playerState) {
   if (ctx.action === Action.READY) return 0;
   if (ctx.action === Action.STANDBY) return 0;
+  if (ctx.action === Action.HEAL) return 0;
   const base = 1 + (ctx.enhance || 0);
   const pen = playerState?.staminaPenalty || 0;
   const dis = playerState?.staminaDiscount || 0;

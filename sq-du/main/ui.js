@@ -39,6 +39,12 @@ const engine = new BattleEngine(EngineMode.PVE, {
 window.engine = engine;
 window.Action = Action;
 window.PlayerId = PlayerId;
+window.EffectLayer = EffectLayer;
+window.updateIcons = () => {
+  const snap = engine.getSnapshot();
+  updateStatusIcons(PlayerId.P1, snap.players[PlayerId.P1]);
+  updateStatusIcons(PlayerId.P2, snap.players[PlayerId.P2]);
+};
 
 function getEffectMeta(effectId) {
   const handler = EffectHandlers[effectId] || {};
@@ -80,6 +86,7 @@ const ui = {
   // 指令区
   standbyBtn: $('standbyBtn'),
   readyBtn: $('readyBtn'),
+  healBtn: $('healBtn'),
   redecideBtn: $('redecideBtn'),
   declineRedecideBtn: $('declineRedecideBtn'),
   waitingLabel: $('waitingLabel'),
@@ -411,6 +418,7 @@ function resetForNewTurn() {
   ui.p1RingWrap.classList.remove('is-ready');
   ui.standbyBtn.disabled = false;
   ui.readyBtn.disabled = false;
+  ui.healBtn.disabled = false;
   ui.p1SpeedUp.disabled = false;
   ui.p1SpeedDown.disabled = false;
   ui.redecideBtn.classList.remove('show');
@@ -482,6 +490,22 @@ ui.readyBtn.addEventListener('click', () => {
     // 没选任何行动 → 直接就绪（READY），不触发技能
     engine.submitAction(PlayerId.P1, { action: Action.READY, enhance: 0 });
   }
+  engine.setReady(PlayerId.P1);
+});
+
+ui.healBtn.addEventListener('click', () => {
+  if (isGameOver) return;
+  const snap = engine.getSnapshot();
+  const p1 = snap.players[PlayerId.P1];
+  if (p1.ready) return;
+  if (p1.healBlocked) return; // 禁止疗愈
+
+  document.querySelectorAll('.act-btn').forEach(b => b.classList.remove('selected'));
+  selectedAction = null;
+  localEnhance = 0;
+  ui.actionConfigPanel.classList.remove('show');
+
+  engine.submitAction(PlayerId.P1, { action: Action.HEAL, enhance: 0 });
   engine.setReady(PlayerId.P1);
 });
 
@@ -633,7 +657,8 @@ engine.on(EngineEvent.PLAYER_READY, ({ playerId, ready }) => {
   // 只更新 P1 自己的环，不让 P2 就绪引发任何视觉变化（防信息泄露）
   if (playerId === PlayerId.P1) {
     ui.p1RingWrap.classList.toggle('is-ready', p1.ready);
-    ui.standbyBtn.disabled = ready;
+    ui.standbyBtn.disabled = ready || p1.standbyBlocked;
+    ui.healBtn.disabled = ready || p1.healBlocked;
     ui.readyBtn.disabled = ready;
     ui.waitingLabel.classList.toggle('show', ready && !p2.ready);
     if (ready) {
@@ -951,28 +976,28 @@ function initUI() {
 
 /** effectId → 图标元数据 */
 const EFFECT_ICON_META = {
-  [EffectId.POWER]:         { icon: 'strong.svg',        name: '力量',  resource: '攻击点数', sign: +1 },
-  [EffectId.WEAK]:          { icon: 'broken-knife.svg',  name: '虚弱',  resource: '攻击点数', sign: -1 },
-  [EffectId.SOLID]:         { icon: 'shield.svg',        name: '坚固',  resource: '守备点数', sign: +1 },
-  [EffectId.CRACKED_ARMOR]: { icon: 'broken-shield.svg', name: '碎甲',  resource: '守备点数', sign: -1 },
-  [EffectId.SIDE_STEP]:     { icon: 'avoid.svg',         name: '侧身',  resource: '闪避点数', sign: +1 },
-  'side_step_state':        { icon: 'avoid.svg',         name: '侧身',  resource: '闪避点数', sign: +1 },
-  [EffectId.CLUMSY]:        { icon: 'heavy.svg',         name: '僵硬',  resource: '闪避点数', sign: -1 },
-  [EffectId.LIGHT]:         { icon: 'fast.svg',          name: '轻盈',  resource: '动速',     sign: +1 },
-  [EffectId.HEAVY]:         { icon: 'fast.svg',          name: '沉重',  resource: '动速',     sign: -1 },
-  [EffectId.WOUNDED]:       { icon: 'wound.svg',         name: '创伤',  resource: '命数',     sign: -1 },
-  [EffectId.FORTIFIED]:     { icon: 'treat.svg',         name: '治愈',  resource: '命数',     sign: +1 },
-  [EffectId.REJUVENATED]:   { icon: 'uplifting.svg',     name: '振奋',  resource: '精力', sign: +1 },
-  [EffectId.SLUGGISH]:      { icon: 'listless.svg',      name: '萎靡',  resource: '精力', sign: -1 },
-  [EffectId.EXHAUSTED]:     { icon: 'tired.svg',         name: '疲惫',  resource: '精力消耗', sign: +1 },
-  [EffectId.EXCITED]:       { icon: 'excited.svg',       name: '兴奋',  resource: '精力消耗', sign: -1 },
-  [EffectId.INSIGHTFUL]:    { icon: 'eye.svg',           name: '先机',  resource: '洞察消耗', sign: -1 },
-  [EffectId.DULL]:          { icon: 'weak-eye.svg',      name: '愚钝',  resource: '洞察消耗', sign: +1 },
-  [EffectId.BLINDED]:       { icon: 'close-eye.svg',     name: '蒙蔽',  resource: '禁止洞察', binary: true },
-  [EffectId.BROKEN_BLADE]:  { icon: 'close-knife.svg',   name: '碎刃',  resource: '禁止攻击', binary: true },
-  [EffectId.BROKEN_ARMOR]:  { icon: 'close-shield.svg',  name: '废甲',  resource: '禁止守备', binary: true },
-  [EffectId.SHACKLED]:      { icon: 'fast.svg',          name: '禁锢',  resource: '禁止调速', binary: true },
-  [EffectId.SHACKLED_DODGE]: { icon: 'close-avoid.svg',  name: '锁链',  resource: '禁止闪避', binary: true },
+  [EffectId.POWER]: { icon: 'strong.svg', name: '力量', resource: '攻击点数', sign: +1 },
+  [EffectId.WEAK]: { icon: 'broken-knife.svg', name: '虚弱', resource: '攻击点数', sign: -1 },
+  [EffectId.SOLID]: { icon: 'shield.svg', name: '坚固', resource: '守备点数', sign: +1 },
+  [EffectId.CRACKED_ARMOR]: { icon: 'broken-shield.svg', name: '碎甲', resource: '守备点数', sign: -1 },
+  [EffectId.SIDE_STEP]: { icon: 'avoid.svg', name: '侧身', resource: '闪避点数', sign: +1 },
+  'side_step_state': { icon: 'avoid.svg', name: '侧身', resource: '闪避点数', sign: +1 },
+  [EffectId.CLUMSY]: { icon: 'heavy.svg', name: '僵硬', resource: '闪避点数', sign: -1 },
+  [EffectId.LIGHT]: { icon: 'fast.svg', name: '轻盈', resource: '动速', sign: +1 },
+  [EffectId.HEAVY]: { icon: 'fast.svg', name: '沉重', resource: '动速', sign: -1 },
+  [EffectId.WOUNDED]: { icon: 'wound.svg', name: '创伤', resource: '命数', sign: -1 },
+  [EffectId.FORTIFIED]: { icon: 'treat.svg', name: '治愈', resource: '命数', sign: +1 },
+  [EffectId.REJUVENATED]: { icon: 'uplifting.svg', name: '振奋', resource: '精力', sign: +1 },
+  [EffectId.SLUGGISH]: { icon: 'listless.svg', name: '萎靡', resource: '精力', sign: -1 },
+  [EffectId.EXHAUSTED]: { icon: 'tired.svg', name: '疲惫', resource: '精力消耗', sign: +1 },
+  [EffectId.EXCITED]: { icon: 'excited.svg', name: '兴奋', resource: '精力消耗', sign: -1 },
+  [EffectId.INSIGHTFUL]: { icon: 'eye.svg', name: '先机', resource: '洞察消耗', sign: -1 },
+  [EffectId.DULL]: { icon: 'weak-eye.svg', name: '愚钝', resource: '洞察消耗', sign: +1 },
+  [EffectId.BLINDED]: { icon: 'close-eye.svg', name: '蒙蔽', resource: '禁止洞察', binary: true },
+  [EffectId.BROKEN_BLADE]: { icon: 'close-knife.svg', name: '碎刃', resource: '禁止攻击', binary: true },
+  [EffectId.BROKEN_ARMOR]: { icon: 'close-shield.svg', name: '废甲', resource: '禁止守备', binary: true },
+  [EffectId.SHACKLED]: { icon: 'fast.svg', name: '禁锢', resource: '禁止调速', binary: true },
+  [EffectId.SHACKLED_DODGE]: { icon: 'close-avoid.svg', name: '锁链', resource: '禁止闪避', binary: true },
 };
 
 /** 生成效果文本（动态 n 值） */
@@ -990,7 +1015,7 @@ function updateStatusIcons(playerId, state) {
   // 清理过期闪烁效果
   pruneFlashEffects(playerId);
 
-  const addIcon = (filename, effectText, timingKey, turnLabel) => {
+  const addIcon = (filename, effectText, timingKey, turnInfo) => {
     const img = document.createElement('img');
     img.className = 'status-icon';
     img.src = `sq-du/effect/ui/${filename}`;
@@ -1002,7 +1027,13 @@ function updateStatusIcons(playerId, state) {
         : document.getElementById('p2StatusTooltip');
 
       if (!tooltip) return;
-      if (tooltip._timeoutId) clearTimeout(tooltip._timeoutId);
+
+      // 若当前 tooltip 已经显示且是同一个图标触发的 → 关闭
+      if (tooltip.classList.contains('show') && tooltip._sourceIcon === img) {
+        tooltip.classList.remove('show');
+        tooltip._sourceIcon = null;
+        return;
+      }
 
       document.querySelectorAll('.status-tooltip').forEach(el => el.classList.remove('show'));
       const timingLabel = timingKey ? (EffectTimingLabel[timingKey] || timingKey) : null;
@@ -1011,72 +1042,83 @@ function updateStatusIcons(playerId, state) {
       const effName = parts[0] || '';
       const effDetail = parts.slice(1).join('：') || '';
       let html = `<strong>${effName}</strong><br>效果：${effDetail}`;
-      if (turnLabel) html += `<br>回合：${turnLabel}`;
+      if (turnInfo) html += `<br>回合：${turnInfo}`;
       if (timingLabel) html += `<br>时期：${timingLabel}`;
       tooltip.innerHTML = html;
       tooltip.classList.add('show');
-
-      tooltip._timeoutId = setTimeout(() => {
-        tooltip.classList.remove('show');
-      }, 2000);
+      tooltip._sourceIcon = img;
     };
 
     tray.appendChild(img);
   };
 
-  // ── 从 pendingEffects 队列聚合：按 (effectId, phaseEvent, turn) 分组计数 ──
+  // ── 从 pendingEffects 队列聚合：按 (effectId, phaseEvent) 分组计数，记录最小 turn ──
   const pending = Array.isArray(state.pendingEffects) ? state.pendingEffects : [];
-  const currentTurn = engine.getSnapshot().turn || 0;
-  const groups = new Map(); // key = "effectId|phaseEvent|turn" → { effectId, phaseEvent, turn, n }
+  const currentTurn = engine.getSnapshot()?.turn ?? 0;
+  const groups = new Map(); // key = "effectId|phaseEvent" → { effectId, phaseEvent, n, minTurn }
 
   for (const entry of pending) {
     const eid = entry.effectId;
     const phase = entry.readyAt?.phaseEvent || '';
     const turn = entry.readyAt?.turn ?? null;
-    const key = `${eid}|${phase}|${turn}`;
+    const key = `${eid}|${phase}`;
     if (groups.has(key)) {
-      groups.get(key).n += 1;
+      const g = groups.get(key);
+      g.n += 1;
+      if (turn !== null && (g.minTurn === null || turn < g.minTurn)) g.minTurn = turn;
     } else {
-      groups.set(key, { effectId: eid, phaseEvent: phase, turn, n: 1 });
+      groups.set(key, {
+        effectId: eid, phaseEvent: phase, n: 1, minTurn: turn,
+        duration: entry.duration ?? null, interval: entry.interval ?? null, maxTriggers: entry.maxTriggers ?? null
+      });
     }
   }
 
-  /** 回合差 → 中文标签 */
-  const getTurnLabel = (targetTurn) => {
-    if (targetTurn == null) return null;
+  /**
+   * 根据 pendingEffect 的 readyAt.turn 和当前回合计算回合标签
+   * @param {number|null} targetTurn - 目标触发回合
+   * @returns {string} ‘本回合’ | ‘N回合后’
+   */
+  const getTurnLabel = (group) => {
+    if (group.interval != null && group.interval > 0) {
+      const base = `每隔${group.interval}回合`;
+      if (group.maxTriggers != null && group.maxTriggers > 0) return `${base}（共${group.maxTriggers}次）`;
+      return `${base}（永久）`;
+    }
+    if (group.duration != null && group.duration > 0) return `${group.duration}回合内`;
+    const targetTurn = group.minTurn;
+    if (targetTurn == null) return '本回合';
     const delta = targetTurn - currentTurn;
     if (delta <= 0) return '本回合';
-    if (delta === 1) return '下回合';
-    if (delta === 2) return '下下回合';
     return `${delta}回合后`;
   };
 
   // 已渲染的 effectId 集合（跨 pending 和 flat 去重）
   const rendered = new Set();
 
-  // ── 1. 渲染 pending 效果图标（动态时期 + 动态 n 值） ──
+  // ── 1. 渲染 pending 效果图标（动态时期 + 动态 n 值 + 回合标签） ──
   for (const [, group] of groups) {
     const meta = EFFECT_ICON_META[group.effectId];
     if (!meta) continue;
     const label = formatEffectLabel(meta, group.n);
-    addIcon(meta.icon, label, group.phaseEvent, getTurnLabel(group.turn));
+    addIcon(meta.icon, label, group.phaseEvent, getTurnLabel(group));
     rendered.add(group.effectId);
   }
 
   // ── 2. 兜底：从 flat state 字段渲染已触发但不在队列中的效果 ──
   const flatChecks = [
-    { field: 'chargeBoost',     eid: EffectId.POWER,         sign: +1, resource: '攻击点数', name: '力量',  icon: 'strong.svg' },
-    { field: 'ptsDebuff',       eid: EffectId.WEAK,          sign: -1, resource: '攻击点数', name: '虚弱',  icon: 'broken-knife.svg' },
-    { field: 'guardBoost',      eid: EffectId.SOLID,         sign: +1, resource: '守备点数', name: '坚固',  icon: 'shield.svg' },
-    { field: 'guardDebuff',     eid: EffectId.CRACKED_ARMOR, sign: -1, resource: '守备点数', name: '碎甲',  icon: 'broken-shield.svg' },
-    { field: 'dodgeBoost',      eid: EffectId.SIDE_STEP,     sign: +1, resource: '闪避点数', name: '侧身',  icon: 'avoid.svg' },
-    { field: 'dodgeDebuff',     eid: EffectId.CLUMSY,        sign: -1, resource: '闪避点数', name: '僵硬',  icon: 'heavy.svg' },
-    { field: 'agilityBoost',    eid: EffectId.LIGHT,         sign: +1, resource: '动速',     name: '轻盈',  icon: 'fast.svg' },
-    { field: 'agilityDebuff',   eid: EffectId.HEAVY,         sign: -1, resource: '动速',     name: '沉重',  icon: 'fast.svg' },
-    { field: 'staminaPenalty',  eid: EffectId.EXHAUSTED,     sign: +1, resource: '精力消耗', name: '疲惫',  icon: 'tired.svg' },
-    { field: 'staminaDiscount', eid: EffectId.EXCITED,       sign: -1, resource: '精力消耗', name: '兴奋',  icon: 'excited.svg' },
-    { field: 'hpDrain',         eid: EffectId.WOUNDED,       sign: -1, resource: '命数',     name: '创伤',  icon: 'wound.svg' },
-    { field: 'hpBonusNextTurn', eid: EffectId.FORTIFIED,     sign: +1, resource: '命数',     name: '治愈',  icon: 'treat.svg' },
+    { field: 'chargeBoost', eid: EffectId.POWER, sign: +1, resource: '攻击点数', name: '力量', icon: 'strong.svg' },
+    { field: 'ptsDebuff', eid: EffectId.WEAK, sign: -1, resource: '攻击点数', name: '虚弱', icon: 'broken-knife.svg' },
+    { field: 'guardBoost', eid: EffectId.SOLID, sign: +1, resource: '守备点数', name: '坚固', icon: 'shield.svg' },
+    { field: 'guardDebuff', eid: EffectId.CRACKED_ARMOR, sign: -1, resource: '守备点数', name: '碎甲', icon: 'broken-shield.svg' },
+    { field: 'dodgeBoost', eid: EffectId.SIDE_STEP, sign: +1, resource: '闪避点数', name: '侧身', icon: 'avoid.svg' },
+    { field: 'dodgeDebuff', eid: EffectId.CLUMSY, sign: -1, resource: '闪避点数', name: '僵硬', icon: 'heavy.svg' },
+    { field: 'agilityBoost', eid: EffectId.LIGHT, sign: +1, resource: '动速', name: '轻盈', icon: 'fast.svg' },
+    { field: 'agilityDebuff', eid: EffectId.HEAVY, sign: -1, resource: '动速', name: '沉重', icon: 'fast.svg' },
+    { field: 'staminaPenalty', eid: EffectId.EXHAUSTED, sign: +1, resource: '精力消耗', name: '疲惫', icon: 'tired.svg' },
+    { field: 'staminaDiscount', eid: EffectId.EXCITED, sign: -1, resource: '精力消耗', name: '兴奋', icon: 'excited.svg' },
+    { field: 'hpDrain', eid: EffectId.WOUNDED, sign: -1, resource: '命数', name: '创伤', icon: 'wound.svg' },
+    { field: 'hpBonusNextTurn', eid: EffectId.FORTIFIED, sign: +1, resource: '命数', name: '治愈', icon: 'treat.svg' },
   ];
 
   for (const { field, eid, sign, resource, name, icon } of flatChecks) {
@@ -1086,28 +1128,28 @@ function updateStatusIcons(playerId, state) {
     // 但为了避免重复图标，跳过已渲染的（pending 的 n 值已经在上面正确聚合了）
     if (rendered.has(eid)) continue;
     const display = sign * val;
-    addIcon(icon, `${name}：${resource} ${display > 0 ? '+' : ''}${display}`, 'ACTION_START');
+    addIcon(icon, `${name}：${resource} ${display > 0 ? '+' : ''}${display}`, 'ACTION_START', '本回合');
     rendered.add(eid);
   }
 
   // 洞察相关
   if (!rendered.has(EffectId.DULL) && state.insightDebuff > 0)
-    addIcon('weak-eye.svg', `愚钝：洞察消耗 +${state.insightDebuff}`, 'TURN_PHASE');
+    addIcon('weak-eye.svg', `愚钝：洞察消耗 +${state.insightDebuff}`, 'TURN_PHASE', '本回合');
   if (!rendered.has(EffectId.INSIGHTFUL) && state.insightDebuff < 0)
-    addIcon('eye.svg', `先机：洞察消耗 ${state.insightDebuff}`, 'TURN_PHASE');
+    addIcon('eye.svg', `先机：洞察消耗 ${state.insightDebuff}`, 'TURN_PHASE', '本回合');
   if (!rendered.has(EffectId.BLINDED) && state.insightBlocked)
-    addIcon('close-eye.svg', `蒙蔽：禁止洞察`, 'TURN_PHASE');
+    addIcon('close-eye.svg', `蒙蔽：禁止洞察`, 'TURN_PHASE', '本回合');
   if (!rendered.has(EffectId.SHACKLED) && state.speedAdjustBlocked)
-    addIcon('fast.svg', `禁锢：禁止调速`, 'TURN_PHASE');
+    addIcon('fast.svg', `禁锢：禁止调速`, 'TURN_PHASE', '本回合');
 
   // 行动禁止
   if (state.actionBlocked) {
     if (!rendered.has(EffectId.BROKEN_BLADE) && state.actionBlocked.includes(Action.ATTACK))
-      addIcon('close-knife.svg', `碎刃：禁止攻击`, 'TURN_PHASE');
+      addIcon('close-knife.svg', `碎刃：禁止攻击`, 'TURN_PHASE', '本回合');
     if (!rendered.has(EffectId.SHACKLED_DODGE) && state.actionBlocked.includes(Action.DODGE))
-      addIcon('close-avoid.svg', `锁链：禁止闪避`, 'TURN_PHASE');
+      addIcon('close-avoid.svg', `锁链：禁止闪避`, 'TURN_PHASE', '本回合');
     if (!rendered.has(EffectId.BROKEN_ARMOR) && state.actionBlocked.includes(Action.GUARD))
-      addIcon('close-shield.svg', `废甲：禁止守备`, 'TURN_PHASE');
+      addIcon('close-shield.svg', `废甲：禁止守备`, 'TURN_PHASE', '本回合');
   }
 
   // ── 3. 渲染闪烁效果图标（即时消费型效果的临时可视化） ──
@@ -1122,7 +1164,7 @@ function updateStatusIcons(playerId, state) {
     const meta = EFFECT_ICON_META[eid];
     if (!meta) continue;
     const label = formatEffectLabel(meta, count);
-    addIcon(meta.icon, label, 'ACTION_START');
+    addIcon(meta.icon, label, 'ACTION_START', '本回合');
     // 给闪烁图标添加消退动画
     const lastIcon = tray.lastElementChild;
     if (lastIcon) lastIcon.classList.add('flash-effect');
@@ -1396,8 +1438,9 @@ engine.on(EngineEvent.EQUIP_PHASE_START, ({ secondsLeft }) => {
     ui.equipOverlay.classList.add('active');
     // 每次进入装备期都刷新槽位显示
     refreshEquipSlots();
-    // 主操作区禁用
+    // 禁用指令区操作
     ui.standbyBtn.disabled = true;
+    ui.healBtn.disabled = true;
     ui.readyBtn.disabled = true;
     ui.insightBtn.disabled = true;
   }
@@ -1414,6 +1457,7 @@ engine.on(EngineEvent.EQUIP_PHASE_END, () => {
 
   if (!p1.ready) {
     ui.standbyBtn.disabled = false;
+    ui.healBtn.disabled = false;
     ui.readyBtn.disabled = false;
     ui.insightBtn.disabled = p1.insightUsed || getEffectiveStamina(p1) < 1 || p1.insightBlocked;
   }

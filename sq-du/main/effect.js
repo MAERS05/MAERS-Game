@@ -261,7 +261,7 @@ export class EffectLayer {
       Clash.DODGE_OUTMANEUVERED,
       Clash.MUTUAL_HIT,
       Clash.INSIGHT_CLASH,
-      Clash.WASTED_ACTION,
+      Clash.OTHER,
       Clash.FULLNESS,
     ]);
 
@@ -446,6 +446,9 @@ export class EffectLayer {
         turn: options.turn ?? null,
         ownerId: options.ownerId || owner.id,
       },
+      duration: options.duration ?? null,
+      interval: options.interval ?? null,
+      maxTriggers: options.maxTriggers ?? null,
     });
   }
 

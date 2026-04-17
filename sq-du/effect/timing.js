@@ -48,7 +48,37 @@ export class EffectTimingLayer {
             source: entry.source || 'pending',
           });
         }
-      }
+
+        // ── 处理周期和持续时长，决定是否将其留在队列中 ──
+        let shouldKeep = false;
+
+        // 间歇触发（由于可能带 maxTriggers，所以优先判定）
+        if (entry.interval != null && entry.interval > 0) {
+          if (entry.maxTriggers != null && entry.maxTriggers > 0) {
+            entry.maxTriggers -= 1;
+            if (entry.maxTriggers > 0) shouldKeep = true;
+          } else {
+            // 永久间歇
+            shouldKeep = true;
+          }
+          if (shouldKeep) {
+            entry.readyAt.turn = (engine?.turn || 0) + entry.interval + 1;
+          }
+        }
+        // 持续型触发
+        else if (entry.duration != null && entry.duration > 0) {
+          entry.duration -= 1;
+          if (entry.duration > 0) {
+            shouldKeep = true;
+            // 持续型默认每回合触发（interval=1）
+            entry.readyAt.turn = (engine?.turn || 0) + 1;
+          }
+        }
+
+        if (shouldKeep) {
+          remain.push(entry);
+        }
+      } // <--- restore missing closing brace here
 
       player.pendingEffects = remain;
     }

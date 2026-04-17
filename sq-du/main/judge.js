@@ -83,6 +83,7 @@ export class JudgeLayer {
         timeline.push({ type: EvtType.MOUNT_EVASION, actorId: playerId, speed: ctx.speed, pts: ctx.pts });
         break;
       case Action.STANDBY:
+      case Action.HEAL:
       case Action.READY:
         break;
     }
@@ -185,6 +186,7 @@ export class JudgeLayer {
     if (act === Action.GUARD) return '守备';
     if (act === Action.DODGE) return '闪避';
     if (act === Action.STANDBY) return '蓄势';
+    if (act === Action.HEAL) return '疗愈';
     if (act === Action.READY) return '就绪';
     return '行动';
   }
@@ -192,7 +194,7 @@ export class JudgeLayer {
   static _formatAction(ctx, isP1) {
     const actName = this._getActName(ctx.action);
     const pronoun = isP1 ? '你' : '敌方';
-    if (ctx.action === Action.STANDBY || ctx.action === Action.READY) {
+    if (ctx.action === Action.STANDBY || ctx.action === Action.HEAL || ctx.action === Action.READY) {
       return `${pronoun}执行了${actName}`;
     }
     return `${pronoun}执行了${actName}(动速${ctx.speed}，点数${ctx.pts})`;
@@ -206,7 +208,11 @@ export class JudgeLayer {
     const p2Desc = this._formatAction(p2Ctx, false);
     const prefix = `${p2Desc}，${p1Desc}，`;
 
-    if (p1Act === Action.STANDBY && p2Act === Action.STANDBY)
+    // 治疗和蓄势都视为非战斗行为
+    const p1IsPassive = (p1Act === Action.STANDBY || p1Act === Action.HEAL);
+    const p2IsPassive = (p2Act === Action.STANDBY || p2Act === Action.HEAL);
+
+    if (p1IsPassive && p2IsPassive)
       return this._zero(Clash.MUTUAL_STANDBY, `${prefix}战场陷入僵持——什么也没有发生。`);
 
     if (p1Act === Action.GUARD && p2Act === Action.GUARD)
@@ -219,10 +225,10 @@ export class JudgeLayer {
       return this._zero(Clash.PROBE, `${prefix}双方仅是一次无果的试探。`);
     }
 
-    if (p1Act === Action.ATTACK && p2Act === Action.STANDBY)
+    if (p1Act === Action.ATTACK && p2IsPassive)
       return this._withExecute(Clash.ONE_SIDE_ATTACK, `${prefix}你的攻击成功命中！`, rawDmgP1, rawDmgP2, p1State, p2State, p1EntryEffective, p2EntryEffective);
 
-    if (p2Act === Action.ATTACK && p1Act === Action.STANDBY)
+    if (p2Act === Action.ATTACK && p1IsPassive)
       return this._withExecute(Clash.ONE_SIDE_ATTACK, `${prefix}敌方的攻击成功命中！`, rawDmgP1, rawDmgP2, p1State, p2State, p1EntryEffective, p2EntryEffective);
 
     // ── 待命：一方或双方直接就绪（READY） ──
@@ -249,15 +255,15 @@ export class JudgeLayer {
     }
 
     // ── 运筹：一方蓄势，另一方守备或闪避 ──
-    if ((p1Act === Action.STANDBY && (p2Act === Action.GUARD || p2Act === Action.DODGE)) ||
-      (p2Act === Action.STANDBY && (p1Act === Action.GUARD || p1Act === Action.DODGE))) {
+    if ((p1IsPassive && (p2Act === Action.GUARD || p2Act === Action.DODGE)) ||
+      (p2IsPassive && (p1Act === Action.GUARD || p1Act === Action.DODGE))) {
       return this._zero(Clash.FULLNESS, `${prefix}无事发生。`);
     }
 
     // ── 落空：其他无意义组合 ──
-    if ((p1Act !== Action.ATTACK && p2Act === Action.STANDBY) ||
-      (p2Act !== Action.ATTACK && p1Act === Action.STANDBY)) {
-      return this._zero(Clash.WASTED_ACTION, `${prefix}行动毫无意义。`);
+    if ((p1Act !== Action.ATTACK && p2IsPassive) ||
+      (p2Act !== Action.ATTACK && p1IsPassive)) {
+      return this._zero(Clash.OTHER, `${prefix}无事发生。`);
     }
 
     return this._deriveFromLog(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2, p1EntryEffective, p2EntryEffective);
@@ -398,8 +404,8 @@ export class JudgeLayer {
           : `${prefix}敌方的攻击命中！`;
       }
     } else {
-      clash = Clash.WASTED_ACTION;
-      clashDesc = `${prefix}发生了不在预期内的交锋结果。`;
+      clash = Clash.OTHER;
+      clashDesc = `${prefix}发生了意料之外的结果。`;
     }
 
     return this._withExecute(clash, clashDesc, rawDmgP1, rawDmgP2, p1State, p2State, p1EntryEffective, p2EntryEffective);
@@ -473,17 +479,21 @@ export class JudgeLayer {
     const p1HpOverkill = rawP1Hp < 0 ? -rawP1Hp : 0;
     const p2HpOverkill = rawP2Hp < 0 ? -rawP2Hp : 0;
 
+    // 识破时行动被取消
+    const isInsightClash = clash === Clash.INSIGHT_CLASH;
+
     // 命数正溢出（回血超上限）
-    const rawP1HealedHp = (rawP1Hp < 0 ? 0 : rawP1Hp) + (p1State.hpBonus || 0);
+    // 疗愈行动：先伤后愈 —— 伤害致死则疗愈无效
+    const p1HealBonus = (newP1Hp > 0 && !isInsightClash && p1Ctx.action === Action.HEAL) ? 1 : 0;
+    const p2HealBonus = (newP2Hp > 0 && !isInsightClash && p2Ctx.action === Action.HEAL) ? 1 : 0;
+    const rawP1HealedHp = newP1Hp + (p1State.hpBonus || 0) + p1HealBonus;
     const p1HpOverflow = rawP1HealedHp > DefaultStats.MAX_HP ? rawP1HealedHp - DefaultStats.MAX_HP : 0;
     const finalP1Hp = Math.min(DefaultStats.MAX_HP, rawP1HealedHp);
-    const rawP2HealedHp = (rawP2Hp < 0 ? 0 : rawP2Hp) + (p2State.hpBonus || 0);
+    const rawP2HealedHp = newP2Hp + (p2State.hpBonus || 0) + p2HealBonus;
     const p2HpOverflow = rawP2HealedHp > DefaultStats.MAX_HP ? rawP2HealedHp - DefaultStats.MAX_HP : 0;
     const finalP2Hp = Math.min(DefaultStats.MAX_HP, rawP2HealedHp);
 
     // 精力结算（行动精力消耗在此处统一扣除，resolve 接收的是扣费前精力）
-    // 识破时行动被取消，不扣除行动精力
-    const isInsightClash = clash === Clash.INSIGHT_CLASH;
     const p1ActionCost = isInsightClash ? 0 : (p1Ctx.cost || 0);
     const p2ActionCost = isInsightClash ? 0 : (p2Ctx.cost || 0);
     // 仅蓄势恢复精力，就绪不恢复；识破时行动取消，蓄势也不生效
@@ -516,32 +526,32 @@ export class JudgeLayer {
     // ── 溢出管道：将所有溢出字段转化为下回合 pendingEffects ──
     // 命数溢出
     p1NewState.hpUnderflow = p1HpOverkill;
-    p1NewState.hpOverflow  = p1HpOverflow;
+    p1NewState.hpOverflow = p1HpOverflow;
     p2NewState.hpUnderflow = p2HpOverkill;
-    p2NewState.hpOverflow  = p2HpOverflow;
+    p2NewState.hpOverflow = p2HpOverflow;
     // 精力溢出（直接赋值，_buildPlayerNewState 已初始化过 staminaOverflow，此处覆盖避免双重计算）
-    p1NewState.staminaOverflow  = p1StaminaBonusOverflow;
+    p1NewState.staminaOverflow = p1StaminaBonusOverflow;
     p1NewState.staminaUnderflow = p1StaminaUnderflow;
-    p2NewState.staminaOverflow  = p2StaminaBonusOverflow;
+    p2NewState.staminaOverflow = p2StaminaBonusOverflow;
     p2NewState.staminaUnderflow = p2StaminaUnderflow;
     // 攻击/守备/闪避/动速溢出（由 effect.js processPreEffects → clampPts 写入 p1State/p2State，
     // _buildPlayerNewState 创建的是新对象不含这些字段，必须手动复制）
-    p1NewState.attackPtsOverflow  = p1State.attackPtsOverflow  || 0;
+    p1NewState.attackPtsOverflow = p1State.attackPtsOverflow || 0;
     p1NewState.attackPtsUnderflow = p1State.attackPtsUnderflow || 0;
-    p1NewState.guardPtsOverflow   = p1State.guardPtsOverflow   || 0;
-    p1NewState.guardPtsUnderflow  = p1State.guardPtsUnderflow  || 0;
-    p1NewState.dodgePtsOverflow   = p1State.dodgePtsOverflow   || 0;
-    p1NewState.dodgePtsUnderflow  = p1State.dodgePtsUnderflow  || 0;
-    p1NewState.speedOverflow      = p1State.speedOverflow      || 0;
-    p1NewState.speedUnderflow     = p1State.speedUnderflow     || 0;
-    p2NewState.attackPtsOverflow  = p2State.attackPtsOverflow  || 0;
+    p1NewState.guardPtsOverflow = p1State.guardPtsOverflow || 0;
+    p1NewState.guardPtsUnderflow = p1State.guardPtsUnderflow || 0;
+    p1NewState.dodgePtsOverflow = p1State.dodgePtsOverflow || 0;
+    p1NewState.dodgePtsUnderflow = p1State.dodgePtsUnderflow || 0;
+    p1NewState.speedOverflow = p1State.speedOverflow || 0;
+    p1NewState.speedUnderflow = p1State.speedUnderflow || 0;
+    p2NewState.attackPtsOverflow = p2State.attackPtsOverflow || 0;
     p2NewState.attackPtsUnderflow = p2State.attackPtsUnderflow || 0;
-    p2NewState.guardPtsOverflow   = p2State.guardPtsOverflow   || 0;
-    p2NewState.guardPtsUnderflow  = p2State.guardPtsUnderflow  || 0;
-    p2NewState.dodgePtsOverflow   = p2State.dodgePtsOverflow   || 0;
-    p2NewState.dodgePtsUnderflow  = p2State.dodgePtsUnderflow  || 0;
-    p2NewState.speedOverflow      = p2State.speedOverflow      || 0;
-    p2NewState.speedUnderflow     = p2State.speedUnderflow     || 0;
+    p2NewState.guardPtsOverflow = p2State.guardPtsOverflow || 0;
+    p2NewState.guardPtsUnderflow = p2State.guardPtsUnderflow || 0;
+    p2NewState.dodgePtsOverflow = p2State.dodgePtsOverflow || 0;
+    p2NewState.dodgePtsUnderflow = p2State.dodgePtsUnderflow || 0;
+    p2NewState.speedOverflow = p2State.speedOverflow || 0;
+    p2NewState.speedUnderflow = p2State.speedUnderflow || 0;
 
     // 统一收集溢出并转换为 pendingEffects
     collectOverflows(p1NewState, turn);
@@ -570,39 +580,31 @@ export class JudgeLayer {
 
     if (!p1Dead && !p2Dead) return { isOver: false, winner: null, reason: '' };
 
-    // 自伤来源：directDamage（泣命等 onPre）+ hpDebuff（效果结算期扣血）
-    const p1SelfHarm = (result.newState.p1.directDamage || 0) + (result.p1CtxEff?.hpDebuff || 0);
-    const p2SelfHarm = (result.newState.p2.directDamage || 0) + (result.p2CtxEff?.hpDebuff || 0);
-    // 反推行动前 HP：finalHp + 受到的总伤害（对方伤害 + 自伤）
-    const p1OrigHp = result.newState.p1.hp + (result.damageToP1 || 0) + p1SelfHarm;
-    const p2OrigHp = result.newState.p2.hp + (result.damageToP2 || 0) + p2SelfHarm;
-    const p1Suicide = p1SelfHarm >= p1OrigHp && p1SelfHarm > 0;
-    const p2Suicide = p2SelfHarm >= p2OrigHp && p2SelfHarm > 0;
-
-    let winner = null, reason = '';
+    let winner = null;
 
     if (p1Dead && p2Dead) {
-      reason = '【同归】双方同归于尽。';
+      result.clashName = '同归';
+      result.clashDesc = '双方同归于尽。';
     } else if (p1Dead) {
       winner = PlayerId.P2;
-      if (p1Suicide) {
-        reason = '【自刎】你耗尽了自己的命数。';
-      } else if (result.executeP1) {
-        reason = '【处决】你精力耗尽，遭到致命一击！';
+      if (result.executeP1) {
+        result.clashName = '处决';
+        result.clashDesc = '你精力耗尽，遭到致命一击！';
       } else {
-        reason = '【战终】你的命数已空。';
+        result.clashName = '战终';
+        result.clashDesc = '你的命数已空。';
       }
     } else {
       winner = PlayerId.P1;
-      if (p2Suicide) {
-        reason = '【自刎】敌方耗尽了自己的命数。';
-      } else if (result.executeP2) {
-        reason = '【处决】敌方精力耗尽，被你一击终结！';
+      if (result.executeP2) {
+        result.clashName = '处决';
+        result.clashDesc = '敌方精力耗尽，被你一击终结！';
       } else {
-        reason = '【战终】敌方命数已空。';
+        result.clashName = '战终';
+        result.clashDesc = '敌方命数已空。';
       }
     }
 
-    return { isOver: true, winner, reason };
+    return { isOver: true, winner, reason: `【${result.clashName}】${result.clashDesc}` };
   }
 }

@@ -176,6 +176,8 @@ function createPlayerState(id, overrides = {}) {
     readyBlockNextTurn: false,                    // 下回合禁手动就绪预约
     standbyBlocked: false,                        // 本回合禁蓄势
     standbyBlockNextTurn: false,                  // 下回合禁蓄势预约
+    healBlocked: false,                           // 本回合禁疗愈
+    healBlockNextTurn: false,                     // 下回合禁疗愈预约
     actionBlocked: [],                            // 本回合禁用动作列表（Action 值）
     actionBlockNextTurn: [],                      // 下回合禁用动作预约
     // ── 永久禁用（不衰减、不清零，由 AI/玩家定制文件写入） ──
@@ -286,6 +288,9 @@ export class BattleEngine {
   on(event, handler) {
     return this._bus.on(event, handler);
   }
+
+  /** 调试用：直接返回内部 player 引用（不拷贝），可直接修改 */
+  _getPlayerRef(playerId) { return this._players[playerId]; }
 
   /** 开始游戏（第一回合） */
   startGame() {
@@ -910,11 +915,11 @@ export class BattleEngine {
       this._emitPhaseEffectEvent(EngineEvent.ACTION_END, {});
 
       this._emitPhaseEffectEvent(EngineEvent.RESOLVE_START, {});
+      this._checkGameOver(result);
       this._bus.emit(EngineEvent.TURN_RESOLVED, result);
       setTimeout(() => {
         this._emitPhaseEffectEvent(EngineEvent.RESOLVE_END, { result });
       }, 5000);
-      this._checkGameOver(result);
     }, 3000);
   }
 
