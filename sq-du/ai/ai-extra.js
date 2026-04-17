@@ -123,6 +123,7 @@ export class AIExtraLayer {
       [EffectId.SHOCKWAVE]:    action === Action.GUARD  ? B + 0.1 : -5,
       // ── AI 守备技能 ──
       [EffectId.IRON_GUARD]:   action === Action.GUARD  ? B + 0.1 : -5,  // 迅防
+      [EffectId.TREMOR]:       action === Action.GUARD  ? B + 0.1 : -5,  // 震颤
     };
 
     let total = score + (byId[id] ?? 0);

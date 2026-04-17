@@ -338,15 +338,34 @@ function updateConfigPanel() {
   ui.effectList.innerHTML = '';
   const actionEnum = Action[selectedAction.toUpperCase()];
   const equipped = p1.equippedEffects[actionEnum] || [];
+  const blockedArr = p1.slotBlocked?.[actionEnum] || [];
 
   for (let i = 0; i < EFFECT_SLOTS; i++) {
     const effectId = equipped[i];
     const item = document.createElement('div');
     const isValid = i < totalPts;
+    const isBlocked = !!blockedArr[i];
 
-    item.className = 'effect-item' + (!isValid ? ' incompatible' : '') + (effectId && isValid ? ' selected' : '');
+    item.className = 'effect-item'
+      + (!isValid || isBlocked ? ' incompatible' : '')
+      + (effectId && isValid && !isBlocked ? ' selected' : '');
 
-    if (effectId && EffectDefs[effectId]) {
+    if (isBlocked && effectId && EffectDefs[effectId]) {
+      const meta = getEffectMeta(effectId);
+      item.innerHTML = `
+        <div class="effect-item-main">
+          <div class="effect-item-name">${meta.name}（封锁）</div>
+          <div class="effect-item-desc" style="color:#ef4444">该槽位已被封锁，本回合效果无法生效</div>
+        </div>
+      `;
+    } else if (isBlocked) {
+      item.innerHTML = `
+        <div class="effect-item-main">
+          <div class="effect-item-name" style="color:#ef4444">槽位 ${i + 1} - 封锁</div>
+          <div class="effect-item-desc" style="color:#ef4444">该槽位已被封锁</div>
+        </div>
+      `;
+    } else if (effectId && EffectDefs[effectId]) {
       const meta = getEffectMeta(effectId);
       item.innerHTML = `
         <div class="effect-item-main">
@@ -1120,6 +1139,9 @@ function updateStatusIcons(playerId, state) {
   }
 
   // ── 2. 兜底：从 flat state 字段渲染已触发但不在队列中的效果 ──
+  // 衰减字段的 val 即为剩余回合数（每回合衰减1），动态生成回合标签
+  const decayTurnLabel = (val) => val > 1 ? `${val}回合内` : '本回合';
+
   const flatChecks = [
     { field: 'chargeBoost', eid: EffectId.POWER, sign: +1, resource: '攻击点数', name: '力量', icon: 'strong.svg' },
     { field: 'ptsDebuff', eid: EffectId.WEAK, sign: -1, resource: '攻击点数', name: '虚弱', icon: 'broken-knife.svg' },
@@ -1142,15 +1164,15 @@ function updateStatusIcons(playerId, state) {
     // 但为了避免重复图标，跳过已渲染的（pending 的 n 值已经在上面正确聚合了）
     if (rendered.has(eid)) continue;
     const display = sign * val;
-    addIcon(icon, `${name}：${resource} ${display > 0 ? '+' : ''}${display}`, 'ACTION_START', '本回合');
+    addIcon(icon, `${name}：${resource} ${display > 0 ? '+' : ''}${display}`, 'ACTION_START', decayTurnLabel(val));
     rendered.add(eid);
   }
 
   // 洞察相关
   if (!rendered.has(EffectId.DULL) && state.insightDebuff > 0)
-    addIcon('weak-eye.svg', `愚钝：洞察消耗 +${state.insightDebuff}`, 'TURN_PHASE', '本回合');
+    addIcon('weak-eye.svg', `愚钝：洞察消耗 +${state.insightDebuff}`, 'TURN_PHASE', decayTurnLabel(state.insightDebuff));
   if (!rendered.has(EffectId.INSIGHTFUL) && state.insightDebuff < 0)
-    addIcon('eye.svg', `先机：洞察消耗 ${state.insightDebuff}`, 'TURN_PHASE', '本回合');
+    addIcon('eye.svg', `先机：洞察消耗 ${state.insightDebuff}`, 'TURN_PHASE', decayTurnLabel(Math.abs(state.insightDebuff)));
   if (!rendered.has(EffectId.BLINDED) && state.insightBlocked)
     addIcon('close-eye.svg', `蒙蔽：禁止洞察`, 'TURN_PHASE', '本回合');
   if (!rendered.has(EffectId.SHACKLED) && state.speedAdjustBlocked)
@@ -1164,6 +1186,15 @@ function updateStatusIcons(playerId, state) {
       addIcon('close-avoid.svg', `锁链：禁止闪避`, 'TURN_PHASE', '本回合');
     if (!rendered.has(EffectId.BROKEN_ARMOR) && state.actionBlocked.includes(Action.GUARD))
       addIcon('close-shield.svg', `废甲：禁止守备`, 'TURN_PHASE', '本回合');
+  }
+
+  // 槽位封锁（任意行动的技能槽位被禁用）
+  if (state.slotBlocked) {
+    const hasAnyBlocked = [Action.ATTACK, Action.GUARD, Action.DODGE].some(act =>
+      (state.slotBlocked[act] || []).some(v => !!v)
+    );
+    if (hasAnyBlocked)
+      addIcon('prohibited-skill.svg', `封锁：部分槽位禁用`, 'TURN_PHASE', '本回合');
   }
 
   // ── 3. 渲染闪烁效果图标（即时消费型效果的临时可视化） ──
@@ -1204,13 +1235,24 @@ function refreshEquipSlots() {
     const container = $(`equipSlots-${action}`);
     if (!container) return;
 
+    const blockedArr = p1.slotBlocked?.[action] || [];
+
     const slots = container.querySelectorAll('.equip-slot');
     slots.forEach((slotEl, idx) => {
+      const isBlocked = !!blockedArr[idx];
       const effectId = p1.equippedEffects[action]?.[idx] ?? null;
       slotEl.innerHTML = '';
-      slotEl.classList.toggle('filled', !!effectId);
+      slotEl.classList.toggle('filled', !!effectId && !isBlocked);
+      slotEl.classList.toggle('slot-blocked', isBlocked);
 
-      if (effectId && EffectDefs[effectId]) {
+      if (isBlocked) {
+        // 被封锁的槽位：直接显示淡灰色的“封锁”二字，不可交互
+        const lockLabel = document.createElement('div');
+        lockLabel.className = 'slot-name slot-blocked-label';
+        lockLabel.style.color = '#94a3b8';
+        lockLabel.textContent = '封锁';
+        slotEl.appendChild(lockLabel);
+      } else if (effectId && EffectDefs[effectId]) {
         const def = EffectDefs[effectId];
         const nameEl = document.createElement('div');
         nameEl.className = 'slot-name';
@@ -1242,7 +1284,7 @@ function refreshEquipSlots() {
 
       // 标记待交换状态
       slotEl.classList.toggle('swapping',
-        !!_swapCtx && _swapCtx.action === action && _swapCtx.slot === idx
+        !isBlocked && !!_swapCtx && _swapCtx.action === action && _swapCtx.slot === idx
       );
     });
   });
@@ -1374,6 +1416,9 @@ ui.equipOverlay.addEventListener('click', e => {
 
   const slotEl = e.target.closest('.equip-slot');
   if (!slotEl) return;
+
+  // 被封锁的槽位不可交互
+  if (slotEl.classList.contains('slot-blocked')) return;
 
   const action = slotEl.dataset.action;
   const slot = parseInt(slotEl.dataset.slot, 10);

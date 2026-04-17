@@ -65,6 +65,7 @@ import { BruteForceEffect } from '../skill/ai-attack/brute_force.js';
 
 // ── AI 守备技能（skill/ai-guard/）──
 import { IronGuardEffect } from '../skill/ai-guard/swift_guard.js';
+import { TremorEffect } from '../skill/ai-guard/tremor.js';
 
 /**
  * 效果处理器映射表（EffectId → handler）
@@ -115,6 +116,7 @@ const RawEffectHandlers = {
   [EffectId.BRUTE_FORCE]: BruteForceEffect,
   // ── AI 守备技能 ──
   [EffectId.IRON_GUARD]: IronGuardEffect,
+  [EffectId.TREMOR]: TremorEffect,
   // ── 状态效果（effect/function/）──
   sluggish: SluggishEffect,
   rejuvenated: RejuvenatedEffect,

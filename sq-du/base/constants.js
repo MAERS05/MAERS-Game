@@ -378,6 +378,7 @@ export const EffectId = Object.freeze({
   BRUTE_FORCE: 'brute_force',
   // ── AI 守备技能（skill/ai-guard/）──
   IRON_GUARD: 'iron_guard',
+  TREMOR: 'tremor',
 });
 
 
@@ -548,6 +549,11 @@ export const EffectDefs = Object.freeze({
   // ── AI 守备技能（skill/ai-guard/）──
   [EffectId.IRON_GUARD]: {
     id: EffectId.IRON_GUARD, name: '迅防',
+    applicableTo: [Action.GUARD],
+    aiOnly: true,
+  },
+  [EffectId.TREMOR]: {
+    id: EffectId.TREMOR, name: '震颤',
     applicableTo: [Action.GUARD],
     aiOnly: true,
   },

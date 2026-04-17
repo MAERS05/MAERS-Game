@@ -22,7 +22,7 @@ export class EffectLayer {
   }
 
   static rewriteRoundDraft({ p1Ctx, p2Ctx, p1State, p2State }) {
-    const { p1CtxEff, p2CtxEff, p1TriggeredEffects, p2TriggeredEffects } = this.processPreEffects(
+    const { p1CtxEff, p2CtxEff } = this.processPreEffects(
       p1Ctx,
       p2Ctx,
       p1State,
@@ -35,8 +35,12 @@ export class EffectLayer {
     finalP1Ctx = this._rewriteBlockedSlots(finalP1Ctx, p1State);
     finalP2Ctx = this._rewriteBlockedSlots(finalP2Ctx, p2State);
 
-    const p1CostBase = finalP1Ctx.cost ?? calcActionCost(finalP1Ctx, p1State);
-    const p2CostBase = finalP2Ctx.cost ?? calcActionCost(finalP2Ctx, p2State);
+    // 槽位封锁后重新收集有效触发列表（被封锁的效果不参与 onPost）
+    const p1TriggeredEffects = this._collectTriggeredEffects(finalP1Ctx);
+    const p2TriggeredEffects = this._collectTriggeredEffects(finalP2Ctx);
+
+    const p1CostBase = calcActionCost(finalP1Ctx, p1State);
+    const p2CostBase = calcActionCost(finalP2Ctx, p2State);
 
     finalP1Ctx.cost = Math.max(0, p1CostBase + (p1State.staminaDebuff || 0) - (p1State.staminaOverflow || 0));
     finalP2Ctx.cost = Math.max(0, p2CostBase + (p2State.staminaDebuff || 0) - (p2State.staminaOverflow || 0));

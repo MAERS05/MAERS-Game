@@ -65,6 +65,7 @@ const MAES_GUARD_EFFECTS = [
   EffectId.RESTORE,       // 恢复
   EffectId.SHOCKWAVE,     // 崩震
   EffectId.IRON_GUARD,    // 强防（AI 专属）
+  EffectId.TREMOR,        // 震颤（AI 专属）
 ];
 
 /** MAES AI 闪避技能池（已禁用闪避行为，保留空池备用） */
