@@ -66,10 +66,12 @@ export function resolve(p1Ctx, p2Ctx, p1State, p2State, bothInsighted, turn) {
     },
   };
 
-  // ── 1.5 快照本回合有效精力（前置处理后 discount/penalty 已确定，后置处理前尚未污染）─────────
-  // 处决检测必须用这一帧的数值，避免 onPost 写入的"下回合修正"干扰判断
-  const p1EntryEffective = p1State.stamina + (p1State.staminaDiscount || 0) - (p1State.staminaPenalty || 0);
-  const p2EntryEffective = p2State.stamina + (p2State.staminaDiscount || 0) - (p2State.staminaPenalty || 0);
+  // ── 1.5 快照本回合真实精力（前置处理后，后置处理前尚未污染）─────────
+  // 处决检测基于真实精力（stamina），而非有效精力（含 penalty/discount）。
+  // staminaPenalty 仅增加行动成本，不代表"精力耗尽"；
+  // 玩家仍可执行零成本行为（蓄势/就绪/疗愈），不应因临时惩罚被判处决。
+  const p1EntryEffective = p1State.stamina;
+  const p2EntryEffective = p2State.stamina;
 
   // ── 2. 裁判层：构建物理时间轴并推演博弈结果 ─────────
   const { bs, derived } = JudgeLayer.evaluateTimeline(p1CtxEff, p2CtxEff, p1State, p2State, p1EntryEffective, p2EntryEffective);
