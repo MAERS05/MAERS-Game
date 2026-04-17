@@ -607,8 +607,11 @@ export class JudgeLayer {
       }
     }
 
-    // 修改结果标题为最终战果，但保留原有的详细战斗过程（不覆盖 clashDesc）
+    // 当游戏结束时，用极简的行动总结覆盖原有详细（可能啰嗦）的战报过程
+    const p1Desc = this._formatAction(result.p1Action, true);
+    const p2Desc = this._formatAction(result.p2Action, false);
     result.clashName = finalClashName;
+    result.clashDesc = `${p1Desc}，${p2Desc}。<br><br><span style="font-size:1.1em;font-weight:bold;color:var(--text-main);">${finalDesc}</span>`;
 
     return { isOver: true, winner, reason: `【${finalClashName}】${finalDesc}` };
   }
