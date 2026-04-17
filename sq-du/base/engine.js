@@ -847,7 +847,7 @@ export class BattleEngine {
     const p1Snap = { ...p1 };
     const p2Snap = { ...p2 };
     const calcGross = (ctx, penalty) =>
-      (!ctx || ctx.action === Action.STANDBY || ctx.action === Action.READY) ? 0 : 1 + (ctx.enhance || 0) + (penalty || 0);
+      (!ctx || ctx.action === Action.STANDBY || ctx.action === Action.READY || ctx.action === Action.HEAL) ? 0 : 1 + (ctx.enhance || 0) + (penalty || 0);
     // P1 逆转
     const p1Gross = calcGross(p1.actionCtx, p1.staminaPenalty);
     const p1DiscSpent = p1.actionDiscountSpent || 0;
