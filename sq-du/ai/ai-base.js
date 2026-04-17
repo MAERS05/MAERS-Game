@@ -127,6 +127,12 @@ export class AIBaseLogic {
       playerPtsDebuff:   player.ptsDebuff   || 0,
       playerDodgeDebuff: player.dodgeDebuff || 0,
       playerGuardDebuff: player.guardDebuff || 0,
+      // 对手增益状态（用于防御决策）
+      playerChargeBoost: player.chargeBoost || 0,  // 对手蓄力中 → 下一击会很重
+      playerGuardBoost:  player.guardBoost  || 0,  // 对手守备增强 → 攻击难打穿
+      playerDodgeBoost:  player.dodgeBoost  || 0,  // 对手闪避增强 → 攻击难命中
+      playerStaminaPenalty: player.staminaPenalty || 0, // 对手精力惩罚 → 对手变弱
+      playerHealBlocked: !!player.healBlocked,     // 对手被禁疗愈
 
       // ── AI 自身效果感知 ──────────────────────────
       aiPtsDebuff:       ai.ptsDebuff       || 0,  // 攻击点数被削
@@ -216,6 +222,33 @@ export class AIBaseLogic {
     if (snap.aiStaminaPenalty > 0) {
       w.standby += snap.aiStaminaPenalty * 1.5;
       w.attack  -= snap.aiStaminaPenalty * 0.6;
+    }
+
+    // ── 对手效果感知（对手挂 buff/debuff 时调整决策）────
+    // 对手蓄力中 → 下一击会很重，必须防备
+    if (snap.playerChargeBoost > 0) {
+      w.guard  += snap.playerChargeBoost * 2.0;
+      w.dodge  += snap.playerChargeBoost * 1.2;
+      w.attack -= 0.8;
+    }
+    // 对手守备增强 → 正面攻击难打穿，转蓄势等 buff 消退或选择待命
+    if (snap.playerGuardBoost > 0) {
+      w.attack  -= snap.playerGuardBoost * 0.8;
+      w.standby += 0.6;
+    }
+    // 对手闪避增强 → 攻击难命中，不宜盲目进攻
+    if (snap.playerDodgeBoost > 0) {
+      w.attack  -= snap.playerDodgeBoost * 0.8;
+      w.guard   += 0.4;
+    }
+    // 对手精力惩罚 → 对手行动受限，趁机施压
+    if (snap.playerStaminaPenalty > 0) {
+      w.attack  += snap.playerStaminaPenalty * 1.0;
+      w.standby -= 0.5;
+    }
+    // 对手被禁疗愈 → 无法回血，持续进攻耗血
+    if (snap.playerHealBlocked) {
+      w.attack += 0.6;
     }
 
     // ── 自身血量压力 ─────────────────────────────
