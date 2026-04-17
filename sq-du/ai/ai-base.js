@@ -143,10 +143,15 @@ export class AIBaseLogic {
   // ═══════════════════════════════════════════════════════════
 
   static pickAction(snap, ai) {
-    const w = { attack: 1.0, guard: 1.0, dodge: 1.0, standby: 0.2 };
+    const w = { attack: 1.0, guard: 1.0, dodge: 1.0, standby: 0.2, heal: 0.0 };
 
     const aiEffectiveStamina = this.getEffectiveStamina(ai);
     const indicators         = this.buildIndicators(snap, aiEffectiveStamina);
+
+    // ── 定制化行为偏移（由 MaesProfile.tuning 注入）────
+    const tuning = ai.aiTuning || {};
+    w.attack += tuning.attackBias || 0;
+    w.guard  += tuning.guardBias  || 0;
 
     // ── 处决窗口（对手精力耗尽）：果断出击 ──────
     if (indicators.executeWindow > 0) {
@@ -252,18 +257,35 @@ export class AIBaseLogic {
     w.dodge  += indicators.aiDanger * indicators.antiAttackNeed * 1.2;
     w.attack -= indicators.aiDanger * indicators.antiAttackNeed * 1.0;
 
+    // ── 疗愈评估（低血量 + 未被禁止时考虑）─────────
+    if (!ai.healBlocked && ai.hp < 3) {
+      // 血量越低越想疗愈
+      const hpUrgency = (3 - ai.hp) / 2; // hp=1→1.0, hp=2→0.5
+      w.heal += hpUrgency * 2.5;
+      // 对手攻击倾向高时疗愈风险大
+      w.heal -= snap.oppAggression * 1.5;
+      // 精力充裕时更敢疗愈
+      if (aiEffectiveStamina >= 2) w.heal += 0.5;
+      // 对手也低精力时安全疗愈
+      if (snap.playerStaminaRatio <= 0.3) w.heal += 1.0;
+      // 绝杀窗口时不疗愈
+      if (indicators.killWindow > 0 || indicators.executeWindow > 0) w.heal = -Infinity;
+    }
+
     // ── 行动禁用：被效果封禁的行动权重归零 ──────────
     const blocked = Array.isArray(ai.actionBlocked) ? ai.actionBlocked : [];
     if (blocked.includes(Action.ATTACK))  w.attack  = -Infinity;
     if (blocked.includes(Action.GUARD))   w.guard   = -Infinity;
     if (blocked.includes(Action.DODGE))   w.dodge   = -Infinity;
     if (blocked.includes(Action.STANDBY)) w.standby = -Infinity;
+    if (blocked.includes(Action.HEAL))    w.heal    = -Infinity;
 
     const weightMap = {
       [Action.ATTACK]:  w.attack,
       [Action.GUARD]:   w.guard,
       [Action.DODGE]:   w.dodge,
       [Action.STANDBY]: w.standby,
+      [Action.HEAL]:    w.heal,
     };
     return this.pickSmartAction(weightMap, indicators);
   }

@@ -121,11 +121,13 @@ function _shouldUseInsight(snap, ai, aiEffective) {
   if (snap.playerStaminaRatio <= 0.15) score -= 1.5;
 
   // 阈值：分数不足时不洞察（避免无意义消耗）
-  const BASE_THRESHOLD = 1.8;
+  const tuning = ai.aiTuning || {};
+  const BASE_THRESHOLD = tuning.insightThreshold ?? 1.8;
   if (score < BASE_THRESHOLD) return false;
 
-  // 分数转化为概率（最高 65%，避免 AI 失去不确定性）
-  const prob = Math.min(0.65, (score - BASE_THRESHOLD) / 4.0 + 0.15);
+  // 分数转化为概率
+  const maxProb = tuning.insightMaxProb ?? 0.65;
+  const prob = Math.min(maxProb, (score - BASE_THRESHOLD) / 4.0 + 0.15);
   return Math.random() < prob;
 }
 
@@ -173,16 +175,17 @@ function _evaluateRedecide(ai, player, revealedAction, effectiveStamina, getHist
   const revealed = revealedAction;
   const snap = AIBaseLogic.snapshot(ai, player, getHistory());
   const indicators = AIBaseLogic.buildIndicators(snap, effectiveStamina);
+  const tuning = ai.aiTuning || {};
+  const bias = tuning.redecideBias || 0;
 
-  // ── 斩杀窗口：绝对不弃权 ────────────────────
+  // ── 斜杀窗口：绝对不弃权 ────────────────────
   if ((indicators.killWindow > 0 || indicators.executeWindow > 0) && effectiveStamina >= 1) {
     return AIJudgeLayer.buildRedecideDecision(ai, player, revealed, getHistory());
   }
 
   // ── 对手出攻击：威胁度驱动是否重决策 ──────────
   if (revealed?.action === Action.ATTACK) {
-    // 危险程度越高，越倾向重决策防守
-    const dangerFactor = 0.50 + indicators.aiDanger * 0.40;
+    const dangerFactor = Math.min(1, 0.50 + indicators.aiDanger * 0.40 + bias);
     if (Math.random() < dangerFactor) {
       return AIJudgeLayer.buildRedecideDecision(ai, player, revealed, getHistory());
     }
@@ -191,16 +194,14 @@ function _evaluateRedecide(ai, player, revealedAction, effectiveStamina, getHist
 
   // ── 对手出被动（待命/守备）：进攻机会评估 ─────
   if (revealed?.action === Action.STANDBY && effectiveStamina >= 1) {
-    // 待命是最好的攻击机会，高概率进攻
-    if (Math.random() < 0.70) {
+    if (Math.random() < Math.min(1, 0.70 + bias)) {
       return AIJudgeLayer.buildRedecideDecision(ai, player, revealed, getHistory());
     }
     return null;
   }
 
   if (revealed?.action === Action.GUARD && effectiveStamina >= 2) {
-    // 守备时：只有精力充足（可强化破防）才值得改动
-    if (Math.random() < 0.45) {
+    if (Math.random() < Math.min(1, 0.45 + bias)) {
       return AIJudgeLayer.buildRedecideDecision(ai, player, revealed, getHistory());
     }
     return null;
@@ -208,8 +209,7 @@ function _evaluateRedecide(ai, player, revealedAction, effectiveStamina, getHist
 
   // ── 对手出闪避：攻击大概率被闪开，通常弃权 ────
   if (revealed?.action === Action.DODGE) {
-    // 有足够精力加速超越时，小概率尝试
-    if (effectiveStamina >= 2 && Math.random() < 0.30) {
+    if (effectiveStamina >= 2 && Math.random() < Math.min(1, 0.30 + bias)) {
       return AIJudgeLayer.buildRedecideDecision(ai, player, revealed, getHistory());
     }
     return null;

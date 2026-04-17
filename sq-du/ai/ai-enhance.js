@@ -10,7 +10,7 @@
 
 'use strict';
 
-import { Action, DefaultStats, EffectId } from '../base/constants.js';
+import { Action, DefaultStats, EffectDefs, EffectId } from '../base/constants.js';
 
 export class AIEnhanceLayer {
   /**
@@ -28,8 +28,8 @@ export class AIEnhanceLayer {
    */
   static constrainDecision(decision, scene) {
     const normalized = {
-      action:  decision?.action  ?? Action.STANDBY,
-      speed:   decision?.speed   ?? DefaultStats.BASE_SPEED,
+      action: decision?.action ?? Action.STANDBY,
+      speed: decision?.speed ?? DefaultStats.BASE_SPEED,
       enhance: decision?.enhance ?? 0,
       effects: decision?.effects ?? [null, null, null],
     };
@@ -43,8 +43,8 @@ export class AIEnhanceLayer {
     // 底线1：有效精力不足时强制待命。
     if (effectiveStamina <= 0) {
       return {
-        action:  Action.STANDBY,
-        speed:   DefaultStats.BASE_SPEED,
+        action: Action.STANDBY,
+        speed: DefaultStats.BASE_SPEED,
         enhance: 0,
         effects: [null, null, null],
       };
@@ -80,8 +80,8 @@ export class AIEnhanceLayer {
       !killWindow && !executeWindow &&
       player.hp > 1 && player.stamina > 0
     ) {
-      normalized.action  = Action.STANDBY;
-      normalized.speed   = DefaultStats.BASE_SPEED;
+      normalized.action = Action.STANDBY;
+      normalized.speed = DefaultStats.BASE_SPEED;
       normalized.enhance = 0;
       normalized.effects = [null, null, null];
     }

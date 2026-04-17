@@ -5,7 +5,7 @@ import { createSkillEffect } from '../../effect/function/skill-factory.js';
 import { EffectLayer } from '../../main/effect.js';
 
 export const LightfootEffect = createSkillEffect({
-  id: EffectId.LIGHTFOOT,
+  id: EffectId.LIGHTBODY,
   name: '轻身',
   desc: '在行动期开始后，行动期结束前为自身附加1级[侧身]并触发，随后为自身附加1级[虚弱]并在下一回合的回合开始后，装配期开始前触发',
   staminaCost: 0,

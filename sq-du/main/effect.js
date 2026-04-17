@@ -410,11 +410,13 @@ export class EffectLayer {
       const handler = EffectHandlers[effectId];
       if (!handler?.onPost) continue;
       // 按行动类型检查是否成功，不成功则跳过
+      // 但 triggerOnFail 标记的技能在行动失败时触发
       if (p1Flags) {
         const act = p1CtxEff?.action;
-        if (act === Action.ATTACK && !p1Flags.attackSuccess) continue;
-        if (act === Action.DODGE && !p1Flags.dodgeSuccess) continue;
-        if (act === Action.GUARD && !p1Flags.guardSuccess) continue;
+        const isFail = handler.triggerOnFail;
+        if (act === Action.ATTACK && (isFail ? p1Flags.attackSuccess : !p1Flags.attackSuccess)) continue;
+        if (act === Action.DODGE  && (isFail ? p1Flags.dodgeSuccess  : !p1Flags.dodgeSuccess))  continue;
+        if (act === Action.GUARD  && (isFail ? p1Flags.guardSuccess  : !p1Flags.guardSuccess))  continue;
       }
       handler.onPost(p1CtxEff, p1State, p2State, p1DmgReceived, p2DmgReceived, p2CtxEff);
     }
@@ -424,9 +426,10 @@ export class EffectLayer {
       if (!handler?.onPost) continue;
       if (p2Flags) {
         const act = p2CtxEff?.action;
-        if (act === Action.ATTACK && !p2Flags.attackSuccess) continue;
-        if (act === Action.DODGE && !p2Flags.dodgeSuccess) continue;
-        if (act === Action.GUARD && !p2Flags.guardSuccess) continue;
+        const isFail = handler.triggerOnFail;
+        if (act === Action.ATTACK && (isFail ? p2Flags.attackSuccess : !p2Flags.attackSuccess)) continue;
+        if (act === Action.DODGE  && (isFail ? p2Flags.dodgeSuccess  : !p2Flags.dodgeSuccess))  continue;
+        if (act === Action.GUARD  && (isFail ? p2Flags.guardSuccess  : !p2Flags.guardSuccess))  continue;
       }
       handler.onPost(p2CtxEff, p2State, p1State, p2DmgReceived, p1DmgReceived, p1CtxEff);
     }

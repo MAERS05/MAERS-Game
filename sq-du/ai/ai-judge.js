@@ -17,6 +17,7 @@ import { AIBaseLogic } from './ai-base.js';
 import { AIExtraLayer } from './ai-extra.js';
 import { AIStrategyLayer } from './ai-strategy.js';
 import { AIEnhanceLayer } from './ai-enhance.js';
+import { maesConstrainDecision } from './sq-du-maes/ai-maes.js';
 
 export class AIJudgeLayer {
   /**
@@ -37,10 +38,11 @@ export class AIJudgeLayer {
     const { speed, enhance } = this.validateBudget(ai, action, speedRaw, enhanceRaw);
     const effects = AIExtraLayer.pickEffects(action, enhance, ai, { player, isRedecide: false });
 
-    return AIEnhanceLayer.constrainDecision(
+    const base = AIEnhanceLayer.constrainDecision(
       { action, enhance, speed, effects },
       { ai, player, history, revealedAction: null, isRedecide: false }
     );
+    return maesConstrainDecision(base, { ai, player, history, revealedAction: null, isRedecide: false });
   }
 
   /**
@@ -67,10 +69,11 @@ export class AIJudgeLayer {
       player, revealedAction, isRedecide: true
     });
 
-    return AIEnhanceLayer.constrainDecision(
+    const base = AIEnhanceLayer.constrainDecision(
       { action, enhance, speed, effects },
       { ai, player, history, revealedAction, isRedecide: true }
     );
+    return maesConstrainDecision(base, { ai, player, history, revealedAction, isRedecide: true });
   }
 
   /**

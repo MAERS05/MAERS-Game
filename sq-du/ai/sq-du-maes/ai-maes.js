@@ -8,13 +8,15 @@
  *
  * 定制化清单：
  *  - 永久攻击点数 +1（attackPtsBonus）
+ *  - 永久守备点数 +1（guardPtsBonus）
  *  - 永久禁止闪避（permActionBlocked）
  *  - 独立技能库（effectInventory）：AI 拥有独属技能池，与玩家不共享
+ *  - 行为调优（aiTuning）：攻击偏好、洞察欲望、重决策概率
  */
 
 'use strict';
 
-import { Action, EffectId, EffectDefs } from '../../base/constants.js';
+import { Action, DefaultStats, EffectId, EffectDefs } from '../../base/constants.js';
 
 // ── 基础 AI 行为层：统一引入并转导出 ─────────────
 export { scheduleAI, scheduleAIRedecide } from '../ai-scheduler.js';
@@ -42,14 +44,13 @@ export { AIEnhanceLayer } from '../ai-enhance.js';
 const MAES_ATTACK_EFFECTS = [
   EffectId.REND,          // 撕裂
   EffectId.BREAK_QI,      // 泣命
-  EffectId.CHARGE,        // 蓄力
-  EffectId.POUNCE,        // 猛扑
   EffectId.RECKLESS,      // 舍身
-  EffectId.CAUTIOUS,      // 谨慎
   EffectId.DRAIN,         // 汲取
-  EffectId.CHAINLOCK,     // 锁链
+  EffectId.CHAINLOCK,     // 束缚（AI 专属）
   EffectId.OBSCURE,       // 障目
   EffectId.BLOOD_DRINK,   // 饮血（AI 专属）
+  EffectId.PURSUIT,       // 追击（AI 专属）
+  EffectId.HEAVY_PRESS,   // 猛压（AI 专属）
 ];
 
 /** MAES AI 守备技能池 */
@@ -58,7 +59,6 @@ const MAES_GUARD_EFFECTS = [
   EffectId.REDIRECT,      // 化劲
   EffectId.BASTION,       // 磐石
   EffectId.IRON_WALL,     // 铁壁
-  EffectId.RIGID,         // 硬体
   EffectId.ABSORB_QI,     // 纳气
   EffectId.INTERCEPT,     // 截脉
   EffectId.RESTORE,       // 恢复
@@ -98,7 +98,7 @@ export const MaesProfile = {
 
   // ── 永久数值修正（正=增益，负=减益，不衰减、不清零，整局生效） ──
   attackPtsBonus: 1,          // 永久攻击点数加值
-  guardPtsBonus: 0,           // 永久守备点数加值
+  guardPtsBonus: 1,           // 永久守备点数加值
   dodgePtsBonus: 0,           // 永久闪避点数加值
   speedBonus: 0,              // 永久动速加值
 
@@ -113,6 +113,15 @@ export const MaesProfile = {
     [Action.ATTACK]: [false, false, false],
     [Action.GUARD]: [false, false, false],
     [Action.DODGE]: [false, false, false],
+  },
+
+  // ── MAES 行为调优（注入 AI 状态，被 ai-base / ai-scheduler 读取） ──
+  tuning: {
+    attackBias:        0.5,   // 攻击权重偏移（正=更好斗）
+    guardBias:         0.0,   // 守备权重偏移
+    insightThreshold:  1.2,   // 洞察评分阈值（低=更积极洞察；默认 1.8）
+    insightMaxProb:    0.80,  // 洞察最大概率（默认 0.65）
+    redecideBias:      0.20,  // 重决策概率偏移（加到各情境概率上）
   },
 };
 
@@ -153,4 +162,60 @@ export function applyCustomization(state) {
 
   // ── 覆写技能库为 AI 独立技能池 ──
   state.effectInventory = buildMaesInventory();
+
+  // ── 注入行为调优参数 ──
+  state.aiTuning = { ...MaesProfile.tuning };
+}
+
+// ═════════════════════════════════════════════════
+// MAES 定制化场景约束（在基础约束的基础上追加）
+// ═════════════════════════════════════════════════
+
+/**
+ * MAES 专属场景约束。
+ * 在 AIEnhanceLayer.constrainDecision 之后调用，提供 MAES 特有的战斗直觉。
+ *
+ * @param {Object} decision - 经过基础约束的决策
+ * @param {Object} scene    - { ai, player, history, revealedAction, isRedecide }
+ * @returns {Object} 约束后的决策
+ */
+export function maesConstrainDecision(decision, scene) {
+  const d = { ...decision };
+  const { ai, player } = scene;
+  const effectiveStamina = Math.max(0, ai.stamina + (ai.staminaDiscount || 0) - (ai.staminaPenalty || 0));
+  const killWindow = player.hp <= 1 || (player.hp <= 2 && player.stamina <= 1);
+  const executeWindow = player.stamina <= 0;
+
+  // ── 场景1（血线保命）：HP=1 + 对手有精力 → 强制守备 ──
+  if (
+    ai.hp <= 1 &&
+    player.stamina > 0 &&
+    d.action !== Action.GUARD &&
+    d.action !== Action.HEAL &&
+    !killWindow && !executeWindow
+  ) {
+    d.action  = Action.GUARD;
+    d.speed   = DefaultStats.BASE_SPEED;
+    d.enhance = 0;
+  }
+
+  // ── 场景2（空精反守）：对手精力=0 + AI有精力 → 禁止待命/疗愈，迫使进攻 ──
+  if (
+    player.stamina <= 0 &&
+    effectiveStamina >= 1 &&
+    (d.action === Action.STANDBY || d.action === Action.HEAL)
+  ) {
+    d.action = Action.ATTACK;
+  }
+
+  // ── 场景3（自残保护）：HP=1 → 移除所有带 hpCost 的技能 ──
+  if (ai.hp <= 1 && Array.isArray(d.effects)) {
+    d.effects = d.effects.map(id => {
+      if (!id) return null;
+      const def = EffectDefs[id];
+      return (def?.hpCost && def.hpCost > 0) ? null : id;
+    });
+  }
+
+  return d;
 }

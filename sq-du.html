@@ -1944,6 +1944,32 @@
   <script type="module" src="./sq-du/main/ui.js"></script>
 
   <style>
+    #bgmToggle {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      width: 22px;
+      height: 22px;
+      z-index: 9999;
+      cursor: pointer;
+      opacity: 0.8;
+      transition: opacity 0.3s, transform 0.3s;
+      filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6));
+    }
+
+    #bgmToggle:hover {
+      opacity: 1;
+      transform: scale(1.1);
+    }
+
+    #bgmToggle.playing {
+      animation: spin 4s linear infinite;
+    }
+
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+
     #globalPauseBtn {
       position: fixed;
       bottom: 20px;
@@ -2016,6 +2042,41 @@
   <!-- 全局暂停按钮 -->
   <button id="globalPauseBtn">⏸︎</button>
 
+  <audio id="bgm" loop>
+    <source src="sq-du/music/sq-du-maes.mp3" type="audio/mpeg">
+  </audio>
+  <img src="ui-all/music.svg" id="bgmToggle" alt="BGM">
+
+  <script>
+    const bgm = document.getElementById('bgm');
+    const bgmToggle = document.getElementById('bgmToggle');
+    const startBtn = document.getElementById('startBtn');
+    
+    // 初始化音量
+    bgm.volume = 0.5;
+
+    // 点击开始游戏时播放音乐
+    if (startBtn) {
+      startBtn.addEventListener('click', () => {
+        if (bgm.paused) {
+          bgm.play().then(() => {
+            bgmToggle.classList.add('playing');
+          }).catch(() => {});
+        }
+      });
+    }
+
+    // 点击图标切换播放/暂停
+    bgmToggle.addEventListener('click', () => {
+      if (bgm.paused) {
+        bgm.play();
+        bgmToggle.classList.add('playing');
+      } else {
+        bgm.pause();
+        bgmToggle.classList.remove('playing');
+      }
+    });
+  </script>
 </body>
 
 </html>

@@ -19,25 +19,31 @@ import { PowerEffect, WeakEffect, BrokenBladeEffect, ChainlockEffect } from '../
 import { SolidEffect, CrackedArmorEffect, BrokenArmorEffect } from '../effect/function/defense-status.js';
 import { SideStepEffect, ClumsyEffect, ShackledDodgeEffect } from '../effect/function/dodge-status.js';
 
-// ── 共享技能（skill/all/）──
-import { RendEffect } from '../skill/all/rend.js';
-import { BreakQiEffect } from '../skill/all/break_qi.js';
-import { ChargeEffect } from '../skill/all/charge.js';
-import { PounceEffect } from '../skill/all/pounce.js';
-import { RecklessEffect } from '../skill/all/reckless.js';
-import { CautiousEffect } from '../skill/all/cautious.js';
-import { DrainEffect } from '../skill/all/drain.js';
-import { ChainLock } from '../skill/all/chainlock.js';
-import { ObscureEffect } from '../skill/all/obscure.js';
-import { BloodShieldEffect } from '../skill/all/blood_shield.js';
-import { RedirectEffect } from '../skill/all/redirect.js';
-import { BastionEffect } from '../skill/all/bastion.js';
-import { IronWallEffect } from '../skill/all/iron_wall.js';
-import { RigidEffect } from '../skill/all/rigid.js';
-import { AbsorbQiEffect } from '../skill/all/absorb_qi.js';
-import { InterceptEffect } from '../skill/all/intercept.js';
-import { Restore } from '../skill/all/restore.js';
-import { ShockwaveEffect } from '../skill/all/shockwave.js';
+// ── 共享攻击技能（skill/attack/）──
+import { RendEffect } from '../skill/attack/rend.js';
+import { BreakQiEffect } from '../skill/attack/break_qi.js';
+import { RecklessEffect } from '../skill/attack/reckless.js';
+import { DrainEffect } from '../skill/attack/drain.js';
+import { ObscureEffect } from '../skill/attack/obscure.js';
+
+// ── 共享守备技能（skill/guard/）──
+import { BloodShieldEffect } from '../skill/guard/blood_shield.js';
+import { RedirectEffect } from '../skill/guard/redirect.js';
+import { BastionEffect } from '../skill/guard/bastion.js';
+import { IronWallEffect } from '../skill/guard/iron_wall.js';
+import { AbsorbQiEffect } from '../skill/guard/absorb_qi.js';
+import { InterceptEffect } from '../skill/guard/intercept.js';
+import { Restore } from '../skill/guard/restore.js';
+import { ShockwaveEffect } from '../skill/guard/shockwave.js';
+
+// ── 玩家攻击技能（skill/player-attack/）──
+import { ChargeEffect } from '../skill/player-attack/charge.js';
+import { PounceEffect } from '../skill/player-attack/pounce.js';
+import { CautiousEffect } from '../skill/player-attack/cautious.js';
+import { ExhilarateEffect } from '../skill/player-attack/exhilarate.js';
+
+// ── 玩家守备技能（skill/player-guard/）──
+import { RigidEffect } from '../skill/player-guard/rigid.js';
 
 // ── 玩家闪避技能（skill/player-dodge/）──
 import { AgilityEffect } from '../skill/player-dodge/agility.js';
@@ -50,8 +56,13 @@ import { Hide } from '../skill/player-dodge/hide.js';
 import { Lure } from '../skill/player-dodge/lure.js';
 import { SeeThrough } from '../skill/player-dodge/see-through.js';
 
-// ── AI 专属技能 ──
+// ── AI 攻击技能（skill/ai-attack/）──
 import { BloodDrinkEffect } from '../skill/ai-attack/blood_drink.js';
+import { ChainLock } from '../skill/ai-attack/chainlock.js';
+import { PursuitEffect } from '../skill/ai-attack/pursuit.js';
+import { HeavyPressEffect } from '../skill/ai-attack/heavy_press.js';
+
+// ── AI 守备技能（skill/ai-guard/）──
 import { IronGuardEffect } from '../skill/ai-guard/iron_guard.js';
 
 /**
@@ -63,36 +74,46 @@ import { IronGuardEffect } from '../skill/ai-guard/iron_guard.js';
  *   onPhase(args)                              → void（阶段接口触发时机）
  */
 const RawEffectHandlers = {
+  // ── 共享攻击技能 ──
   [EffectId.REND]: RendEffect,
   [EffectId.BREAK_QI]: BreakQiEffect,
-  [EffectId.CHARGE]: ChargeEffect,
+  [EffectId.RECKLESS]: RecklessEffect,
+  [EffectId.DRAIN]: DrainEffect,
+  [EffectId.OBSCURE]: ObscureEffect,
+  // ── 共享守备技能 ──
   [EffectId.BLOOD_SHIELD]: BloodShieldEffect,
   [EffectId.REDIRECT]: RedirectEffect,
   [EffectId.BASTION]: BastionEffect,
-  [EffectId.AGILITY]: AgilityEffect,
-  [EffectId.ABANDON]: AbandonEffect,
-  [EffectId.MOMENTUM]: MomentumEffect,
-  [EffectId.LIGHTFOOT]: LightfootEffect,
-  [EffectId.DISARM]: DisarmEffect,
   [EffectId.IRON_WALL]: IronWallEffect,
-  [EffectId.RIGID]: RigidEffect,
-  [EffectId.POUNCE]: PounceEffect,
-  [EffectId.RECKLESS]: RecklessEffect,
   [EffectId.ABSORB_QI]: AbsorbQiEffect,
-  [EffectId.DISRUPT]: DisruptEffect,
-  [EffectId.CAUTIOUS]: CautiousEffect,
-  [EffectId.DRAIN]: DrainEffect,
-  [EffectId.CHAINLOCK]: ChainLock,
-  [EffectId.OBSCURE]: ObscureEffect,
   [EffectId.INTERCEPT]: InterceptEffect,
   [EffectId.RESTORE]: Restore,
   [EffectId.SHOCKWAVE]: ShockwaveEffect,
+  // ── 玩家攻击技能 ──
+  [EffectId.CHARGE]: ChargeEffect,
+  [EffectId.POUNCE]: PounceEffect,
+  [EffectId.CAUTIOUS]: CautiousEffect,
+  [EffectId.EXHILARATE]: ExhilarateEffect,
+  // ── 玩家守备技能 ──
+  [EffectId.RIGID]: RigidEffect,
+  // ── 玩家闪避技能 ──
+  [EffectId.AGILITY]: AgilityEffect,
+  [EffectId.ABANDON]: AbandonEffect,
+  [EffectId.MOMENTUM]: MomentumEffect,
+  [EffectId.LIGHTBODY]: LightfootEffect,
+  [EffectId.DISARM]: DisarmEffect,
+  [EffectId.DISRUPT]: DisruptEffect,
   [EffectId.HIDE]: Hide,
   [EffectId.LURE]: Lure,
   [EffectId.SEE_THROUGH]: SeeThrough,
-  // ── AI 专属技能 ──
+  // ── AI 攻击技能 ──
   [EffectId.BLOOD_DRINK]: BloodDrinkEffect,
+  [EffectId.CHAINLOCK]: ChainLock,
+  [EffectId.PURSUIT]: PursuitEffect,
+  [EffectId.HEAVY_PRESS]: HeavyPressEffect,
+  // ── AI 守备技能 ──
   [EffectId.IRON_GUARD]: IronGuardEffect,
+  // ── 状态效果（effect/function/）──
   sluggish: SluggishEffect,
   rejuvenated: RejuvenatedEffect,
   exhausted: ExhaustedEffect,

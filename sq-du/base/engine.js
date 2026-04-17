@@ -98,10 +98,12 @@ class EventBus {
  * @returns {import('./constants.js').PlayerState}
  */
 function createPlayerState(id, overrides = {}) {
-  // 每个行动独立维护自己的效果库
-  const allAttackEffects = Object.values(EffectId).filter(id => EffectDefs[id]?.applicableTo.includes(Action.ATTACK));
-  const allGuardEffects = Object.values(EffectId).filter(id => EffectDefs[id]?.applicableTo.includes(Action.GUARD));
-  const allDodgeEffects = Object.values(EffectId).filter(id => EffectDefs[id]?.applicableTo.includes(Action.DODGE));
+  // 每个行动独立维护自己的效果库（排除 AI 专属技能）
+  const isPlayerSkill = (id, action) =>
+    EffectDefs[id]?.applicableTo.includes(action) && !EffectDefs[id]?.aiOnly;
+  const allAttackEffects = Object.values(EffectId).filter(id => isPlayerSkill(id, Action.ATTACK));
+  const allGuardEffects = Object.values(EffectId).filter(id => isPlayerSkill(id, Action.GUARD));
+  const allDodgeEffects = Object.values(EffectId).filter(id => isPlayerSkill(id, Action.DODGE));
   // 创建每个行为的空槽位（长度固定为 EFFECT_SLOTS）
   const emptySlots = () => Array(EFFECT_SLOTS).fill(null);
 

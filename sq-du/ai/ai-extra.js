@@ -96,28 +96,29 @@ export class AIExtraLayer {
     const score = 1;
 
     const byId = {
-      [EffectId.BREAK_QI]: action === Action.ATTACK ? (playerLowHp ? 3.2 : 1.2) : -5,
-      [EffectId.CHARGE]: action === Action.ATTACK
-        ? ((ai.chargeBoost || 0) > 0 || aiLowHp ? -4 : 1.0)
-        : -5,
-      [EffectId.POUNCE]: action === Action.ATTACK ? (playerLowHp ? 2.4 : 1.5) : -5,
-      [EffectId.RECKLESS]: action === Action.ATTACK ? (playerLowHp ? 2.0 : 1.0) : -5,
-      [EffectId.CAUTIOUS]: action === Action.ATTACK ? (playerLowStamina ? 0.6 : 1.4) : -5,
+      // ── 共享攻击技能 ──
       [EffectId.REND]: action === Action.ATTACK ? (playerLowStamina ? 0.8 : 1.8) : -5,
+      [EffectId.BREAK_QI]: action === Action.ATTACK ? (playerLowHp ? 3.2 : 1.2) : -5,
+      [EffectId.RECKLESS]: action === Action.ATTACK ? (playerLowHp ? 2.0 : 1.0) : -5,
+      [EffectId.DRAIN]: action === Action.ATTACK ? (playerLowStamina ? 1.0 : 1.6) : -5,
+      [EffectId.OBSCURE]: action === Action.ATTACK ? 1.4 : -5,
+      // ── AI 攻击技能 ──
+      [EffectId.CHAINLOCK]: action === Action.ATTACK ? 1.5 : -5,
+      [EffectId.BLOOD_DRINK]: action === Action.ATTACK ? (aiLowHp ? 2.4 : 1.3) : -5,
+      [EffectId.PURSUIT]: action === Action.ATTACK ? 1.4 : -5,
+      [EffectId.HEAVY_PRESS]: action === Action.ATTACK ? 1.4 : -5,
 
-      [EffectId.BLOOD_SHIELD]: action === Action.GUARD ? (aiLowHp ? 2.2 : 0.8) : -5,
-      [EffectId.REDIRECT]: action === Action.GUARD ? 1.8 : -5,
+      // ── 共享守备技能 ──
+      [EffectId.BLOOD_SHIELD]: action === Action.GUARD ? (aiLowHp ? 2.2 : 1.0) : -5,
+      [EffectId.REDIRECT]: action === Action.GUARD ? 1.5 : -5,
       [EffectId.BASTION]: action === Action.GUARD ? 1.2 : -5,
       [EffectId.IRON_WALL]: action === Action.GUARD ? 1.4 : -5,
-      [EffectId.RIGID]: action === Action.GUARD ? 1.3 : -5,
-      [EffectId.ABSORB_QI]: action === Action.GUARD ? (ai.stamina <= 2 ? 2.5 : 1.1) : -5,
-
-      [EffectId.AGILITY]: action === Action.DODGE ? 1.4 : -5,
-      [EffectId.ABANDON]: action === Action.DODGE ? (aiLowHp ? 0.4 : 1.5) : -5,
-      [EffectId.MOMENTUM]: action === Action.DODGE ? (ai.stamina <= 2 ? 2.6 : 1.3) : -5,
-      [EffectId.LIGHTFOOT]: action === Action.DODGE ? 1.1 : -5,
-      [EffectId.DISARM]: action === Action.DODGE ? 1.3 : -5,
-      [EffectId.DISRUPT]: action === Action.DODGE ? (playerLowStamina ? 0.5 : 1.9) : -5,
+      [EffectId.ABSORB_QI]: action === Action.GUARD ? (ai.stamina <= 2 ? 2.2 : 1.1) : -5,
+      [EffectId.INTERCEPT]: action === Action.GUARD ? (playerLowStamina ? 0.6 : 1.5) : -5,
+      [EffectId.RESTORE]: action === Action.GUARD ? (aiLowHp ? 2.0 : 1.2) : -5,
+      [EffectId.SHOCKWAVE]: action === Action.GUARD ? 1.3 : -5,
+      // ── AI 守备技能 ──
+      [EffectId.IRON_GUARD]: action === Action.GUARD ? 1.3 : -5,
     };
 
     let total = score + (byId[id] ?? 0);
@@ -125,7 +126,7 @@ export class AIExtraLayer {
     if (hpCost > 0 && aiLowHp) total -= 2.0;
     if (scene?.isRedecide && revealed?.action === Action.ATTACK && action === Action.GUARD) total += 0.5;
     if (scene?.isRedecide && revealed?.action === Action.STANDBY && action === Action.ATTACK) total += 0.5;
-    total += Math.random() * 0.15;
+    total += Math.random() * 0.3;
     return total;
   }
 }

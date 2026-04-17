@@ -996,7 +996,7 @@ const EFFECT_ICON_META = {
   [EffectId.BLINDED]: { icon: 'close-eye.svg', name: '蒙蔽', resource: '禁止洞察', binary: true },
   [EffectId.BROKEN_BLADE]: { icon: 'close-knife.svg', name: '碎刃', resource: '禁止攻击', binary: true },
   [EffectId.BROKEN_ARMOR]: { icon: 'close-shield.svg', name: '废甲', resource: '禁止守备', binary: true },
-  [EffectId.SHACKLED]: { icon: 'fast.svg', name: '禁锢', resource: '禁止调速', binary: true },
+  [EffectId.SHACKLED]: { icon: 'close-fast.svg', name: '禁锢', resource: '禁止调速', binary: true },
   [EffectId.SHACKLED_DODGE]: { icon: 'close-avoid.svg', name: '锁链', resource: '禁止闪避', binary: true },
 };
 
@@ -1085,7 +1085,7 @@ function updateStatusIcons(playerId, state) {
       if (group.maxTriggers != null && group.maxTriggers > 0) return `${base}（共${group.maxTriggers}次）`;
       return `${base}（永久）`;
     }
-    if (group.duration != null && group.duration > 0) return `${group.duration}回合内`;
+    if (group.duration != null && group.duration > 1) return `${group.duration}回合内`;
     const targetTurn = group.minTurn;
     if (targetTurn == null) return '本回合';
     const delta = targetTurn - currentTurn;

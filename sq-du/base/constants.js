@@ -336,38 +336,46 @@ export const EffectId = Object.freeze({
   CRACKED_ARMOR: 'cracked_armor',
   BROKEN_ARMOR: 'broken_armor',
   SIDE_STEP: 'side_step',
-  LIGHTFOOT: 'lightfoot',
   CLUMSY: 'clumsy',
   SHACKLED_DODGE: 'shackled_dodge',
-  // ── 既有效果 ──
+  // ── 共享攻击技能（skill/attack/）──
   REND: 'rend',
   BREAK_QI: 'break_qi',
-  CHARGE: 'charge',
-  POUNCE: 'pounce',
   RECKLESS: 'reckless',
-  CAUTIOUS: 'cautious',
   DRAIN: 'drain',
-  CHAINLOCK: 'chainlock',
   OBSCURE: 'obscure',
+  // ── 共享守备技能（skill/guard/）──
   BLOOD_SHIELD: 'blood_shield',
   REDIRECT: 'redirect',
   BASTION: 'bastion',
   IRON_WALL: 'iron_wall',
-  RIGID: 'rigid',
   ABSORB_QI: 'absorb_qi',
   INTERCEPT: 'intercept',
   RESTORE: 'restore',
   SHOCKWAVE: 'shockwave',
+  // ── 玩家攻击技能（skill/player-attack/）──
+  CHARGE: 'charge',
+  POUNCE: 'pounce',
+  CAUTIOUS: 'cautious',
+  EXHILARATE: 'exhilarate',
+  // ── 玩家守备技能（skill/player-guard/）──
+  RIGID: 'rigid',
+  // ── 玩家闪避技能（skill/player-dodge/）──
   AGILITY: 'agility',
   ABANDON: 'abandon',
   MOMENTUM: 'momentum',
+  LIGHTBODY: 'lightbody',
   DISARM: 'disarm',
   DISRUPT: 'disrupt',
   HIDE: 'hide',
   LURE: 'lure',
   SEE_THROUGH: 'see-through',
-  // ── AI 专属技能 ──
+  // ── AI 攻击技能（skill/ai-attack/）──
   BLOOD_DRINK: 'blood_drink',
+  CHAINLOCK: 'chainlock',
+  PURSUIT: 'pursuit',
+  HEAVY_PRESS: 'heavy_press',
+  // ── AI 守备技能（skill/ai-guard/）──
   IRON_GUARD: 'iron_guard',
 });
 
@@ -389,6 +397,7 @@ export const EffectId = Object.freeze({
  * 目前保留空壳结构，引擎按 EffectId 分支处理时若找不到定义则跳过。
  */
 export const EffectDefs = Object.freeze({
+  // ── 共享攻击技能（skill/attack/）──
   [EffectId.REND]: {
     id: EffectId.REND, name: '撕裂',
     applicableTo: [Action.ATTACK],
@@ -398,22 +407,19 @@ export const EffectDefs = Object.freeze({
     applicableTo: [Action.ATTACK],
     hpCost: 1,
   },
-  [EffectId.CHARGE]: {
-    id: EffectId.CHARGE, name: '蓄力',
-    applicableTo: [Action.ATTACK],
-  },
-  [EffectId.POUNCE]: {
-    id: EffectId.POUNCE, name: '猛扑',
-    applicableTo: [Action.ATTACK],
-  },
   [EffectId.RECKLESS]: {
     id: EffectId.RECKLESS, name: '舍身',
     applicableTo: [Action.ATTACK],
   },
-  [EffectId.CAUTIOUS]: {
-    id: EffectId.CAUTIOUS, name: '谨慎',
+  [EffectId.DRAIN]: {
+    id: EffectId.DRAIN, name: '汲取',
     applicableTo: [Action.ATTACK],
   },
+  [EffectId.OBSCURE]: {
+    id: EffectId.OBSCURE, name: '障目',
+    applicableTo: [Action.ATTACK],
+  },
+  // ── 共享守备技能（skill/guard/）──
   [EffectId.BLOOD_SHIELD]: {
     id: EffectId.BLOOD_SHIELD, name: '血盾',
     applicableTo: [Action.GUARD],
@@ -431,50 +437,9 @@ export const EffectDefs = Object.freeze({
     id: EffectId.IRON_WALL, name: '铁壁',
     applicableTo: [Action.GUARD],
   },
-  [EffectId.RIGID]: {
-    id: EffectId.RIGID, name: '硬体',
-    applicableTo: [Action.GUARD],
-  },
   [EffectId.ABSORB_QI]: {
     id: EffectId.ABSORB_QI, name: '纳气',
     applicableTo: [Action.GUARD],
-  },
-  [EffectId.AGILITY]: {
-    id: EffectId.AGILITY, name: '灵巧',
-    applicableTo: [Action.DODGE],
-  },
-  [EffectId.ABANDON]: {
-    id: EffectId.ABANDON, name: '弃身',
-    applicableTo: [Action.DODGE],
-    hpCost: 1,
-  },
-  [EffectId.MOMENTUM]: {
-    id: EffectId.MOMENTUM, name: '借势',
-    applicableTo: [Action.DODGE],
-  },
-  [EffectId.LIGHTFOOT]: {
-    id: EffectId.LIGHTFOOT, name: '轻身',
-    applicableTo: [Action.DODGE],
-  },
-  [EffectId.DISARM]: {
-    id: EffectId.DISARM, name: '解甲',
-    applicableTo: [Action.DODGE],
-  },
-  [EffectId.DISRUPT]: {
-    id: EffectId.DISRUPT, name: '乱心',
-    applicableTo: [Action.DODGE],
-  },
-  [EffectId.DRAIN]: {
-    id: EffectId.DRAIN, name: '汲取',
-    applicableTo: [Action.ATTACK],
-  },
-  [EffectId.CHAINLOCK]: {
-    id: EffectId.CHAINLOCK, name: '锁链',
-    applicableTo: [Action.ATTACK],
-  },
-  [EffectId.OBSCURE]: {
-    id: EffectId.OBSCURE, name: '障目',
-    applicableTo: [Action.ATTACK],
   },
   [EffectId.INTERCEPT]: {
     id: EffectId.INTERCEPT, name: '截脉',
@@ -488,6 +453,59 @@ export const EffectDefs = Object.freeze({
     id: EffectId.SHOCKWAVE, name: '崩震',
     applicableTo: [Action.GUARD],
   },
+  // ── 玩家攻击技能（skill/player-attack/）──
+  [EffectId.CHARGE]: {
+    id: EffectId.CHARGE, name: '蓄力',
+    applicableTo: [Action.ATTACK],
+    playerOnly: true,
+  },
+  [EffectId.POUNCE]: {
+    id: EffectId.POUNCE, name: '猛扑',
+    applicableTo: [Action.ATTACK],
+    playerOnly: true,
+  },
+  [EffectId.CAUTIOUS]: {
+    id: EffectId.CAUTIOUS, name: '谨慎',
+    applicableTo: [Action.ATTACK],
+    playerOnly: true,
+  },
+  [EffectId.EXHILARATE]: {
+    id: EffectId.EXHILARATE, name: '激昂',
+    applicableTo: [Action.ATTACK],
+    playerOnly: true,
+  },
+  // ── 玩家守备技能（skill/player-guard/）──
+  [EffectId.RIGID]: {
+    id: EffectId.RIGID, name: '硬体',
+    applicableTo: [Action.GUARD],
+    playerOnly: true,
+  },
+  // ── 玩家闪避技能（skill/player-dodge/）──
+  [EffectId.AGILITY]: {
+    id: EffectId.AGILITY, name: '灵巧',
+    applicableTo: [Action.DODGE],
+  },
+  [EffectId.ABANDON]: {
+    id: EffectId.ABANDON, name: '弃身',
+    applicableTo: [Action.DODGE],
+    hpCost: 1,
+  },
+  [EffectId.MOMENTUM]: {
+    id: EffectId.MOMENTUM, name: '借势',
+    applicableTo: [Action.DODGE],
+  },
+  [EffectId.LIGHTBODY]: {
+    id: EffectId.LIGHTBODY, name: '轻身',
+    applicableTo: [Action.DODGE],
+  },
+  [EffectId.DISARM]: {
+    id: EffectId.DISARM, name: '解甲',
+    applicableTo: [Action.DODGE],
+  },
+  [EffectId.DISRUPT]: {
+    id: EffectId.DISRUPT, name: '乱心',
+    applicableTo: [Action.DODGE],
+  },
   [EffectId.HIDE]: {
     id: EffectId.HIDE, name: '隐匿',
     applicableTo: [Action.DODGE],
@@ -500,14 +518,32 @@ export const EffectDefs = Object.freeze({
     id: EffectId.SEE_THROUGH, name: '看破',
     applicableTo: [Action.DODGE],
   },
-  // ── AI 专属技能 ──
+  // ── AI 攻击技能（skill/ai-attack/）──
   [EffectId.BLOOD_DRINK]: {
     id: EffectId.BLOOD_DRINK, name: '饮血',
     applicableTo: [Action.ATTACK],
+    aiOnly: true,
   },
+  [EffectId.CHAINLOCK]: {
+    id: EffectId.CHAINLOCK, name: '束缚',
+    applicableTo: [Action.ATTACK],
+    aiOnly: true,
+  },
+  [EffectId.PURSUIT]: {
+    id: EffectId.PURSUIT, name: '追击',
+    applicableTo: [Action.ATTACK],
+    aiOnly: true,
+  },
+  [EffectId.HEAVY_PRESS]: {
+    id: EffectId.HEAVY_PRESS, name: '猛压',
+    applicableTo: [Action.ATTACK],
+    aiOnly: true,
+  },
+  // ── AI 守备技能（skill/ai-guard/）──
   [EffectId.IRON_GUARD]: {
     id: EffectId.IRON_GUARD, name: '强防',
     applicableTo: [Action.GUARD],
+    aiOnly: true,
   },
 });
 
