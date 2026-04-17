@@ -18,13 +18,13 @@ import { Action, DefaultStats } from '../base/constants.js';
 
 export class AIBaseLogic {
   static TUNING = {
-    staminaConserveFloor:  0.40,
-    staminaConserveBias:   0.12,
-    maxProcProb:           0.78,
-    lowHpLine:             0.30,
-    executeHpLine:         0.20,
-    decisiveLead:          1.20,
-    decisiveCriticalLead:  0.80,
+    staminaConserveFloor: 0.40,
+    staminaConserveBias: 0.12,
+    maxProcProb: 0.78,
+    lowHpLine: 0.30,
+    executeHpLine: 0.20,
+    decisiveLead: 1.20,
+    decisiveCriticalLead: 0.80,
   };
 
   static clamp01(v) { return Math.max(0, Math.min(1, v)); }
@@ -41,16 +41,16 @@ export class AIBaseLogic {
   }
 
   static buildIndicators(snap, aiEffectiveStamina) {
-    const aiDanger      = this.clamp01((0.4  - snap.aiHpRatio)     / 0.4);
+    const aiDanger = this.clamp01((0.4 - snap.aiHpRatio) / 0.4);
     const playerExposed = this.clamp01((0.35 - snap.playerHpRatio) / 0.35);
-    const killWindow    = (
-      snap.playerHpRatio    <= this.TUNING.executeHpLine &&
+    const killWindow = (
+      snap.playerHpRatio <= this.TUNING.executeHpLine &&
       snap.playerStaminaRatio <= 0.34 &&
       aiEffectiveStamina >= 2
     ) ? 1 : 0;
     // 使用有效精力（含 penalty/discount 修正）判定处决窗口，而非原始精力
-    const executeWindow   = (snap.playerEffectiveStamina ?? snap.playerStamina) <= 0 ? 1 : 0;
-    const antiAttackNeed  = this.clamp01((snap.oppAggression - 0.45) / 0.55);
+    const executeWindow = (snap.playerEffectiveStamina ?? snap.playerStamina) <= 0 ? 1 : 0;
+    const antiAttackNeed = this.clamp01((snap.oppAggression - 0.45) / 0.55);
 
     return { aiDanger, playerExposed, killWindow, executeWindow, antiAttackNeed };
   }
@@ -62,20 +62,20 @@ export class AIBaseLogic {
     let total = 0;
     const counts = { [Action.ATTACK]: 0, [Action.GUARD]: 0, [Action.DODGE]: 0, [Action.STANDBY]: 0 };
     for (let i = 1; i < history.length; i++) {
-       if (history[i - 1].opponentAction === lastAction && counts[history[i].opponentAction] !== undefined) {
-           counts[history[i].opponentAction]++;
-           total++;
-       }
+      if (history[i - 1].opponentAction === lastAction && counts[history[i].opponentAction] !== undefined) {
+        counts[history[i].opponentAction]++;
+        total++;
+      }
     }
     if (total === 0) return fallback;
 
     // 引入平滑拉平样本极值，避免因只出现过1次导致预测出现 100% 概率
-    const smoothedTotal = total + 2; 
+    const smoothedTotal = total + 2;
     return {
-       [Action.ATTACK]: (counts[Action.ATTACK] + 0.68) / smoothedTotal,
-       [Action.GUARD]:  (counts[Action.GUARD]  + 0.66) / smoothedTotal,
-       [Action.DODGE]:  (counts[Action.DODGE]  + 0.66) / smoothedTotal,
-       [Action.STANDBY]: counts[Action.STANDBY] / smoothedTotal
+      [Action.ATTACK]: (counts[Action.ATTACK] + 0.68) / smoothedTotal,
+      [Action.GUARD]: (counts[Action.GUARD] + 0.66) / smoothedTotal,
+      [Action.DODGE]: (counts[Action.DODGE] + 0.66) / smoothedTotal,
+      [Action.STANDBY]: counts[Action.STANDBY] / smoothedTotal
     };
   }
 
@@ -85,11 +85,11 @@ export class AIBaseLogic {
 
   static snapshot(ai, player, history) {
     const MAX_STAMINA = DefaultStats.MAX_STAMINA;
-    const MAX_HP      = DefaultStats.MAX_HP;
+    const MAX_HP = DefaultStats.MAX_HP;
 
     const recent = history.slice(-4);
     const oppSpeedTrend = recent.length
-      ? recent.reduce((s, h) => s + (h.opponentSpeed  ?? DefaultStats.BASE_SPEED), 0) / recent.length
+      ? recent.reduce((s, h) => s + (h.opponentSpeed ?? DefaultStats.BASE_SPEED), 0) / recent.length
       : DefaultStats.BASE_SPEED;
     const oppEnhanceTrend = recent.length
       ? recent.reduce((s, h) => s + (h.opponentEnhance ?? 0), 0) / recent.length
@@ -100,7 +100,7 @@ export class AIBaseLogic {
     const oppAggression = recent.length
       ? recent.filter(h => h.opponentAction === Action.ATTACK).length / recent.length
       : 0.33;
-    const lastAction    = recent.length ? recent[recent.length - 1].opponentAction : null;
+    const lastAction = recent.length ? recent[recent.length - 1].opponentAction : null;
     const lastOppStamina = recent.length
       ? recent[recent.length - 1].opponentStamina ?? DefaultStats.MAX_STAMINA
       : DefaultStats.MAX_STAMINA;
@@ -116,43 +116,43 @@ export class AIBaseLogic {
     })();
 
     return {
-      aiHpRatio:          this.clamp01(ai.hp     / MAX_HP),
-      playerHpRatio:      this.clamp01(player.hp / MAX_HP),
-      aiStaminaRatio:     this.clamp01(ai.stamina     / MAX_STAMINA),
-      playerStamina:      player.stamina,  // 精确整数，用于处决判断
+      aiHpRatio: this.clamp01(ai.hp / MAX_HP),
+      playerHpRatio: this.clamp01(player.hp / MAX_HP),
+      aiStaminaRatio: this.clamp01(ai.stamina / MAX_STAMINA),
+      playerStamina: player.stamina,  // 精确整数，用于处决判断
       playerStaminaRatio: this.clamp01(player.stamina / MAX_STAMINA),
       // 对手有效精力（含 penalty/discount 修正），用于处决窗口和精确威胁评估
       playerEffectiveStamina: Math.max(0, player.stamina + (player.staminaDiscount || 0) - (player.staminaPenalty || 0)),
       // 对手当前点数减益状态（用于进攻时机评估）
-      playerPtsDebuff:   player.ptsDebuff   || 0,
+      playerPtsDebuff: player.ptsDebuff || 0,
       playerDodgeDebuff: player.dodgeDebuff || 0,
       playerGuardDebuff: player.guardDebuff || 0,
       // 对手增益状态（用于防御决策）
       playerChargeBoost: player.chargeBoost || 0,  // 对手蓄力中 → 下一击会很重
-      playerGuardBoost:  player.guardBoost  || 0,  // 对手守备增强 → 攻击难打穿
-      playerDodgeBoost:  player.dodgeBoost  || 0,  // 对手闪避增强 → 攻击难命中
+      playerGuardBoost: player.guardBoost || 0,  // 对手守备增强 → 攻击难打穿
+      playerDodgeBoost: player.dodgeBoost || 0,  // 对手闪避增强 → 攻击难命中
       playerStaminaPenalty: player.staminaPenalty || 0, // 对手精力惩罚 → 对手变弱
       playerHealBlocked: !!player.healBlocked,     // 对手被禁疗愈
 
       // ── AI 自身效果感知 ──────────────────────────
-      aiPtsDebuff:       ai.ptsDebuff       || 0,  // 攻击点数被削
-      aiGuardDebuff:     ai.guardDebuff     || 0,  // 守备点数被削
-      aiDodgeDebuff:     ai.dodgeDebuff     || 0,  // 闪避点数被削
-      aiGuardBoost:      ai.guardBoost      || 0,  // 守备增益
-      aiDodgeBoost:      ai.dodgeBoost      || 0,  // 闪避增益
-      aiChargeBoost:     ai.chargeBoost     || 0,  // 蓄力增益
-      aiStaminaPenalty:  ai.staminaPenalty   || 0,  // 精力消耗增加
-      aiHealBlocked:     !!ai.healBlocked,         // 被禁疗愈
-      aiSpeedBlocked:    !!ai.speedAdjustBlocked,  // 被禁提速
+      aiPtsDebuff: ai.ptsDebuff || 0,  // 攻击点数被削
+      aiGuardDebuff: ai.guardDebuff || 0,  // 守备点数被削
+      aiDodgeDebuff: ai.dodgeDebuff || 0,  // 闪避点数被削
+      aiGuardBoost: ai.guardBoost || 0,  // 守备增益
+      aiDodgeBoost: ai.dodgeBoost || 0,  // 闪避增益
+      aiChargeBoost: ai.chargeBoost || 0,  // 蓄力增益
+      aiStaminaPenalty: ai.staminaPenalty || 0,  // 精力消耗增加
+      aiHealBlocked: !!ai.healBlocked,         // 被禁疗愈
+      aiSpeedBlocked: !!ai.speedAdjustBlocked,  // 被禁提速
 
       oppSpeedTrend,
       oppEnhanceTrend,
       oppStaminaTrend,
       lastOppStamina,
       oppAggression,
-      oppLastAction:   lastAction,
+      oppLastAction: lastAction,
       oppActionStreak: sameActionStreak,
-      predictNext:     this._buildTransitionModel(history, lastAction),
+      predictNext: this._buildTransitionModel(history, lastAction),
     };
   }
 
@@ -164,26 +164,26 @@ export class AIBaseLogic {
     const w = { attack: 1.0, guard: 1.0, dodge: 1.0, standby: 0.2, heal: 0.0 };
 
     const aiEffectiveStamina = this.getEffectiveStamina(ai);
-    const indicators         = this.buildIndicators(snap, aiEffectiveStamina);
+    const indicators = this.buildIndicators(snap, aiEffectiveStamina);
 
     // ── 定制化行为偏移（由 MaesProfile.tuning 注入）────
     const tuning = ai.aiTuning || {};
     w.attack += tuning.attackBias || 0;
-    w.guard  += tuning.guardBias  || 0;
+    w.guard += tuning.guardBias || 0;
 
     // ── 处决窗口（对手精力耗尽）：果断出击 ──────
     if (indicators.executeWindow > 0) {
-      w.attack  += 10.0;
-      w.guard   *= 0.05;
-      w.dodge   *= 0.05;
+      w.attack += 10.0;
+      w.guard *= 0.05;
+      w.dodge *= 0.05;
       w.standby *= 0.02;
     }
 
     // ── 斩杀窗口（对手血量+精力双低）────────────
     if (indicators.killWindow > 0) {
-      w.attack  += 3.5;
+      w.attack += 3.5;
       w.standby *= 0.25;
-      w.guard   *= 0.70;
+      w.guard *= 0.70;
     }
 
     // ── 对手点数减益时进攻机会更大 ───────────────
@@ -199,8 +199,8 @@ export class AIBaseLogic {
     // ── AI 自身效果感知（被挂 debuff 时调整决策）────
     // 攻击被削 → 攻击效率低，转守/蓄势
     if (snap.aiPtsDebuff > 0) {
-      w.attack  -= snap.aiPtsDebuff * 1.2;
-      w.guard   += 0.6;
+      w.attack -= snap.aiPtsDebuff * 1.2;
+      w.guard += 0.6;
       w.standby += 0.8;
     }
     // 守备被削 → 守备不可靠，转闪避
@@ -215,35 +215,35 @@ export class AIBaseLogic {
     }
     // 蓄力增益在身 → 优先攻击释放蓄力伤害
     if (snap.aiChargeBoost > 0) {
-      w.attack  += 2.0;
+      w.attack += 2.0;
       w.standby -= 1.5;
     }
     // 精力惩罚 → 行动变贵，更保守
     if (snap.aiStaminaPenalty > 0) {
       w.standby += snap.aiStaminaPenalty * 1.5;
-      w.attack  -= snap.aiStaminaPenalty * 0.6;
+      w.attack -= snap.aiStaminaPenalty * 0.6;
     }
 
     // ── 对手效果感知（对手挂 buff/debuff 时调整决策）────
     // 对手蓄力中 → 下一击会很重，必须防备
     if (snap.playerChargeBoost > 0) {
-      w.guard  += snap.playerChargeBoost * 2.0;
-      w.dodge  += snap.playerChargeBoost * 1.2;
+      w.guard += snap.playerChargeBoost * 2.0;
+      w.dodge += snap.playerChargeBoost * 1.2;
       w.attack -= 0.8;
     }
     // 对手守备增强 → 正面攻击难打穿，转蓄势等 buff 消退或选择待命
     if (snap.playerGuardBoost > 0) {
-      w.attack  -= snap.playerGuardBoost * 0.8;
+      w.attack -= snap.playerGuardBoost * 0.8;
       w.standby += 0.6;
     }
     // 对手闪避增强 → 攻击难命中，不宜盲目进攻
     if (snap.playerDodgeBoost > 0) {
-      w.attack  -= snap.playerDodgeBoost * 0.8;
-      w.guard   += 0.4;
+      w.attack -= snap.playerDodgeBoost * 0.8;
+      w.guard += 0.4;
     }
     // 对手精力惩罚 → 对手行动受限，趁机施压
     if (snap.playerStaminaPenalty > 0) {
-      w.attack  += snap.playerStaminaPenalty * 1.0;
+      w.attack += snap.playerStaminaPenalty * 1.0;
       w.standby -= 0.5;
     }
     // 对手被禁疗愈 → 无法回血，持续进攻耗血
@@ -253,8 +253,8 @@ export class AIBaseLogic {
 
     // ── 自身血量压力 ─────────────────────────────
     const aiHpPressure = 1 - snap.aiHpRatio;
-    w.guard  += aiHpPressure * 2.5;
-    w.dodge  += aiHpPressure * 1.5;
+    w.guard += aiHpPressure * 2.5;
+    w.dodge += aiHpPressure * 1.5;
     w.attack -= aiHpPressure * 0.5;
 
     // ── 对手血量压力（有精力时主动进攻）──────────
@@ -263,8 +263,8 @@ export class AIBaseLogic {
     }
 
     // ── 对手攻击倾向（对应防守）───────────────────
-    w.guard  += snap.oppAggression * 1.5;
-    w.dodge  += snap.oppAggression * 1.0;
+    w.guard += snap.oppAggression * 1.5;
+    w.dodge += snap.oppAggression * 1.0;
     w.attack -= snap.oppAggression * 0.5;
 
     // ══════════════════════════════════════════════
@@ -283,8 +283,8 @@ export class AIBaseLogic {
     // ── 阶段1：危机（精力 ≤ 1）─ 几乎只能蓄势回气 ──
     if (aiEffectiveStamina <= 1) {
       w.standby += 4.0;
-      w.attack  -= 1.5;
-      w.dodge   -= 0.5;
+      w.attack -= 1.5;
+      w.dodge -= 0.5;
       // 疗愈消耗 0 精力 —— 危机期低血时是零成本最优解
       if (!ai.healBlocked && ai.hp < 3) {
         w.heal += (3 - ai.hp) * 1.5; // hp=1: +3.0, hp=2: +1.5
@@ -294,14 +294,14 @@ export class AIBaseLogic {
     else if (aiEffectiveStamina === 2) {
       // 对手也低精力：精力对等，不急于蓄势
       if (snap.playerStamina <= 1) {
-        w.attack  += 0.8;
-        w.guard   += 0.5;
+        w.attack += 0.8;
+        w.guard += 0.5;
       }
       // 对手高精力：我方处于劣势，收缩
       else {
         w.standby += 1.8;
-        w.guard   += 0.8;
-        w.attack  -= 0.6;
+        w.guard += 0.8;
+        w.attack -= 0.6;
       }
       // 自身低血时更优先蓄势保命
       if (snap.aiHpRatio <= 0.4) w.standby += 1.2;
@@ -310,18 +310,18 @@ export class AIBaseLogic {
     else if (aiEffectiveStamina === 3) {
       // 精力优势：施压
       if (staminaGap >= 2) {
-        w.attack  += 1.2;
+        w.attack += 1.2;
         w.standby -= 0.8;
       }
       // 对手高精力（精力劣势）：防守为主
       else if (staminaGap <= -1) {
-        w.guard   += 0.6;
+        w.guard += 0.6;
         w.standby += 0.4;
       }
     }
     // ── 阶段4：充裕（精力 ≥ 4）─ 主动施压 ──
     else {
-      w.attack  += 1.5;
+      w.attack += 1.5;
       w.standby *= 0.3;
       // 精力远超对手：全面施压
       if (staminaGap >= 2) {
@@ -331,17 +331,17 @@ export class AIBaseLogic {
 
     // ── 对手换气窗口（对手低精力）─ 抓住机会 ──
     if (snap.lastOppStamina <= 1 && aiEffectiveStamina >= 2) {
-      w.attack  += 1.5;
+      w.attack += 1.5;
       w.standby -= 1.0;
     } else if (snap.oppStaminaTrend <= 1.5 && aiEffectiveStamina >= 2) {
-      w.attack  += 0.8;
+      w.attack += 0.8;
       w.standby -= 0.4;
     }
 
     // ── 对手濒危时不允许保守 ─────────────────────
     if (snap.playerHpRatio <= this.TUNING.lowHpLine && aiEffectiveStamina >= 2) {
       w.standby *= 0.25;
-      w.attack  += 1.0;
+      w.attack += 1.0;
     }
 
     // ── 马尔可夫链行为预测驱动 ───────────────────────────
@@ -349,8 +349,8 @@ export class AIBaseLogic {
 
     // 预测高度连击/攻击倾向时，规避并防守
     if (pAtk > 0.45) {
-      w.guard  += pAtk * 2.5; 
-      w.dodge  += pAtk * 1.5; 
+      w.guard += pAtk * 2.5;
+      w.dodge += pAtk * 1.5;
       w.attack -= pAtk * 1.0;
     }
     // 预测对手龟缩防守时，攒气或者强攻（精力充足时）
@@ -361,13 +361,13 @@ export class AIBaseLogic {
     // 预测对手灵活闪避时，避免盲目攻击导致精疲力竭，倾向防守或保留精力
     if (pDodge > 0.45) {
       w.standby += pDodge * 1.5;
-      w.guard   += pDodge * 1.0;
-      w.attack  -= pDodge * 1.5;
+      w.guard += pDodge * 1.0;
+      w.attack -= pDodge * 1.5;
     }
 
     // ── 濒危保命 ─────────────────────────────────
-    w.guard  += indicators.aiDanger * indicators.antiAttackNeed * 1.8;
-    w.dodge  += indicators.aiDanger * indicators.antiAttackNeed * 1.2;
+    w.guard += indicators.aiDanger * indicators.antiAttackNeed * 1.8;
+    w.dodge += indicators.aiDanger * indicators.antiAttackNeed * 1.2;
     w.attack -= indicators.aiDanger * indicators.antiAttackNeed * 1.0;
 
     // ── 疗愈评估（低血量 + 未被禁止时考虑）─────────
@@ -387,18 +387,18 @@ export class AIBaseLogic {
 
     // ── 行动禁用：被效果封禁的行动权重归零 ──────────
     const blocked = Array.isArray(ai.actionBlocked) ? ai.actionBlocked : [];
-    if (blocked.includes(Action.ATTACK))  w.attack  = -Infinity;
-    if (blocked.includes(Action.GUARD))   w.guard   = -Infinity;
-    if (blocked.includes(Action.DODGE))   w.dodge   = -Infinity;
+    if (blocked.includes(Action.ATTACK)) w.attack = -Infinity;
+    if (blocked.includes(Action.GUARD)) w.guard = -Infinity;
+    if (blocked.includes(Action.DODGE)) w.dodge = -Infinity;
     if (blocked.includes(Action.STANDBY)) w.standby = -Infinity;
-    if (blocked.includes(Action.HEAL))    w.heal    = -Infinity;
+    if (blocked.includes(Action.HEAL)) w.heal = -Infinity;
 
     const weightMap = {
-      [Action.ATTACK]:  w.attack,
-      [Action.GUARD]:   w.guard,
-      [Action.DODGE]:   w.dodge,
+      [Action.ATTACK]: w.attack,
+      [Action.GUARD]: w.guard,
+      [Action.DODGE]: w.dodge,
       [Action.STANDBY]: w.standby,
-      [Action.HEAL]:    w.heal,
+      [Action.HEAL]: w.heal,
     };
     return this.pickSmartAction(weightMap, indicators);
   }
@@ -412,14 +412,14 @@ export class AIBaseLogic {
     if (action === Action.STANDBY) return BASE;
 
     const aiEffectiveStamina = this.getEffectiveStamina(ai);
-    const availableForBoost  = aiEffectiveStamina - 1;
+    const availableForBoost = aiEffectiveStamina - 1;
 
     if (availableForBoost <= 0) return BASE; // 精力不足以提速
 
     const { attack: pAtk, guard: pGrd, dodge: pDodge } = snap.predictNext;
 
     // 绝杀窗口无条件提速确保先手致命一击
-    const killWindow    = (snap.playerHpRatio <= this.TUNING.executeHpLine && snap.playerStaminaRatio <= 0.34 && aiEffectiveStamina >= 2) ? 1 : 0;
+    const killWindow = (snap.playerHpRatio <= this.TUNING.executeHpLine && snap.playerStaminaRatio <= 0.34 && aiEffectiveStamina >= 2) ? 1 : 0;
     const executeWindow = (snap.playerEffectiveStamina ?? snap.playerStamina) <= 0 ? 1 : 0;
     if ((killWindow || executeWindow) && availableForBoost >= 1 && action === Action.ATTACK) {
       return BASE + 1;
@@ -472,7 +472,7 @@ export class AIBaseLogic {
     const { attack: pAtk, guard: pGrd, dodge: pDodge } = snap.predictNext;
 
     // 绝杀斩杀阶段：无脑拉满伤害
-    const killWindow    = (snap.playerHpRatio <= this.TUNING.executeHpLine && snap.playerStaminaRatio <= 0.34 && aiEffectiveStamina >= 2) ? 1 : 0;
+    const killWindow = (snap.playerHpRatio <= this.TUNING.executeHpLine && snap.playerStaminaRatio <= 0.34 && aiEffectiveStamina >= 2) ? 1 : 0;
     const executeWindow = (snap.playerEffectiveStamina ?? snap.playerStamina) <= 0 ? 1 : 0;
     if ((killWindow || executeWindow) && action === Action.ATTACK) {
       return 1;
@@ -486,13 +486,13 @@ export class AIBaseLogic {
 
     // 守备/闪避 vs 强力攻击：若预测对手大概率攻击，且对手有强化习惯（增加攻击点数），我方不强化将被贯穿
     if ((action === Action.GUARD || action === Action.DODGE) && pAtk > 0.45 && snap.oppEnhanceTrend >= 0.2) {
-       // 对手有交强化的趋势，我方面对攻击时强化点数来硬抗/躲避
-       if (snap.aiStaminaRatio >= 0.35 || snap.aiHpRatio <= 0.3) return 1;
+      // 对手有交强化的趋势，我方面对攻击时强化点数来硬抗/躲避
+      if (snap.aiStaminaRatio >= 0.35 || snap.aiHpRatio <= 0.3) return 1;
     }
 
     // 对手极大破绽（比如刚刚精力竭力过）：重拳出击
     if (action === Action.ATTACK && snap.lastOppStamina <= 1 && pAtk < 0.2) {
-       return 1;
+      return 1;
     }
 
     return 0; // 无明显差值获胜收益，保留精力
@@ -515,7 +515,7 @@ export class AIBaseLogic {
    */
   static pickSmartAction(weightMap, indicators) {
     const { top, second } = this.pickTopAction(weightMap);
-    const lead     = top[1] - second[1];
+    const lead = top[1] - second[1];
     const critical = indicators.killWindow > 0 || indicators.executeWindow > 0 || indicators.aiDanger >= 0.55;
     const threshold = critical ? this.TUNING.decisiveCriticalLead : this.TUNING.decisiveLead;
     if (lead >= threshold) return top[0];

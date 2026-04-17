@@ -339,46 +339,47 @@ export const EffectId = Object.freeze({
   CLUMSY: 'clumsy',
   SHACKLED_DODGE: 'shackled_dodge',
   // ── 共享攻击技能（skill/attack/）──
-  REND: 'rend',
   BREAK_QI: 'break_qi',
   RECKLESS: 'reckless',
   DRAIN: 'drain',
   OBSCURE: 'obscure',
+  EXHILARATE: 'exhilarate',
+  CHAINLOCK: 'chainlock',
   // ── 共享守备技能（skill/guard/）──
   BLOOD_SHIELD: 'blood_shield',
-  REDIRECT: 'redirect',
   BASTION: 'bastion',
   IRON_WALL: 'iron_wall',
   ABSORB_QI: 'absorb_qi',
   INTERCEPT: 'intercept',
   RESTORE: 'restore',
   SHOCKWAVE: 'shockwave',
-  // ── 玩家攻击技能（skill/player-attack/）──
-  CHARGE: 'charge',
-  POUNCE: 'pounce',
-  CAUTIOUS: 'cautious',
-  EXHILARATE: 'exhilarate',
-  // ── 玩家守备技能（skill/player-guard/）──
-  RIGID: 'rigid',
-  // ── 玩家闪避技能（skill/player-dodge/）──
+  // ── 共享闪避技能（skill/dodge/）──
   AGILITY: 'agility',
   ABANDON: 'abandon',
   MOMENTUM: 'momentum',
-  LIGHTBODY: 'lightbody',
   DISARM: 'disarm',
   DISRUPT: 'disrupt',
   HIDE: 'hide',
   LURE: 'lure',
   SEE_THROUGH: 'see-through',
+  // ── 玩家攻击技能（skill/player-attack/）──
+  CHARGE: 'charge',
+  POUNCE: 'pounce',
+  CAUTIOUS: 'cautious',
+  // ── 玩家守备技能（skill/player-guard/）──
+  RIGID: 'rigid',
+  REDIRECT: 'redirect',
+  // ── 玩家闪避技能（skill/player-dodge/）──
+  LIGHTBODY: 'lightbody',
   // ── AI 攻击技能（skill/ai-attack/）──
   BLOOD_DRINK: 'blood_drink',
-  CHAINLOCK: 'chainlock',
-  PURSUIT: 'pursuit',
   HEAVY_PRESS: 'heavy_press',
   BRUTE_FORCE: 'brute_force',
   // ── AI 守备技能（skill/ai-guard/）──
-  IRON_GUARD: 'iron_guard',
   TREMOR: 'tremor',
+  STEADY: 'steady',
+  // ── AI 闪避技能（skill/ai-dodge/）──
+  DEFERRED: 'deferred',
 });
 
 
@@ -400,10 +401,6 @@ export const EffectId = Object.freeze({
  */
 export const EffectDefs = Object.freeze({
   // ── 共享攻击技能（skill/attack/）──
-  [EffectId.REND]: {
-    id: EffectId.REND, name: '撕裂',
-    applicableTo: [Action.ATTACK],
-  },
   [EffectId.BREAK_QI]: {
     id: EffectId.BREAK_QI, name: '泣命',
     applicableTo: [Action.ATTACK],
@@ -421,15 +418,19 @@ export const EffectDefs = Object.freeze({
     id: EffectId.OBSCURE, name: '障目',
     applicableTo: [Action.ATTACK],
   },
+  [EffectId.EXHILARATE]: {
+    id: EffectId.EXHILARATE, name: '激昂',
+    applicableTo: [Action.ATTACK],
+  },
+  [EffectId.CHAINLOCK]: {
+    id: EffectId.CHAINLOCK, name: '束缚',
+    applicableTo: [Action.ATTACK],
+  },
   // ── 共享守备技能（skill/guard/）──
   [EffectId.BLOOD_SHIELD]: {
     id: EffectId.BLOOD_SHIELD, name: '血盾',
     applicableTo: [Action.GUARD],
     hpCost: 1,
-  },
-  [EffectId.REDIRECT]: {
-    id: EffectId.REDIRECT, name: '化劲',
-    applicableTo: [Action.GUARD],
   },
   [EffectId.BASTION]: {
     id: EffectId.BASTION, name: '磐石',
@@ -471,18 +472,24 @@ export const EffectDefs = Object.freeze({
     applicableTo: [Action.ATTACK],
     playerOnly: true,
   },
-  [EffectId.EXHILARATE]: {
-    id: EffectId.EXHILARATE, name: '激昂',
-    applicableTo: [Action.ATTACK],
-    playerOnly: true,
-  },
   // ── 玩家守备技能（skill/player-guard/）──
   [EffectId.RIGID]: {
     id: EffectId.RIGID, name: '硬体',
     applicableTo: [Action.GUARD],
     playerOnly: true,
   },
+  [EffectId.REDIRECT]: {
+    id: EffectId.REDIRECT, name: '化劲',
+    applicableTo: [Action.GUARD],
+    playerOnly: true,
+  },
   // ── 玩家闪避技能（skill/player-dodge/）──
+  [EffectId.LIGHTBODY]: {
+    id: EffectId.LIGHTBODY, name: '轻身',
+    applicableTo: [Action.DODGE],
+    playerOnly: true,
+  },
+  // ── 共享闪避技能（skill/dodge/）──
   [EffectId.AGILITY]: {
     id: EffectId.AGILITY, name: '灵巧',
     applicableTo: [Action.DODGE],
@@ -494,10 +501,6 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.MOMENTUM]: {
     id: EffectId.MOMENTUM, name: '借势',
-    applicableTo: [Action.DODGE],
-  },
-  [EffectId.LIGHTBODY]: {
-    id: EffectId.LIGHTBODY, name: '轻身',
     applicableTo: [Action.DODGE],
   },
   [EffectId.DISARM]: {
@@ -526,16 +529,6 @@ export const EffectDefs = Object.freeze({
     applicableTo: [Action.ATTACK],
     aiOnly: true,
   },
-  [EffectId.CHAINLOCK]: {
-    id: EffectId.CHAINLOCK, name: '束缚',
-    applicableTo: [Action.ATTACK],
-    aiOnly: true,
-  },
-  [EffectId.PURSUIT]: {
-    id: EffectId.PURSUIT, name: '追击',
-    applicableTo: [Action.ATTACK],
-    aiOnly: true,
-  },
   [EffectId.HEAVY_PRESS]: {
     id: EffectId.HEAVY_PRESS, name: '猛压',
     applicableTo: [Action.ATTACK],
@@ -547,14 +540,20 @@ export const EffectDefs = Object.freeze({
     aiOnly: true,
   },
   // ── AI 守备技能（skill/ai-guard/）──
-  [EffectId.IRON_GUARD]: {
-    id: EffectId.IRON_GUARD, name: '迅防',
-    applicableTo: [Action.GUARD],
-    aiOnly: true,
-  },
   [EffectId.TREMOR]: {
     id: EffectId.TREMOR, name: '震颤',
     applicableTo: [Action.GUARD],
+    aiOnly: true,
+  },
+  [EffectId.STEADY]: {
+    id: EffectId.STEADY, name: '稳重',
+    applicableTo: [Action.GUARD],
+    aiOnly: true,
+  },
+  // ── AI 闪避技能（skill/ai-dodge/）──
+  [EffectId.DEFERRED]: {
+    id: EffectId.DEFERRED, name: '延付',
+    applicableTo: [Action.DODGE],
     aiOnly: true,
   },
 });

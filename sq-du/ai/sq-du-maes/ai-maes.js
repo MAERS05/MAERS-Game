@@ -42,14 +42,12 @@ export { AIEnhanceLayer } from '../ai-enhance.js';
 
 /** MAES AI 攻击技能池 */
 const MAES_ATTACK_EFFECTS = [
-  EffectId.REND,          // 撕裂
   EffectId.BREAK_QI,      // 泣命
   EffectId.RECKLESS,      // 舍身
   EffectId.DRAIN,         // 汲取
-  EffectId.CHAINLOCK,     // 束缚（AI 专属）
+  EffectId.CHAINLOCK,     // 束缚
   EffectId.OBSCURE,       // 障目
   EffectId.BLOOD_DRINK,   // 饮血（AI 专属）
-  EffectId.PURSUIT,       // 追击（AI 专属）
   EffectId.HEAVY_PRESS,   // 猛压（AI 专属）
   EffectId.BRUTE_FORCE,   // 蛮力（AI 专属）
 ];
@@ -57,19 +55,28 @@ const MAES_ATTACK_EFFECTS = [
 /** MAES AI 守备技能池 */
 const MAES_GUARD_EFFECTS = [
   EffectId.BLOOD_SHIELD,  // 血盾
-  EffectId.REDIRECT,      // 化劲
   EffectId.BASTION,       // 磐石
   EffectId.IRON_WALL,     // 铁壁
   EffectId.ABSORB_QI,     // 纳气
   EffectId.INTERCEPT,     // 截脉
   EffectId.RESTORE,       // 恢复
   EffectId.SHOCKWAVE,     // 崩震
-  EffectId.IRON_GUARD,    // 强防（AI 专属）
   EffectId.TREMOR,        // 震颤（AI 专属）
+  EffectId.STEADY,        // 稳重（AI 专属）
 ];
 
-/** MAES AI 闪避技能池（已禁用闪避行为，保留空池备用） */
-const MAES_DODGE_EFFECTS = [];
+/** MAES AI 闪避技能池 */
+const MAES_DODGE_EFFECTS = [
+  EffectId.AGILITY,       // 灵巧
+  EffectId.ABANDON,       // 弃身
+  EffectId.MOMENTUM,      // 借势
+  EffectId.DISRUPT,       // 乱心
+  EffectId.HIDE,          // 隐匿
+  EffectId.LURE,          // 引诱
+  EffectId.SEE_THROUGH,   // 看破
+  EffectId.DISARM,        // 解甲
+  EffectId.DEFERRED,      // 延付（AI 专属）
+];
 
 /**
  * 构建 MAES AI 的效果技能库。
@@ -110,7 +117,7 @@ export const MaesProfile = {
   permSpeedAdjustBlocked: false,  // 永久禁提速/降速
   permReadyBlocked: false,        // 永久禁手动就绪
   permStandbyBlocked: false,      // 永久禁蓄势
-  permActionBlocked: [Action.DODGE],  // 永久禁用闪避行为
+  permActionBlocked: [],  // 永久禁用行为列表
   permSlotBlocked: {              // 永久禁用指定动作的指定槽位（使用布尔数组 [true, false, true] 表示禁1/3槽）
     [Action.ATTACK]: [false, false, false],
     [Action.GUARD]: [false, false, false],

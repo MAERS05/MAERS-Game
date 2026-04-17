@@ -380,7 +380,7 @@ export class BattleEngine {
         const effectiveStamina = p.stamina + (p.staminaDiscount || 0) - (p.staminaPenalty || 0);
         const affordable = Math.min(delta, effectiveStamina);
         const actualBoost = Math.max(0, affordable);
-        
+
         // 扣除精力（优先扣 discount）
         for (let i = 0; i < actualBoost; i++) {
           if (p.staminaDiscount > 0) {
@@ -390,7 +390,7 @@ export class BattleEngine {
             p.stamina--;
           }
         }
-        
+
         p.speed = currentSpeed + actualBoost;
         p.actionCtx.speed = p.speed;
       } else if (delta < 0) {
@@ -676,18 +676,18 @@ export class BattleEngine {
     const clonePlayer = (p) => {
       const copyActionSlots = (src) => src ? {
         [Action.ATTACK]: [...(src[Action.ATTACK] || [])],
-        [Action.GUARD]:  [...(src[Action.GUARD]  || [])],
-        [Action.DODGE]:  [...(src[Action.DODGE]  || [])],
+        [Action.GUARD]: [...(src[Action.GUARD] || [])],
+        [Action.DODGE]: [...(src[Action.DODGE] || [])],
       } : undefined;
       return {
         ...p,
-        equippedEffects:    copyActionSlots(p.equippedEffects),
-        effectInventory:    copyActionSlots(p.effectInventory),
-        effectIntel:        [...(p.effectIntel        || [])],
-        slotBlocked:        copyActionSlots(p.slotBlocked),
-        slotBlockNextTurn:  copyActionSlots(p.slotBlockNextTurn),
-        actionBlocked:      [...(p.actionBlocked      || [])],
-        actionBlockNextTurn:[...(p.actionBlockNextTurn || [])],
+        equippedEffects: copyActionSlots(p.equippedEffects),
+        effectInventory: copyActionSlots(p.effectInventory),
+        effectIntel: [...(p.effectIntel || [])],
+        slotBlocked: copyActionSlots(p.slotBlocked),
+        slotBlockNextTurn: copyActionSlots(p.slotBlockNextTurn),
+        actionBlocked: [...(p.actionBlocked || [])],
+        actionBlockNextTurn: [...(p.actionBlockNextTurn || [])],
         actionCtx: p.actionCtx
           ? { ...p.actionCtx, effects: [...(p.actionCtx.effects || [])] }
           : null,
@@ -872,13 +872,16 @@ export class BattleEngine {
       this._turn
     );
 
+    // 附带洞察使用信息，供战报显示
+    result.p1InsightUsed = !!p1.insightUsed;
+    result.p2InsightUsed = !!p2.insightUsed;
     // ── ACTION_START：消费 onPre 即时效果（delta 模式） ──
     // 只应用 onPre 实际产生的变化量，不覆盖绝对值（避免退回的精力值误写入）
     if (result._immediateState) {
       const imm = result._immediateState;
-      if (imm.p1.hpDelta)      this._players[PlayerId.P1].hp      += imm.p1.hpDelta;
+      if (imm.p1.hpDelta) this._players[PlayerId.P1].hp += imm.p1.hpDelta;
       if (imm.p1.staminaDelta) this._players[PlayerId.P1].stamina += imm.p1.staminaDelta;
-      if (imm.p2.hpDelta)      this._players[PlayerId.P2].hp      += imm.p2.hpDelta;
+      if (imm.p2.hpDelta) this._players[PlayerId.P2].hp += imm.p2.hpDelta;
       if (imm.p2.staminaDelta) this._players[PlayerId.P2].stamina += imm.p2.staminaDelta;
       // 写入闪烁标记
       this._players[PlayerId.P1]._flashEffects = imm.p1._flashEffects || [];
@@ -1047,8 +1050,8 @@ export class BattleEngine {
 
         // PVE 模式：AI 利用已知的对手意图进行重决策
         if (this._mode === EngineMode.PVE && earlyId === PlayerId.P2) {
-          const aiDriver = (typeof window !== 'undefined' && window.DEBUG_AI?.active) 
-            ? window.DEBUG_AI 
+          const aiDriver = (typeof window !== 'undefined' && window.DEBUG_AI?.active)
+            ? window.DEBUG_AI
             : { scheduleAIRedecide };
 
           aiDriver.scheduleAIRedecide({
@@ -1124,9 +1127,9 @@ export class BattleEngine {
     // PVE 模式：记录 P1（玩家）本回合的属性快照，供下回合 AI 分析
     if (this._mode === EngineMode.PVE && result.p1Action) {
       this._aiHistory.push({
-        opponentAction:  result.p1Action.action,
-        opponentSpeed:   result.p1Action.speed   ?? DefaultStats.BASE_SPEED,
-        opponentEnhance: result.p1Action.enhance  ?? 0,
+        opponentAction: result.p1Action.action,
+        opponentSpeed: result.p1Action.speed ?? DefaultStats.BASE_SPEED,
+        opponentEnhance: result.p1Action.enhance ?? 0,
         opponentStamina: result.newState.p1.stamina,
       });
       if (this._aiHistory.length > 5) this._aiHistory.shift();
@@ -1137,61 +1140,61 @@ export class BattleEngine {
   _applyPlayerResult(player, ns) {
     const copySlots = (src, fallback) => src ? {
       [Action.ATTACK]: [...(src[Action.ATTACK] || [false, false, false])],
-      [Action.GUARD]:  [...(src[Action.GUARD]  || [false, false, false])],
-      [Action.DODGE]:  [...(src[Action.DODGE]  || [false, false, false])],
+      [Action.GUARD]: [...(src[Action.GUARD] || [false, false, false])],
+      [Action.DODGE]: [...(src[Action.DODGE] || [false, false, false])],
     } : fallback;
-    const emptySlots = { [Action.ATTACK]: [false,false,false], [Action.GUARD]: [false,false,false], [Action.DODGE]: [false,false,false] };
+    const emptySlots = { [Action.ATTACK]: [false, false, false], [Action.GUARD]: [false, false, false], [Action.DODGE]: [false, false, false] };
 
-    player.hp              = ns.hp;
-    player.stamina         = ns.stamina;
-    player.chargeBoost     = ns.chargeBoost     ?? 0;
-    player.ptsDebuff       = ns.ptsDebuff       ?? 0;
-    player.guardBoost      = ns.guardBoost      ?? 0;
-    player.guardDebuff     = ns.guardDebuff     ?? 0;
-    player.dodgeBoost      = ns.dodgeBoost      ?? 0;
-    player.dodgeDebuff     = ns.dodgeDebuff     ?? 0;
-    player.agilityBoost    = ns.agilityBoost    ?? 0;
-    player.agilityDebuff   = ns.agilityDebuff   ?? 0;
-    player.staminaPenalty  = ns.staminaPenalty  ?? 0;
+    player.hp = ns.hp;
+    player.stamina = ns.stamina;
+    player.chargeBoost = ns.chargeBoost ?? 0;
+    player.ptsDebuff = ns.ptsDebuff ?? 0;
+    player.guardBoost = ns.guardBoost ?? 0;
+    player.guardDebuff = ns.guardDebuff ?? 0;
+    player.dodgeBoost = ns.dodgeBoost ?? 0;
+    player.dodgeDebuff = ns.dodgeDebuff ?? 0;
+    player.agilityBoost = ns.agilityBoost ?? 0;
+    player.agilityDebuff = ns.agilityDebuff ?? 0;
+    player.staminaPenalty = ns.staminaPenalty ?? 0;
     player.staminaDiscount = ns.staminaDiscount ?? 0;
-    player.insightDebuff   = ns.insightDebuff   ?? 0;
-    player.restRecoverBonus    = ns.restRecoverBonus    ?? 0;
-    player.restRecoverPenalty  = ns.restRecoverPenalty  ?? 0;
-    player.insightBlockNextTurn    = ns.insightBlockNextTurn    ?? false;
-    player.insightBlocked          = ns.insightBlocked          ?? player.insightBlocked ?? false;
-    player.redecideBlocked         = ns.redecideBlocked         ?? player.redecideBlocked ?? false;
-    player.redecideBlockNextTurn   = ns.redecideBlockNextTurn   ?? false;
-    player.speedAdjustBlocked      = ns.speedAdjustBlocked      ?? player.speedAdjustBlocked ?? false;
+    player.insightDebuff = ns.insightDebuff ?? 0;
+    player.restRecoverBonus = ns.restRecoverBonus ?? 0;
+    player.restRecoverPenalty = ns.restRecoverPenalty ?? 0;
+    player.insightBlockNextTurn = ns.insightBlockNextTurn ?? false;
+    player.insightBlocked = ns.insightBlocked ?? player.insightBlocked ?? false;
+    player.redecideBlocked = ns.redecideBlocked ?? player.redecideBlocked ?? false;
+    player.redecideBlockNextTurn = ns.redecideBlockNextTurn ?? false;
+    player.speedAdjustBlocked = ns.speedAdjustBlocked ?? player.speedAdjustBlocked ?? false;
     player.speedAdjustBlockNextTurn = ns.speedAdjustBlockNextTurn ?? false;
-    player.readyBlocked            = ns.readyBlocked            ?? player.readyBlocked ?? false;
-    player.readyBlockNextTurn      = ns.readyBlockNextTurn      ?? false;
-    player.standbyBlocked          = ns.standbyBlocked          ?? player.standbyBlocked ?? false;
-    player.standbyBlockNextTurn    = ns.standbyBlockNextTurn    ?? false;
-    player.actionBlocked      = Array.isArray(ns.actionBlocked)      ? [...ns.actionBlocked]      : (player.actionBlocked || []);
+    player.readyBlocked = ns.readyBlocked ?? player.readyBlocked ?? false;
+    player.readyBlockNextTurn = ns.readyBlockNextTurn ?? false;
+    player.standbyBlocked = ns.standbyBlocked ?? player.standbyBlocked ?? false;
+    player.standbyBlockNextTurn = ns.standbyBlockNextTurn ?? false;
+    player.actionBlocked = Array.isArray(ns.actionBlocked) ? [...ns.actionBlocked] : (player.actionBlocked || []);
     player.actionBlockNextTurn = Array.isArray(ns.actionBlockNextTurn) ? [...ns.actionBlockNextTurn] : [];
-    player.slotBlocked        = copySlots(ns.slotBlocked,     player.slotBlocked     || emptySlots);
-    player.slotBlockNextTurn  = copySlots(ns.slotBlockNextTurn, player.slotBlockNextTurn || emptySlots);
-    player.hpDrain          = ns.hpDrain          ?? 0;
-    player.hpBonusNextTurn   = ns.hpBonusNextTurn  ?? 0;
-    player.hpDebuff          = ns.hpDebuff          ?? 0;
-    player.staminaOverflow   = ns.staminaOverflow   ?? 0;
-    player.staminaDebuff     = ns.staminaDebuff     ?? 0;
+    player.slotBlocked = copySlots(ns.slotBlocked, player.slotBlocked || emptySlots);
+    player.slotBlockNextTurn = copySlots(ns.slotBlockNextTurn, player.slotBlockNextTurn || emptySlots);
+    player.hpDrain = ns.hpDrain ?? 0;
+    player.hpBonusNextTurn = ns.hpBonusNextTurn ?? 0;
+    player.hpDebuff = ns.hpDebuff ?? 0;
+    player.staminaOverflow = ns.staminaOverflow ?? 0;
+    player.staminaDebuff = ns.staminaDebuff ?? 0;
     // ── 溢出字段 ──
-    player.hpOverflow        = ns.hpOverflow        ?? 0;
-    player.hpUnderflow       = ns.hpUnderflow       ?? 0;
-    player.staminaUnderflow  = ns.staminaUnderflow  ?? 0;
-    player.speedOverflow     = ns.speedOverflow     ?? 0;
-    player.speedUnderflow    = ns.speedUnderflow    ?? 0;
-    player.attackPtsOverflow  = ns.attackPtsOverflow  ?? 0;
+    player.hpOverflow = ns.hpOverflow ?? 0;
+    player.hpUnderflow = ns.hpUnderflow ?? 0;
+    player.staminaUnderflow = ns.staminaUnderflow ?? 0;
+    player.speedOverflow = ns.speedOverflow ?? 0;
+    player.speedUnderflow = ns.speedUnderflow ?? 0;
+    player.attackPtsOverflow = ns.attackPtsOverflow ?? 0;
     player.attackPtsUnderflow = ns.attackPtsUnderflow ?? 0;
-    player.guardPtsOverflow   = ns.guardPtsOverflow   ?? 0;
-    player.guardPtsUnderflow  = ns.guardPtsUnderflow  ?? 0;
-    player.dodgePtsOverflow   = ns.dodgePtsOverflow   ?? 0;
-    player.dodgePtsUnderflow  = ns.dodgePtsUnderflow  ?? 0;
+    player.guardPtsOverflow = ns.guardPtsOverflow ?? 0;
+    player.guardPtsUnderflow = ns.guardPtsUnderflow ?? 0;
+    player.dodgePtsOverflow = ns.dodgePtsOverflow ?? 0;
+    player.dodgePtsUnderflow = ns.dodgePtsUnderflow ?? 0;
     // 效果队列：从结算包裹写回真实玩家对象，确保 onPost 排队的效果不丢失
-    player.pendingEffects    = Array.isArray(ns.pendingEffects) ? [...ns.pendingEffects] : (player.pendingEffects || []);
+    player.pendingEffects = Array.isArray(ns.pendingEffects) ? [...ns.pendingEffects] : (player.pendingEffects || []);
     // 闪烁标记：从 onPre 的 markFlashEffect 传递到 UI 层
-    player._flashEffects     = Array.isArray(ns._flashEffects) ? [...ns._flashEffects] : [];
+    player._flashEffects = Array.isArray(ns._flashEffects) ? [...ns._flashEffects] : [];
   }
 
 
@@ -1221,8 +1224,8 @@ export class BattleEngine {
   _scheduleAI() {
     if (this._aiHandle) this._aiHandle.cancel();
 
-    const aiDriver = (typeof window !== 'undefined' && window.DEBUG_AI?.active) 
-      ? window.DEBUG_AI 
+    const aiDriver = (typeof window !== 'undefined' && window.DEBUG_AI?.active)
+      ? window.DEBUG_AI
       : { scheduleAI };
 
     this._aiHandle = aiDriver.scheduleAI({

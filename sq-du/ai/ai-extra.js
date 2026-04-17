@@ -100,30 +100,39 @@ export class AIExtraLayer {
     const B = 1.4; // 基准线
     const byId = {
       // ── 共享攻击技能 ──                       基础    调优
-      [EffectId.REND]:         action === Action.ATTACK ? B + 0.1 + (playerLowHp ? 0.4 : 0) : -5,
       [EffectId.BREAK_QI]:     action === Action.ATTACK ? B - 0.1 + (playerLowHp ? 0.8 : 0) : -5,
       [EffectId.RECKLESS]:     action === Action.ATTACK ? B - 0.1 + (playerLowHp ? 0.6 : 0) : -5,
       [EffectId.DRAIN]:        action === Action.ATTACK ? B       + (playerLowStamina ? 0.5 : 0) + (aiLowHp ? 0.4 : 0) : -5,
       [EffectId.OBSCURE]:      action === Action.ATTACK ? B       : -5,
       // ── AI 攻击技能 ──
-      [EffectId.CHAINLOCK]:    action === Action.ATTACK ? B + 0.1 : -5,
+      [EffectId.CHAINLOCK]:    action === Action.ATTACK ? B       : -5,
       [EffectId.BLOOD_DRINK]:  action === Action.ATTACK ? B - 0.1 + (aiLowHp ? 0.8 : 0) : -5,
-      [EffectId.PURSUIT]:      action === Action.ATTACK ? B       : -5,
-      [EffectId.HEAVY_PRESS]:  action === Action.ATTACK ? B       : -5,
+      [EffectId.HEAVY_PRESS]:  action === Action.ATTACK ? B + 0.1 : -5,
       [EffectId.BRUTE_FORCE]:  action === Action.ATTACK ? B + 0.1 : -5,
 
       // ── 共享守备技能 ──
-      [EffectId.BLOOD_SHIELD]: action === Action.GUARD  ? B - 0.2 + (aiLowHp ? 0.5 : 0) : -5,
-      [EffectId.REDIRECT]:     action === Action.GUARD  ? B + 0.1 : -5,
-      [EffectId.BASTION]:      action === Action.GUARD  ? B - 0.1 : -5,
+      [EffectId.BLOOD_SHIELD]: action === Action.GUARD  ? B - 0.1 : -5,
+      [EffectId.BASTION]:      action === Action.GUARD  ? B       : -5,
       [EffectId.IRON_WALL]:    action === Action.GUARD  ? B       : -5,
       [EffectId.ABSORB_QI]:    action === Action.GUARD  ? B - 0.1 + (ai.stamina <= 2 ? 0.8 : 0) : -5,
       [EffectId.INTERCEPT]:    action === Action.GUARD  ? B + 0.1 + (playerLowStamina ? -0.6 : 0) : -5,
       [EffectId.RESTORE]:      action === Action.GUARD  ? B - 0.1 + (aiLowHp ? 0.6 : 0) : -5,
       [EffectId.SHOCKWAVE]:    action === Action.GUARD  ? B + 0.1 : -5,
       // ── AI 守备技能 ──
-      [EffectId.IRON_GUARD]:   action === Action.GUARD  ? B + 0.1 : -5,  // 迅防
-      [EffectId.TREMOR]:       action === Action.GUARD  ? B + 0.1 : -5,  // 震颤
+      [EffectId.TREMOR]:       action === Action.GUARD  ? B + 0.1 : -5,
+      [EffectId.STEADY]:       action === Action.GUARD  ? B + 0.1 + ((ai.guardBoost || 0) > 0 ? -0.6 : 0) : -5,
+
+      // ── 共享闪避技能 ──
+      [EffectId.AGILITY]:      action === Action.DODGE  ? B       : -5,
+      [EffectId.ABANDON]:      action === Action.DODGE  ? B - 0.1 : -5,
+      [EffectId.MOMENTUM]:     action === Action.DODGE  ? B       : -5,
+      [EffectId.DISRUPT]:      action === Action.DODGE  ? B + 0.1 : -5,
+      [EffectId.HIDE]:         action === Action.DODGE  ? B       : -5,
+      [EffectId.LURE]:         action === Action.DODGE  ? B + 0.1 : -5,
+      [EffectId.SEE_THROUGH]:  action === Action.DODGE  ? B       : -5,
+      [EffectId.DISARM]:       action === Action.DODGE  ? B - 0.1 : -5,
+      // ── AI 闪避技能 ──
+      [EffectId.DEFERRED]:     action === Action.DODGE  ? B + 0.1 + ((ai.agilityBoost || 0) > 0 ? -0.6 : 0) : -5,
     };
 
     let total = score + (byId[id] ?? 0);

@@ -224,10 +224,6 @@ function updatePips(prefix, current, max, type, playerState) {
       else if (idxFromRight > current - penalty) {
         el.classList.add('penalty');
       }
-      // 如果超出了真实容量，但受到了 discount（不在此UI做超出绘制，只在已有格子上发光）
-      else if (discount > 0 && idxFromRight === current) {
-        el.classList.add('discount');
-      }
     }
   }
 }
@@ -854,6 +850,14 @@ engine.on(EngineEvent.TURN_RESOLVED, result => {
       `</span>`;
   }
 
+  // 洞察使用提示
+  if (result.p1InsightUsed || result.p2InsightUsed) {
+    const insightLines = [];
+    if (result.p1InsightUsed) insightLines.push('你发动了洞察');
+    if (result.p2InsightUsed) insightLines.push('敌方发动了洞察');
+    extDesc += `<br><br><span style="color:var(--color-insight);font-size:0.9em;">${insightLines.join('<br>')}</span>`;
+  }
+
   ui.clashName.textContent = result.clashName;
   ui.logDetail.innerHTML = extDesc;
   ui.battleLog.classList.add('show');
@@ -1158,10 +1162,12 @@ function updateStatusIcons(playerId, state) {
   ];
 
   for (const { field, eid, sign, resource, name, icon } of flatChecks) {
-    const val = state[field] || 0;
+    // 兴奋图标特殊处理：预扣阶段 staminaDiscount 被消费，但 actionDiscountSpent 记录了消费量
+    // 用两者之和还原"原始 discount"，避免选行动后图标消失
+    const val = field === 'staminaDiscount'
+      ? (state[field] || 0) + (state.actionDiscountSpent || 0)
+      : (state[field] || 0);
     if (val <= 0) continue;
-    // 若 pending 中已渲染过同 effectId，先覆盖（flat 字段是累计真实值，优先级更高）
-    // 但为了避免重复图标，跳过已渲染的（pending 的 n 值已经在上面正确聚合了）
     if (rendered.has(eid)) continue;
     const display = sign * val;
     addIcon(icon, `${name}：${resource} ${display > 0 ? '+' : ''}${display}`, 'ACTION_START', decayTurnLabel(val));

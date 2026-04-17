@@ -39,7 +39,7 @@ export function scheduleAI(ctx) {
   const handle = setTimeout(() => {
     if (ctx.engineState() !== EngineState.TICKING) return;
     const currentAi = ctx.getState().ai;
-    const decision  = AIJudgeLayer.buildDecision(currentAi, ctx.getState().player, getHistory());
+    const decision = AIJudgeLayer.buildDecision(currentAi, ctx.getState().player, getHistory());
     ctx.submitAction(PlayerId.P2, decision);
     ctx.setReady(PlayerId.P2);
   }, delay);

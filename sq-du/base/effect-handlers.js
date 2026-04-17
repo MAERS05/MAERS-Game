@@ -20,15 +20,16 @@ import { SolidEffect, CrackedArmorEffect, BrokenArmorEffect } from '../effect/fu
 import { SideStepEffect, ClumsyEffect, ShackledDodgeEffect } from '../effect/function/dodge-status.js';
 
 // ── 共享攻击技能（skill/attack/）──
-import { RendEffect } from '../skill/attack/rend.js';
 import { BreakQiEffect } from '../skill/attack/break_qi.js';
 import { RecklessEffect } from '../skill/attack/reckless.js';
 import { DrainEffect } from '../skill/attack/drain.js';
 import { ObscureEffect } from '../skill/attack/obscure.js';
+import { ChainLock } from '../skill/attack/chainlock.js';
+import { ExhilarateEffect } from '../skill/attack/exhilarate.js';
 
 // ── 共享守备技能（skill/guard/）──
 import { BloodShieldEffect } from '../skill/guard/blood_shield.js';
-import { RedirectEffect } from '../skill/guard/redirect.js';
+import { RedirectEffect } from '../skill/player-guard/redirect.js';
 import { BastionEffect } from '../skill/guard/bastion.js';
 import { IronWallEffect } from '../skill/guard/iron_wall.js';
 import { AbsorbQiEffect } from '../skill/guard/absorb_qi.js';
@@ -40,32 +41,32 @@ import { ShockwaveEffect } from '../skill/guard/shockwave.js';
 import { ChargeEffect } from '../skill/player-attack/charge.js';
 import { PounceEffect } from '../skill/player-attack/pounce.js';
 import { CautiousEffect } from '../skill/player-attack/cautious.js';
-import { ExhilarateEffect } from '../skill/player-attack/exhilarate.js';
 
 // ── 玩家守备技能（skill/player-guard/）──
 import { RigidEffect } from '../skill/player-guard/rigid.js';
 
-// ── 玩家闪避技能（skill/player-dodge/）──
-import { AgilityEffect } from '../skill/player-dodge/agility.js';
-import { AbandonEffect } from '../skill/player-dodge/abandon.js';
-import { MomentumEffect } from '../skill/player-dodge/momentum.js';
+// ── 闪避技能（skill/dodge/ 及 skill/player-dodge/）──
+import { AgilityEffect } from '../skill/dodge/agility.js';
+import { AbandonEffect } from '../skill/dodge/abandon.js';
+import { MomentumEffect } from '../skill/dodge/momentum.js';
 import { LightfootEffect } from '../skill/player-dodge/lightfoot.js';
-import { DisarmEffect } from '../skill/player-dodge/disarm.js';
-import { DisruptEffect } from '../skill/player-dodge/disrupt.js';
-import { Hide } from '../skill/player-dodge/hide.js';
-import { Lure } from '../skill/player-dodge/lure.js';
-import { SeeThrough } from '../skill/player-dodge/see-through.js';
+import { DisarmEffect } from '../skill/dodge/disarm.js';
+import { DisruptEffect } from '../skill/dodge/disrupt.js';
+import { Hide } from '../skill/dodge/hide.js';
+import { Lure } from '../skill/dodge/lure.js';
+import { SeeThrough } from '../skill/dodge/see-through.js';
 
 // ── AI 攻击技能（skill/ai-attack/）──
 import { BloodDrinkEffect } from '../skill/ai-attack/blood_drink.js';
-import { ChainLock } from '../skill/ai-attack/chainlock.js';
-import { PursuitEffect } from '../skill/ai-attack/pursuit.js';
 import { HeavyPressEffect } from '../skill/ai-attack/heavy_press.js';
 import { BruteForceEffect } from '../skill/ai-attack/brute_force.js';
 
 // ── AI 守备技能（skill/ai-guard/）──
-import { IronGuardEffect } from '../skill/ai-guard/swift_guard.js';
 import { TremorEffect } from '../skill/ai-guard/tremor.js';
+import { SteadyEffect } from '../skill/ai-guard/steady.js';
+
+// ── AI 闪避技能（skill/ai-dodge/）──
+import { DeferredEffect } from '../skill/ai-dodge/deferred.js';
 
 /**
  * 效果处理器映射表（EffectId → handler）
@@ -77,11 +78,12 @@ import { TremorEffect } from '../skill/ai-guard/tremor.js';
  */
 const RawEffectHandlers = {
   // ── 共享攻击技能 ──
-  [EffectId.REND]: RendEffect,
   [EffectId.BREAK_QI]: BreakQiEffect,
   [EffectId.RECKLESS]: RecklessEffect,
   [EffectId.DRAIN]: DrainEffect,
   [EffectId.OBSCURE]: ObscureEffect,
+  [EffectId.CHAINLOCK]: ChainLock,
+  [EffectId.EXHILARATE]: ExhilarateEffect,
   // ── 共享守备技能 ──
   [EffectId.BLOOD_SHIELD]: BloodShieldEffect,
   [EffectId.REDIRECT]: RedirectEffect,
@@ -95,7 +97,6 @@ const RawEffectHandlers = {
   [EffectId.CHARGE]: ChargeEffect,
   [EffectId.POUNCE]: PounceEffect,
   [EffectId.CAUTIOUS]: CautiousEffect,
-  [EffectId.EXHILARATE]: ExhilarateEffect,
   // ── 玩家守备技能 ──
   [EffectId.RIGID]: RigidEffect,
   // ── 玩家闪避技能 ──
@@ -111,12 +112,13 @@ const RawEffectHandlers = {
   // ── AI 攻击技能 ──
   [EffectId.BLOOD_DRINK]: BloodDrinkEffect,
   [EffectId.CHAINLOCK]: ChainLock,
-  [EffectId.PURSUIT]: PursuitEffect,
   [EffectId.HEAVY_PRESS]: HeavyPressEffect,
   [EffectId.BRUTE_FORCE]: BruteForceEffect,
   // ── AI 守备技能 ──
-  [EffectId.IRON_GUARD]: IronGuardEffect,
   [EffectId.TREMOR]: TremorEffect,
+  [EffectId.STEADY]: SteadyEffect,
+  // ── AI 闪避技能 ──
+  [EffectId.DEFERRED]: DeferredEffect,
   // ── 状态效果（effect/function/）──
   sluggish: SluggishEffect,
   rejuvenated: RejuvenatedEffect,
