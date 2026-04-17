@@ -133,8 +133,8 @@ export const MaesProfile = {
     insightThreshold: 0.8,   // 洞察评分阈值（低=更积极洞察；默认 1.8）
     insightMaxProb: 0.90,  // 洞察最大概率（默认 0.65）
     redecideBias: 0.20,  // 重决策概率偏移（加到各情境概率上）
-    speedBoostBias: 0.15,  // 提速概率偏移（正=更爱提速）
-    passiveExploitBias: 1.8,   // 对手被动行为时攻击加成（蓄势/疗愈=白给）
+    speedBoostBias: 0.1,  // 提速概率偏移（正=更爱提速）
+    passiveExploitBias: 1.5,   // 对手被动行为时攻击加成（蓄势/疗愈=白给）
     effectSkipChance: 0.10,    // 10% 概率不携带效果（轻出手）
   },
 };
@@ -207,8 +207,8 @@ export function maesConstrainDecision(decision, scene) {
   const executeWindow = player.stamina <= 0;
 
   // ── 场景0（好斗本能）：基础层在精力≤1时强制待命，但 MAES 更激进 ──
-  // 对手上回合被动行为（蓄势/疗愈）或对手精力低时，MAES 宁可拼光精力也要攻击
-  if (d.action === Action.STANDBY && effectiveStamina >= 1) {
+  // 对手上回合被动行为（蓄势/疗愈）或对手精力低时，MAES 在保留1点精力余量的前提下攻击
+  if (d.action === Action.STANDBY && effectiveStamina >= 2) {
     const recentOpp = history?.length ? history[history.length - 1]?.opponentAction : null;
     const oppPassive = recentOpp === Action.STANDBY || recentOpp === Action.HEAL;
     const oppWeak = player.stamina <= 1 || player.hp <= 2;
