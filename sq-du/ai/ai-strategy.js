@@ -68,6 +68,10 @@ export class AIStrategyLayer {
         // 待命无防御能力，必然命中
         return effectiveStamina >= 1 ? Action.ATTACK : Action.STANDBY;
 
+      case Action.HEAL:
+        // 疗愈无防御能力，等同待命，必然命中
+        return effectiveStamina >= 1 ? Action.ATTACK : Action.STANDBY;
+
       default:
         return AIBaseLogic.pickAction(snap, ai);
     }

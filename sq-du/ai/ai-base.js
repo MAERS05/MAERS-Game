@@ -194,35 +194,75 @@ export class AIBaseLogic {
     w.dodge  += snap.oppAggression * 1.0;
     w.attack -= snap.oppAggression * 0.5;
 
-    // ── 精力管控 ─────────────────────────────────
-    const aiRemainingStamina = aiEffectiveStamina - 1;
+    // ══════════════════════════════════════════════
+    // 精力管控（Phase-based Stamina Management）
+    // ══════════════════════════════════════════════
+    //
+    // 精力阶段：
+    //   危机（0~1）→ 保守（2）→ 均衡（3）→ 充裕（3+）
+    // 核心原则：
+    //   1. 精力差优势时主动施压，劣势时收缩保气
+    //   2. 不可在无绝杀时耗尽精力（留 ≥1 应急）
+    //   3. 对手换气时果断出击，不给喘息机会
 
-    if (aiRemainingStamina <= 0) {
-      w.guard   += 1.2;
-      w.attack  -= 0.8;
-      w.dodge   -= 0.3;
-      w.standby += 3.2;
+    const staminaGap = aiEffectiveStamina - (snap.playerStamina || 0); // 正=我优势
+
+    // ── 阶段1：危机（精力 ≤ 1）─ 几乎只能蓄势回气 ──
+    if (aiEffectiveStamina <= 1) {
+      w.standby += 4.0;
+      w.attack  -= 1.5;
+      w.dodge   -= 0.5;
+      // 疗愈消耗 0 精力 —— 危机期低血时是零成本最优解
+      if (!ai.healBlocked && ai.hp < 3) {
+        w.heal += (3 - ai.hp) * 1.5; // hp=1: +3.0, hp=2: +1.5
+      }
     }
-    if (aiEffectiveStamina <= 1 && snap.playerStamina > 0) {
-      w.standby += 3.0;
-      w.attack  -= 0.8;
+    // ── 阶段2：保守（精力 = 2）─ 可行动一次但不留余量 ──
+    else if (aiEffectiveStamina === 2) {
+      // 对手也低精力：精力对等，不急于蓄势
+      if (snap.playerStamina <= 1) {
+        w.attack  += 0.8;
+        w.guard   += 0.5;
+      }
+      // 对手高精力：我方处于劣势，收缩
+      else {
+        w.standby += 1.8;
+        w.guard   += 0.8;
+        w.attack  -= 0.6;
+      }
+      // 自身低血时更优先蓄势保命
+      if (snap.aiHpRatio <= 0.4) w.standby += 1.2;
     }
-    if (aiEffectiveStamina <= 2 && snap.playerHpRatio > 0.35) {
-      w.standby += 1.4;
-      w.attack  -= 0.4;
-      w.dodge   -= 0.2;
+    // ── 阶段3：均衡（精力 = 3）─ 灵活应对 ──
+    else if (aiEffectiveStamina === 3) {
+      // 精力优势：施压
+      if (staminaGap >= 2) {
+        w.attack  += 1.2;
+        w.standby -= 0.8;
+      }
+      // 对手高精力（精力劣势）：防守为主
+      else if (staminaGap <= -1) {
+        w.guard   += 0.6;
+        w.standby += 0.4;
+      }
     }
-    if (snap.aiHpRatio <= 0.4 && aiEffectiveStamina <= 2) {
-      w.standby += 1.2;
+    // ── 阶段4：充裕（精力 ≥ 4）─ 主动施压 ──
+    else {
+      w.attack  += 1.5;
+      w.standby *= 0.3;
+      // 精力远超对手：全面施压
+      if (staminaGap >= 2) {
+        w.attack += 0.8;
+      }
     }
 
-    // ── 对手低精力时抓住换气机会 ──────────────────
-    if (snap.lastOppStamina <= 1 && aiEffectiveStamina >= 1) {
-      w.attack  += 1.2;
-      w.standby -= 0.6;
-    } else if (snap.oppStaminaTrend <= 1.5 && aiEffectiveStamina >= 1) {
-      w.attack  += 0.6;
-      w.standby -= 0.3;
+    // ── 对手换气窗口（对手低精力）─ 抓住机会 ──
+    if (snap.lastOppStamina <= 1 && aiEffectiveStamina >= 2) {
+      w.attack  += 1.5;
+      w.standby -= 1.0;
+    } else if (snap.oppStaminaTrend <= 1.5 && aiEffectiveStamina >= 2) {
+      w.attack  += 0.8;
+      w.standby -= 0.4;
     }
 
     // ── 对手濒危时不允许保守 ─────────────────────

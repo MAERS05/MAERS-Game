@@ -200,6 +200,14 @@ function _evaluateRedecide(ai, player, revealedAction, effectiveStamina, getHist
     return null;
   }
 
+  // ── 对手疗愈：无防御，绝佳攻击机会 ─────────────
+  if (revealed?.action === Action.HEAL && effectiveStamina >= 1) {
+    if (Math.random() < Math.min(1, 0.85 + bias)) {
+      return AIJudgeLayer.buildRedecideDecision(ai, player, revealed, getHistory());
+    }
+    return null;
+  }
+
   if (revealed?.action === Action.GUARD && effectiveStamina >= 2) {
     if (Math.random() < Math.min(1, 0.45 + bias)) {
       return AIJudgeLayer.buildRedecideDecision(ai, player, revealed, getHistory());
