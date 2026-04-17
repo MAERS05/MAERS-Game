@@ -375,6 +375,7 @@ export const EffectId = Object.freeze({
   CHAINLOCK: 'chainlock',
   PURSUIT: 'pursuit',
   HEAVY_PRESS: 'heavy_press',
+  BRUTE_FORCE: 'brute_force',
   // ── AI 守备技能（skill/ai-guard/）──
   IRON_GUARD: 'iron_guard',
 });
@@ -539,9 +540,14 @@ export const EffectDefs = Object.freeze({
     applicableTo: [Action.ATTACK],
     aiOnly: true,
   },
+  [EffectId.BRUTE_FORCE]: {
+    id: EffectId.BRUTE_FORCE, name: '蛮力',
+    applicableTo: [Action.ATTACK],
+    aiOnly: true,
+  },
   // ── AI 守备技能（skill/ai-guard/）──
   [EffectId.IRON_GUARD]: {
-    id: EffectId.IRON_GUARD, name: '强防',
+    id: EffectId.IRON_GUARD, name: '迅防',
     applicableTo: [Action.GUARD],
     aiOnly: true,
   },

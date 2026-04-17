@@ -51,6 +51,7 @@ const MAES_ATTACK_EFFECTS = [
   EffectId.BLOOD_DRINK,   // 饮血（AI 专属）
   EffectId.PURSUIT,       // 追击（AI 专属）
   EffectId.HEAVY_PRESS,   // 猛压（AI 专属）
+  EffectId.BRUTE_FORCE,   // 蛮力（AI 专属）
 ];
 
 /** MAES AI 守备技能池 */

@@ -61,9 +61,10 @@ import { BloodDrinkEffect } from '../skill/ai-attack/blood_drink.js';
 import { ChainLock } from '../skill/ai-attack/chainlock.js';
 import { PursuitEffect } from '../skill/ai-attack/pursuit.js';
 import { HeavyPressEffect } from '../skill/ai-attack/heavy_press.js';
+import { BruteForceEffect } from '../skill/ai-attack/brute_force.js';
 
 // ── AI 守备技能（skill/ai-guard/）──
-import { IronGuardEffect } from '../skill/ai-guard/iron_guard.js';
+import { IronGuardEffect } from '../skill/ai-guard/swift_guard.js';
 
 /**
  * 效果处理器映射表（EffectId → handler）
@@ -111,6 +112,7 @@ const RawEffectHandlers = {
   [EffectId.CHAINLOCK]: ChainLock,
   [EffectId.PURSUIT]: PursuitEffect,
   [EffectId.HEAVY_PRESS]: HeavyPressEffect,
+  [EffectId.BRUTE_FORCE]: BruteForceEffect,
   // ── AI 守备技能 ──
   [EffectId.IRON_GUARD]: IronGuardEffect,
   // ── 状态效果（effect/function/）──
