@@ -127,6 +127,18 @@ export class AIBaseLogic {
       playerPtsDebuff:   player.ptsDebuff   || 0,
       playerDodgeDebuff: player.dodgeDebuff || 0,
       playerGuardDebuff: player.guardDebuff || 0,
+
+      // ── AI 自身效果感知 ──────────────────────────
+      aiPtsDebuff:       ai.ptsDebuff       || 0,  // 攻击点数被削
+      aiGuardDebuff:     ai.guardDebuff     || 0,  // 守备点数被削
+      aiDodgeDebuff:     ai.dodgeDebuff     || 0,  // 闪避点数被削
+      aiGuardBoost:      ai.guardBoost      || 0,  // 守备增益
+      aiDodgeBoost:      ai.dodgeBoost      || 0,  // 闪避增益
+      aiChargeBoost:     ai.chargeBoost     || 0,  // 蓄力增益
+      aiStaminaPenalty:  ai.staminaPenalty   || 0,  // 精力消耗增加
+      aiHealBlocked:     !!ai.healBlocked,         // 被禁疗愈
+      aiSpeedBlocked:    !!ai.speedAdjustBlocked,  // 被禁提速
+
       oppSpeedTrend,
       oppEnhanceTrend,
       oppStaminaTrend,
@@ -176,6 +188,34 @@ export class AIBaseLogic {
     if (snap.playerDodgeDebuff > 0) {
       // 对手闪避点数被压低，攻击命中率提高
       w.attack += 0.6;
+    }
+
+    // ── AI 自身效果感知（被挂 debuff 时调整决策）────
+    // 攻击被削 → 攻击效率低，转守/蓄势
+    if (snap.aiPtsDebuff > 0) {
+      w.attack  -= snap.aiPtsDebuff * 1.2;
+      w.guard   += 0.6;
+      w.standby += 0.8;
+    }
+    // 守备被削 → 守备不可靠，转闪避
+    if (snap.aiGuardDebuff > 0) {
+      w.guard -= snap.aiGuardDebuff * 1.0;
+      w.dodge += 0.6;
+    }
+    // 闪避被削 → 闪避不可靠，转守备
+    if (snap.aiDodgeDebuff > 0) {
+      w.dodge -= snap.aiDodgeDebuff * 1.0;
+      w.guard += 0.5;
+    }
+    // 蓄力增益在身 → 优先攻击释放蓄力伤害
+    if (snap.aiChargeBoost > 0) {
+      w.attack  += 2.0;
+      w.standby -= 1.5;
+    }
+    // 精力惩罚 → 行动变贵，更保守
+    if (snap.aiStaminaPenalty > 0) {
+      w.standby += snap.aiStaminaPenalty * 1.5;
+      w.attack  -= snap.aiStaminaPenalty * 0.6;
     }
 
     // ── 自身血量压力 ─────────────────────────────
@@ -365,6 +405,22 @@ export class AIBaseLogic {
     // 血线告急时的特殊本能反应保命提速
     if (snap.aiHpRatio <= 0.3 && action !== Action.ATTACK && pAtk > 0.35 && availableForBoost >= 1) {
       return BASE + 1;
+    }
+
+    // ── 精力充裕时主动提速（tuning 驱动）──
+    const tuning = ai.aiTuning || {};
+    const speedBias = tuning.speedBoostBias || 0;
+
+    // 攻击时精力 ≥ 3：有余量提速施压
+    if (action === Action.ATTACK && availableForBoost >= 2) {
+      const prob = Math.min(0.75, 0.30 + speedBias);
+      if (Math.random() < prob) return BASE + 1;
+    }
+
+    // 守备/闪避时精力 ≥ 3：适度提速先手部署
+    if ((action === Action.GUARD || action === Action.DODGE) && availableForBoost >= 2) {
+      const prob = Math.min(0.60, 0.20 + speedBias);
+      if (Math.random() < prob) return BASE + 1;
     }
 
     // 若无关键的竞速必要，保守留存精力

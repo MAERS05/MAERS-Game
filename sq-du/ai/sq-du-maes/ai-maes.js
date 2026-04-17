@@ -119,9 +119,10 @@ export const MaesProfile = {
   tuning: {
     attackBias:        0.5,   // 攻击权重偏移（正=更好斗）
     guardBias:         0.0,   // 守备权重偏移
-    insightThreshold:  1.2,   // 洞察评分阈值（低=更积极洞察；默认 1.8）
-    insightMaxProb:    0.80,  // 洞察最大概率（默认 0.65）
+    insightThreshold:  0.8,   // 洞察评分阈值（低=更积极洞察；默认 1.8）
+    insightMaxProb:    0.90,  // 洞察最大概率（默认 0.65）
     redecideBias:      0.20,  // 重决策概率偏移（加到各情境概率上）
+    speedBoostBias:    0.15,  // 提速概率偏移（正=更爱提速）
   },
 };
 

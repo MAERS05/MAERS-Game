@@ -1010,6 +1010,19 @@ function formatEffectLabel(meta, n) {
 function updateStatusIcons(playerId, state) {
   const tray = playerId === PlayerId.P1 ? ui.p1StatusTray : ui.p2StatusTray;
   if (!tray) return;
+
+  // 清理已打开的 tooltip（对应图标即将被移除）
+  const tooltip = playerId === PlayerId.P1
+    ? document.getElementById('p1StatusTooltip')
+    : document.getElementById('p2StatusTooltip');
+  if (tooltip && tooltip.classList.contains('show') && tooltip._sourceIcon) {
+    // 源图标在当前 tray 内 → 即将被 innerHTML='' 清除，关闭 tooltip
+    if (tray.contains(tooltip._sourceIcon)) {
+      tooltip.classList.remove('show');
+      tooltip._sourceIcon = null;
+    }
+  }
+
   tray.innerHTML = '';
 
   // 清理过期闪烁效果
