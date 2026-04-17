@@ -610,6 +610,7 @@
 
     /* 结算日志框 */
     .battle-log {
+      position: relative;
       background: rgba(0, 0, 0, 0.65);
       padding: 24px 40px;
       border-radius: 12px;
@@ -624,6 +625,28 @@
       pointer-events: none;
     }
 
+    .battle-log-close {
+      position: absolute;
+      right: 10px;
+      top: 10px;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      cursor: pointer;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: color 0.2s, background 0.2s;
+      z-index: 10;
+    }
+
+    .battle-log-close:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.1);
+    }
+
     .battle-log.show {
       opacity: 1;
       transform: translateY(0);
@@ -636,16 +659,15 @@
       transition: opacity 1s ease !important;
     }
 
-    /* 重新开始/开始游戏 按钮（极简版） */
-    #restartBtn,
-    #startBtn {
+    /* 重新开始/开始游戏 按钮（通用风格） */
+    .game-btn {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%) scale(0.9);
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.4s ease, transform 0.4s ease;
+      transition: opacity 0.4s ease;
       background: rgba(5, 7, 18, 0.95);
       border: 1px solid rgba(255, 255, 255, 0.2);
       border-radius: 12px;
@@ -656,23 +678,52 @@
       font-weight: bold;
       letter-spacing: 8px;
       text-indent: 8px;
-      /* 居中对齐文字，因为有横向间距 */
       backdrop-filter: blur(12px);
       box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
       z-index: 500;
+      white-space: nowrap;
     }
 
-    #restartBtn:hover,
-    #startBtn:hover {
-      background: rgba(15, 20, 35, 0.95);
-      border-color: rgba(255, 255, 255, 0.4);
-      transform: translate(-50%, -50%) scale(1.05);
-    }
 
-    #restartBtn.show,
-    #startBtn.show {
+    .game-btn.show {
       opacity: 1;
       transform: translate(-50%, -50%) scale(1);
+      pointer-events: auto;
+    }
+
+    /* 模式选择容器，初始隐藏，覆盖在中心 */
+    .mode-select-box {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.9);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease, transform 0.4s ease;
+      display: flex;
+      gap: 20px;
+      z-index: 500;
+    }
+
+    .mode-select-box.show {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+      pointer-events: auto;
+    }
+
+    /* 将容器内按钮设为相对定位 */
+    .mode-select-box .game-btn {
+      position: relative;
+      top: auto;
+      left: auto;
+      transform: none;
+      font-size: 1.1rem;
+      padding: 18px 45px;
+      opacity: 1;
+      pointer-events: none;
+    }
+
+    .mode-select-box.show .game-btn {
       pointer-events: auto;
     }
 
@@ -1291,7 +1342,32 @@
     .equip-header {
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 20px;
+      position: relative;
+      width: 100%;
+    }
+
+    .equip-close {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      cursor: pointer;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: color 0.2s, background 0.2s;
+    }
+
+    .equip-close:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.1);
     }
 
     .equip-title {
@@ -1833,22 +1909,30 @@
 
     <!-- 结算日志 -->
     <div class="battle-log" id="battleLog">
+      <div class="battle-log-close" id="battleLogClose" style="display:none;">✕</div>
       <div class="clash-name" id="clashName"></div>
       <div class="log-detail" id="logDetail"></div>
       <div class="log-hint" id="battleLogHint">点击关闭，开始下一回合</div>
     </div>
 
     <!-- 重新开始按钮 -->
-    <button id="restartBtn" onclick="location.reload()">重新开始</button>
+    <button id="restartBtn" class="game-btn" onclick="location.reload()">重新开始</button>
 
     <!-- 开始游戏按钮 -->
-    <button id="startBtn">开始游戏</button>
+    <button id="startBtn" class="game-btn">开始游戏</button>
+
+    <!-- 模式选择面板 -->
+    <div id="modeSelectBox" class="mode-select-box">
+      <button id="modeTimedBtn" class="game-btn">计时</button>
+      <button id="modeInstantBtn" class="game-btn">即时</button>
+    </div>
 
     <!-- ═══ 装配期覆盖面板 ═══ -->
     <div class="equip-overlay" id="equipOverlay">
       <div class="equip-overlay-inner">
         <div class="equip-header">
           <span class="equip-title" id="equipOverlayTitle">装配期</span>
+          <div class="equip-close" id="equipCloseBtn" style="display:none;">✕</div>
         </div>
         <div class="equip-slots-wrapper">
           <!-- 攻击槽 -->

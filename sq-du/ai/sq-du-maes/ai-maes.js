@@ -19,7 +19,7 @@
 import { Action, DefaultStats, EffectId, EffectDefs } from '../../base/constants.js';
 
 // ── 基础 AI 行为层：统一引入并转导出 ─────────────
-export { scheduleAI, scheduleAIRedecide } from '../ai-scheduler.js';
+export { scheduleAI, scheduleAIRedecide, accelerateAI } from '../ai-scheduler.js';
 import '../ai-manual.js'; // 初始化 ManualAI 测试工具挂载到 window
 
 // 以下按需转导出，供未来扩展或外部直接访问

@@ -39,7 +39,7 @@ import { EffectLayer } from '../main/effect.js';
 import { resolve } from './resolver.js';
 import { collectOverflows } from '../effect/function/overflow-manager.js';
 import { JudgeLayer } from '../main/judge.js';
-import { scheduleAI, scheduleAIRedecide, applyCustomization as applyMaesAI } from '../ai/sq-du-maes/ai-maes.js';
+import { scheduleAI, scheduleAIRedecide, accelerateAI, applyCustomization as applyMaesAI } from '../ai/sq-du-maes/ai-maes.js';
 
 // ─────────────────────────────────────────────
 // 事件总线（内部工具类）
@@ -239,6 +239,7 @@ export class BattleEngine {
    */
   constructor(mode = EngineMode.PVE, options = {}) {
     this._mode = mode;
+    this._instant = options.instant || false;
     this._bus = new EventBus();
     this._state = EngineState.IDLE;
     this._turn = 0;
@@ -295,8 +296,9 @@ export class BattleEngine {
   _getPlayerRef(playerId) { return this._players[playerId]; }
 
   /** 开始游戏（第一回合） */
-  startGame() {
+  startGame(options = {}) {
     if (this._state !== EngineState.IDLE) return;
+    if (options.instant != null) this._instant = options.instant;
     this._beginTurn();
   }
 
@@ -304,6 +306,12 @@ export class BattleEngine {
   togglePause() {
     if (this._state !== EngineState.TICKING && this._state !== EngineState.EQUIPPING) return false;
     return this._timer.togglePauseGlobal();
+  }
+
+  /** 即时模式：手动结束装备期 */
+  skipEquip() {
+    if (this._state !== EngineState.EQUIPPING) return;
+    this._onEquipEnd();
   }
 
   /**
@@ -534,7 +542,13 @@ export class BattleEngine {
     }
 
     // 只有一方就绪，暂时什么都不需要做
-    if (!this._players[PlayerId.P1].ready || !this._players[PlayerId.P2].ready) return;
+    if (!this._players[PlayerId.P1].ready || !this._players[PlayerId.P2].ready) {
+      // 即时模式：玩家就绪后，加速 AI 决策
+      if (this._instant && playerId === PlayerId.P1 && !this._players[PlayerId.P2].ready) {
+        this._accelerateAI();
+      }
+      return;
+    }
 
     // 3. 双方均就绪：检查识破
     if (this._checkInsightClash()) {
@@ -804,21 +818,32 @@ export class BattleEngine {
         state: this.getSnapshot(),
       });
 
-      // 延迟 1s 后，进入装备期
-      setTimeout(() => {
+      // 延迟后进入装备期（即时模式跳过延迟）
+      const enterEquip = () => {
         this._setState(EngineState.EQUIPPING);
         this._emitPhaseEffectEvent(EngineEvent.EQUIP_START);
         this._bus.emit(EngineEvent.EQUIP_PHASE_START, {
-          secondsLeft: TimerConfig.EQUIP_TIME,
+          secondsLeft: this._instant ? -1 : TimerConfig.EQUIP_TIME,
         });
-        this._timer.reset();
-        this._timer.start();
-      }, 1000);
+        if (!this._instant) {
+          this._timer.reset();
+          this._timer.start();
+        }
+      };
+      if (this._instant) {
+        enterEquip();
+      } else {
+        setTimeout(enterEquip, 1000);
+      }
     };
 
     if (this._turn > 0) {
       this._emitPhaseEffectEvent(EngineEvent.TURN_END_PHASE, {});
-      setTimeout(doRoundStart, 1000);
+      if (this._instant) {
+        doRoundStart();
+      } else {
+        setTimeout(doRoundStart, 1000);
+      }
     } else {
       doRoundStart();
     }
@@ -925,7 +950,7 @@ export class BattleEngine {
       setTimeout(() => {
         this._emitPhaseEffectEvent(EngineEvent.RESOLVE_END, { result });
       }, 5000);
-    }, 3000);
+    }, this._instant ? 1000 : 3000);
   }
 
   _triggerResolve() {
@@ -969,6 +994,17 @@ export class BattleEngine {
     // PVE 模式：装备期结束后才调度 AI
     if (this._mode === EngineMode.PVE) {
       this._scheduleAI();
+    }
+
+    // 即时模式：装备期未启动计时器，此处直接启动决策期计时
+    if (this._instant) {
+      this._timer.reset();
+      this._timer.start();
+      // start() 会设 _inEquipPhase=true，必须在之后覆写
+      this._timer._inEquipPhase = false;
+      [PlayerId.P1, PlayerId.P2].forEach(id => {
+        this._timer._paused[id] = false;
+      });
     }
   }
 
@@ -1221,6 +1257,21 @@ export class BattleEngine {
    * 引擎只负责提供操作接口（类似依赖注入），
    * 具体的时机和决策逻辑完全封装在 ai-base.js 中。
    */
+  /** 即时模式：玩家就绪后，取消 AI 当前延迟，用短延迟重调度 */
+  _accelerateAI() {
+    if (this._aiHandle) this._aiHandle.cancel();
+    this._aiHandle = accelerateAI({
+      engineState: () => this._state,
+      getState: () => ({
+        ai: { ...this._players[PlayerId.P2] },
+        player: { ...this._players[PlayerId.P1] },
+      }),
+      getHistory: () => [...this._aiHistory],
+      submitAction: (id, dec) => this.submitAction(id, dec),
+      setReady: (id) => this.setReady(id),
+    });
+  }
+
   _scheduleAI() {
     if (this._aiHandle) this._aiHandle.cancel();
 
@@ -1230,6 +1281,7 @@ export class BattleEngine {
 
     this._aiHandle = aiDriver.scheduleAI({
       engineState: () => this._state,
+      instant: this._instant,
       getState: () => ({
         ai: { ...this._players[PlayerId.P2] },
         player: { ...this._players[PlayerId.P1] },

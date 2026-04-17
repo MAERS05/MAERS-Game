@@ -202,7 +202,6 @@ function updateRing(arc, ringWrap, secEl, phaseEl, remaining, phase, ready, isOp
 
 /** 刷新 HP / 精力格 pip 状态 */
 function updatePips(prefix, current, max, type, playerState) {
-  const penalty = playerState?.staminaPenalty || 0;
   const discount = playerState?.staminaDiscount || 0;
 
   for (let i = 1; i <= max; i++) {
@@ -220,10 +219,6 @@ function updatePips(prefix, current, max, type, playerState) {
       if (idxFromRight > current) {
         el.classList.add('spent');
       }
-      // 在当前的顶部添加 penalty 的视觉（虚假扣除）
-      else if (idxFromRight > current - penalty) {
-        el.classList.add('penalty');
-      }
     }
   }
 }
@@ -232,7 +227,7 @@ function updatePips(prefix, current, max, type, playerState) {
 
 /** 当前可用于“是否还能执行一次行为/洞察”的真实剩余原始资源 */
 function getEffectiveStamina(player) {
-  return (player.stamina || 0) + (player.staminaDiscount || 0);
+  return (player.stamina || 0) + (player.staminaDiscount || 0) - (player.staminaPenalty || 0);
 }
 
 /** 统一渲染双方资源与基础状态（避免真实值/投影值显示不一致） */
@@ -807,13 +802,14 @@ engine.on(EngineEvent.ACTION_PHASE_START, () => {
     updateStatusIcons(PlayerId.P2, snap.players[PlayerId.P2]);
   }
 
-  ui.actionNotice.textContent = '双方行动中···：3s';
+  const actionDuration = gameMode === 'instant' ? 1 : 3;
+  ui.actionNotice.textContent = `双方行动中··· ${actionDuration}s`;
   ui.actionNotice.classList.add('show');
 
-  let left = 2;
+  let left = actionDuration - 1;
   const intv = setInterval(() => {
     if (left > 0) {
-      ui.actionNotice.textContent = `双方行动中···：${left}s`;
+      ui.actionNotice.textContent = `双方行动中··· ${left}s`;
       left--;
     } else {
       clearInterval(intv);
@@ -874,32 +870,42 @@ engine.on(EngineEvent.TURN_RESOLVED, result => {
 
   if (!isGameOver) {
     const hintText = ui.battleLog.querySelector('.log-hint');
-    hintText.textContent = "5s 后自动关闭";
+    const closeBtn = document.getElementById('battleLogClose');
 
-    let left = 4;
-    const intv = setInterval(() => {
-      if (left >= 0 && ui.battleLog.classList.contains('show')) {
-        hintText.textContent = `${left}s 后自动关闭`;
-        left--;
-      } else {
-        clearInterval(intv);
-      }
-    }, 1000);
+    if (gameMode === 'instant') {
+      // 即时模式：显示 X 按钮，无自动关闭
+      hintText.textContent = '';
+      closeBtn.style.display = 'flex';
+    } else {
+      // 计时模式：自动倒计时关闭
+      closeBtn.style.display = 'none';
+      hintText.textContent = "5s 后自动关闭";
 
-    setTimeout(() => {
-      if (ui.battleLog.classList.contains('show') && !isGameOver) {
-        ui.battleLog.classList.add('fade-out');
-      }
-    }, 4000);
+      let left = 4;
+      const intv = setInterval(() => {
+        if (left >= 0 && ui.battleLog.classList.contains('show')) {
+          hintText.textContent = `${left}s 后自动关闭`;
+          left--;
+        } else {
+          clearInterval(intv);
+        }
+      }, 1000);
 
-    setTimeout(() => {
-      if (ui.battleLog.classList.contains('show') && !isGameOver) {
-        ui.battleLog.classList.remove('show');
-        ui.battleLog.classList.remove('fade-out');
-        document.body.classList.remove('resolving');
-        engine.acknowledgeResolve();
-      }
-    }, 5000);
+      setTimeout(() => {
+        if (ui.battleLog.classList.contains('show') && !isGameOver) {
+          ui.battleLog.classList.add('fade-out');
+        }
+      }, 4000);
+
+      setTimeout(() => {
+        if (ui.battleLog.classList.contains('show') && !isGameOver) {
+          ui.battleLog.classList.remove('show');
+          ui.battleLog.classList.remove('fade-out');
+          document.body.classList.remove('resolving');
+          engine.acknowledgeResolve();
+        }
+      }, 5000);
+    }
 
     ui.turnIndicator.textContent = `TURN ${result.turn + 1}`;
     resetForNewTurn();
@@ -1453,8 +1459,12 @@ ui.equipOverlay.addEventListener('click', e => {
   openEffectPicker(action, slot);
 });
 
+// 全局游戏模式标记
+let gameMode = 'timed'; // 'timed' | 'instant'
+
 // 监听回合结束期（1s）
 engine.on(EngineEvent.TURN_END_PHASE, () => {
+  if (gameMode === 'instant') return; // 即时模式跳过提示
   ui.phaseIndicator.textContent = '回合结束期';
 
   ui.turnEndCountdownHint.textContent = '1s 后自动关闭';
@@ -1476,7 +1486,9 @@ engine.on(EngineEvent.TURN_END_PHASE, () => {
 
 // 监听回合开始期（1s）
 engine.on(EngineEvent.TURN_START_PHASE, () => {
-  ui.phaseIndicator.textContent = '回合开始期';
+  if (gameMode !== 'instant') {
+    ui.phaseIndicator.textContent = '回合开始期';
+  }
   ui.equipOverlayTitle.textContent = '装配期';
 
   // 回合开始：效果刚触发，双方图标均应可见
@@ -1484,26 +1496,42 @@ engine.on(EngineEvent.TURN_START_PHASE, () => {
   updateStatusIcons(PlayerId.P1, snap.players[PlayerId.P1]);
   updateStatusIcons(PlayerId.P2, snap.players[PlayerId.P2]);
 
-  ui.roundStartCountdownHint.textContent = '1s 后自动关闭';
-  ui.roundStartNotice.classList.add('show');
+  // 回合开始即重置倒计时环为满值，避免显示上回合残留值
+  updateRing(
+    ui.p1Arc, ui.p1RingWrap, ui.p1Sec, ui.p1Phase,
+    TimerConfig.DECISION_TIME, Phase.DECISION, false
+  );
 
-  let left = 1;
-  const intv = setInterval(() => {
-    left--;
-    if (left >= 0) {
-      ui.roundStartCountdownHint.textContent = `${left}s 后自动关闭`;
-    }
-  }, 1000);
+  if (gameMode !== 'instant') {
+    ui.roundStartCountdownHint.textContent = '1s 后自动关闭';
+    ui.roundStartNotice.classList.add('show');
 
-  setTimeout(() => {
-    clearInterval(intv);
-    ui.roundStartNotice.classList.remove('show');
-  }, 1000);
+    let left = 1;
+    const intv = setInterval(() => {
+      left--;
+      if (left >= 0) {
+        ui.roundStartCountdownHint.textContent = `${left}s 后自动关闭`;
+      }
+    }, 1000);
+
+    setTimeout(() => {
+      clearInterval(intv);
+      ui.roundStartNotice.classList.remove('show');
+    }, 1000);
+  }
 });
 
 // 监听装备期开始事件 → 显示覆盖面板并倒计时
 engine.on(EngineEvent.EQUIP_PHASE_START, ({ secondsLeft }) => {
-  ui.equipCountdownHint.textContent = `${secondsLeft}s 后关闭`;
+  const equipCloseBtn = document.getElementById('equipCloseBtn');
+  if (gameMode === 'instant') {
+    // 即时模式：隐藏倒计时，显示关闭按钮
+    ui.equipCountdownHint.textContent = '';
+    equipCloseBtn.style.display = 'flex';
+  } else {
+    ui.equipCountdownHint.textContent = `${secondsLeft}s 后关闭`;
+    equipCloseBtn.style.display = 'none';
+  }
   if (!ui.equipOverlay.classList.contains('active')) {
     ui.phaseIndicator.textContent = '装配期';
     ui.equipOverlay.classList.add('active');
@@ -1655,12 +1683,50 @@ if (ui.globalPauseBtn) {
 initUI();
 
 const startBtn = document.getElementById('startBtn');
+const modeSelectBox = document.getElementById('modeSelectBox');
+const modeInstantBtn = document.getElementById('modeInstantBtn');
+const modeTimedBtn = document.getElementById('modeTimedBtn');
+
 if (startBtn) {
   startBtn.classList.add('show');
-  startBtn.addEventListener('click', () => {
+  startBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
     startBtn.classList.remove('show');
-    engine.startGame();
+    // 延迟一帧再显示模式选择，防止同一次点击穿透到下层按钮
+    requestAnimationFrame(() => {
+      modeSelectBox.classList.add('show');
+    });
+  });
+
+  modeTimedBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    gameMode = 'timed';
+    modeSelectBox.classList.remove('show');
+    engine.startGame({ instant: false });
+  });
+
+  modeInstantBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    gameMode = 'instant';
+    modeSelectBox.classList.remove('show');
+    engine.startGame({ instant: true });
   });
 } else {
   engine.startGame();
 }
+
+// 即时模式：装配期手动关闭按钮
+document.getElementById('equipCloseBtn').addEventListener('click', () => {
+  engine.skipEquip();
+});
+
+// 即时模式：结算战报手动关闭按钮
+document.getElementById('battleLogClose').addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (!ui.battleLog.classList.contains('show') || isGameOver) return;
+  ui.battleLog.classList.remove('show');
+  ui.battleLog.classList.remove('fade-out');
+  document.body.classList.remove('resolving');
+  document.getElementById('battleLogClose').style.display = 'none';
+  engine.acknowledgeResolve();
+});

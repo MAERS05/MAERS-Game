@@ -48,6 +48,23 @@ export function scheduleAI(ctx) {
 }
 
 /**
+ * 即时模式加速：玩家就绪后，用短延迟快速完成 AI 决策。
+ */
+export function accelerateAI(ctx) {
+  const delay = 500 + Math.random() * 1000; // 0.5~1.5s
+  const handle = setTimeout(() => {
+    if (ctx.engineState() !== EngineState.TICKING) return;
+    const { ai, player } = ctx.getState();
+    if (ai.ready) return;
+    const getHistory = () => (ctx.getHistory ? ctx.getHistory() : []);
+    const decision = AIJudgeLayer.buildDecision(ai, player, getHistory());
+    ctx.submitAction(PlayerId.P2, decision);
+    ctx.setReady(PlayerId.P2);
+  }, delay);
+  return { cancel: () => clearTimeout(handle) };
+}
+
+/**
  * 重决策调度：已知对手底牌时，决定是否修改指令。
  */
 export function scheduleAIRedecide(ctx) {
