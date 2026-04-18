@@ -114,7 +114,7 @@ export class AIExtraLayer {
       // ── AI 攻击技能 ──
       [EffectId.BLOOD_DRINK]:  action === Action.ATTACK ? B - 0.1 + (aiLowHp ? 0.8 : 0) : -5,
       [EffectId.CHARGE]:       action === Action.ATTACK ? B       : -5,
-      [EffectId.SHATTER_POINT]:action === Action.ATTACK ? B + 0.2 : -5,
+      [EffectId.SHATTER_POINT]:action === Action.ATTACK ? B + 0.1 : -5,
       [EffectId.FRENZY]:       action === Action.ATTACK ? B + 0.1 + (aiLowHp ? -0.3 : 0) : -5,
       [EffectId.PURSUIT]:      action === Action.ATTACK ? B       + ((ai.agilityBoost || 0) > 0 ? 0.3 : 0) : -5,
 

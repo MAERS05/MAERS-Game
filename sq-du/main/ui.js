@@ -1094,8 +1094,9 @@ function updateStatusIcons(playerId, state) {
       }
 
       document.querySelectorAll('.status-tooltip').forEach(el => el.classList.remove('show'));
-      const normalizedKey = timingKey ? timingKey.toUpperCase() : null;
-      const timingLabel = normalizedKey ? (EffectTimingLabel[normalizedKey] || timingKey) : null;
+      // 先尝试将 EngineEvent 原始值（如 'turn_start_phase'）映射为时期键（如 'TURN_START'）
+      const rawKey = timingKey ? (EngineEventToTimingKey[timingKey] || timingKey).toUpperCase() : null;
+      const timingLabel = rawKey ? (EffectTimingLabel[rawKey] || timingKey) : null;
       // 四段式：名称 / 效果 / 回合 / 时期
       const parts = effectText.split('：');
       const effName = parts[0] || '';

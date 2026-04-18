@@ -1026,6 +1026,10 @@ export class BattleEngine {
       // 必须在 _applyResolveResult 之后，否则 decay 会被 result 的值覆盖
       this._emitPhaseEffectEvent(EngineEvent.ACTION_END, {});
 
+      // ── 4. ACTION_END 后效果（如泣命治愈）可能改变了 HP，同步回 result 以供死亡判定 ──
+      result.newState.p1.hp = this._players[PlayerId.P1].hp;
+      result.newState.p2.hp = this._players[PlayerId.P2].hp;
+
       this._emitPhaseEffectEvent(EngineEvent.RESOLVE_START, {});
       this._checkGameOver(result);
       this._bus.emit(EngineEvent.TURN_RESOLVED, result);
