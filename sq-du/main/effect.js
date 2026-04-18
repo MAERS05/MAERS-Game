@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 import {
   Action,
@@ -338,16 +338,31 @@ export class EffectLayer {
       selfDmg <= 0 &&
       result?.clash !== Clash.MUTUAL_HIT;
 
+    // 闪避失败：对手确实发动了攻击，且自身受到了伤害
+    const dodgeFail =
+      selfCtx?.action === Action.DODGE &&
+      oppCtx?.action === Action.ATTACK &&
+      selfDmg > 0;
+
     const guardSuccess =
       selfCtx?.action === Action.GUARD &&
       oppCtx?.action === Action.ATTACK &&
       selfDmg <= 0 &&
       result?.clash !== Clash.MUTUAL_HIT;
 
+    // 守备失败：对手确实发动了攻击，且自身受到了伤害
+    const guardFail =
+      selfCtx?.action === Action.GUARD &&
+      oppCtx?.action === Action.ATTACK &&
+      selfDmg > 0;
+
     return {
       attackSuccess: attack.success,
+      attackFail: !attack.success && selfCtx?.action === Action.ATTACK,
       dodgeSuccess,
+      dodgeFail,
       guardSuccess,
+      guardFail,
     };
   }
 
@@ -474,9 +489,9 @@ export class EffectLayer {
       } else if (p1Flags) {
         const act = p1CtxEff?.action;
         const isFail = handler.triggerOnFail;
-        if (act === Action.ATTACK && (isFail ? p1Flags.attackSuccess : !p1Flags.attackSuccess)) continue;
-        if (act === Action.DODGE  && (isFail ? p1Flags.dodgeSuccess  : !p1Flags.dodgeSuccess))  continue;
-        if (act === Action.GUARD  && (isFail ? p1Flags.guardSuccess  : !p1Flags.guardSuccess))  continue;
+        if (act === Action.ATTACK && (isFail ? !p1Flags.attackFail : !p1Flags.attackSuccess)) continue;
+        if (act === Action.DODGE  && (isFail ? !p1Flags.dodgeFail  : !p1Flags.dodgeSuccess))  continue;
+        if (act === Action.GUARD  && (isFail ? !p1Flags.guardFail  : !p1Flags.guardSuccess))  continue;
       }
       handler.onPost(p1CtxEff, p1State, p2State, p1DmgReceived, p2DmgReceived, p2CtxEff, result);
     }
@@ -489,9 +504,9 @@ export class EffectLayer {
       } else if (p2Flags) {
         const act = p2CtxEff?.action;
         const isFail = handler.triggerOnFail;
-        if (act === Action.ATTACK && (isFail ? p2Flags.attackSuccess : !p2Flags.attackSuccess)) continue;
-        if (act === Action.DODGE  && (isFail ? p2Flags.dodgeSuccess  : !p2Flags.dodgeSuccess))  continue;
-        if (act === Action.GUARD  && (isFail ? p2Flags.guardSuccess  : !p2Flags.guardSuccess))  continue;
+        if (act === Action.ATTACK && (isFail ? !p2Flags.attackFail : !p2Flags.attackSuccess)) continue;
+        if (act === Action.DODGE  && (isFail ? !p2Flags.dodgeFail  : !p2Flags.dodgeSuccess))  continue;
+        if (act === Action.GUARD  && (isFail ? !p2Flags.guardFail  : !p2Flags.guardSuccess))  continue;
       }
       handler.onPost(p2CtxEff, p2State, p1State, p2DmgReceived, p1DmgReceived, p1CtxEff, result);
     }

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file ai-maes.js
  * @description AI 定制化入口 — MAES
  *
@@ -127,7 +127,7 @@ export const MaesProfile = {
     redecideBias: 0.20,  // 重决策概率偏移（加到各情境概率上）
     speedBoostBias: 0.1,  // 先手概率偏移（正=更爱先手）
     passiveExploitBias: 1.5,   // 对手被动行为时攻击加成（蓄势/疗愈=白给）
-    effectSkipChance: 0.10,    // 10% 概率不携带效果（轻出手）
+    effectSkipChance: 0.05,    // 5% 概率不携带效果（轻出手）
   },
 };
 

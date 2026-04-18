@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 
 <head>
@@ -1165,8 +1165,17 @@
       }
 
       .status-card {
-        padding: 8px 12px;
+        padding: 8px 12px 28px 12px;
         gap: 10px;
+      }
+
+      .status-icon-tray {
+        left: 12px;
+        right: 12px;
+      }
+
+      .status-enemy .status-icon-tray {
+        right: 28px;
       }
 
       .avatar-frame {
@@ -1728,12 +1737,22 @@
 
     /* ── 状态图标栏 ──────────────────────────────────── */
     .status-icon-tray {
+      position: absolute;
+      bottom: 6px;
+      left: 20px;
+      right: 20px;
       display: flex;
-      gap: 4px;
+      gap: 3px;
       padding: 0;
-      flex-wrap: wrap;
-      width: 100%;
+      flex-wrap: nowrap;
+      overflow: hidden;
       min-height: 16px;
+      justify-content: flex-start;
+    }
+
+    .status-enemy .status-icon-tray {
+      right: 28px;
+      flex-direction: row-reverse;
     }
 
     .status-icon {
@@ -1814,9 +1833,7 @@
         <div class="avatar-frame" id="p1Avatar">
           <img src="sq-du/avatar/girl.jpg" alt="少女" style="width:100%;height:100%;object-fit:cover;">
         </div>
-        <div class="status-icon-tray" id="p1-status"
-          style="position:absolute; bottom:-22px; left:0; width:100%; justify-content:center; padding:0; min-height:16px;">
-        </div>
+
         <div class="status-tooltip" id="p1StatusTooltip"></div>
       </div>
 
@@ -1841,6 +1858,9 @@
           <button class="speed-btn" id="p1SpeedUp" title="提先手-1精力消耗">＋</button>
         </div>
       </div>
+
+      <!-- 状态图标栏（信息框底部横向单排排列） -->
+      <div class="status-icon-tray" id="p1-status"></div>
     </div>
 
     <!-- 中央回合区 -->
@@ -1858,9 +1878,7 @@
         <div class="avatar-frame" id="p2Avatar">
           <img src="sq-du/avatar/man.jpg" alt="马厄斯" style="width:100%;height:100%;object-fit:cover;">
         </div>
-        <div class="status-icon-tray" id="p2-status"
-          style="position:absolute; bottom:-22px; left:0; width:100%; justify-content:center; padding:0; min-height:16px;">
-        </div>
+
         <div class="status-tooltip" id="p2StatusTooltip"></div>
       </div>
 
@@ -1885,6 +1903,9 @@
           <span class="stat-label" style="text-align:right">先手</span>
         </div>
       </div>
+
+      <!-- 状态图标栏（信息框底部横向单排排列） -->
+      <div class="status-icon-tray" id="p2-status"></div>
 
       <!-- 对手倒计时环（完全隐藏，仅供 JS 引用） -->
       <div class="timer-ring-wrap opponent-ring" id="p2RingWrap" aria-hidden="true">

@@ -21,11 +21,11 @@ export const FuryEffect = createSkillEffect({
       phaseEvent: 'ACTION_START',
       source: 'skill:fury',
     });
-    EffectLayer.queueEffect(owner, EffectId.STIFF, {
+    EffectLayer.queueEffect(owner, EffectId.CLUMSY, {
       phaseEvent: 'ACTION_START',
       source: 'skill:fury',
     });
     EffectLayer.markFlashEffect(owner, EffectId.POWER);
-    EffectLayer.markFlashEffect(owner, EffectId.STIFF);
+    EffectLayer.markFlashEffect(owner, EffectId.CLUMSY);
   },
 });

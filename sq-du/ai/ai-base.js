@@ -408,6 +408,11 @@ export class AIBaseLogic {
       if (snap.playerStaminaRatio <= 0.3) w.heal += 1.0;
       // 绝杀窗口时不疗愈
       if (indicators.killWindow > 0 || indicators.executeWindow > 0) w.heal = -Infinity;
+      // 精力=1时疗愈会清空精力，极其危险——除非有兴奋/振奋等特殊效果抵消消耗
+      if (aiEffectiveStamina <= 1) {
+        const hasRecoverMitigation = (ai.staminaDiscount || 0) > 0 || (ai.restRecoverBonus || 0) > 0;
+        w.heal += hasRecoverMitigation ? -0.5 : -2.0;
+      }
     }
 
     // ── 行动禁用：被效果封禁的行动权重归零 ──────────

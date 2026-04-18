@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file ui.js
  * @description 博弈战斗系统 — UI 交互层
  *
@@ -24,7 +24,7 @@ import {
 } from '../base/constants.js';
 import { EffectHandlers } from '../base/effect-handlers.js';
 import { EffectLayer } from './effect.js';
-import { EffectTimingLabel, TriggerToPhaseKey } from '../effect/timing-constants.js';
+import { EffectTimingLabel, TriggerToPhaseKey, EngineEventToTimingKey } from '../effect/timing-constants.js';
 
 // ─── 常量 ─────────────────────────────────────────────
 const RING_CIRC = 226.195; // 2π × 36（SVG 弧长）

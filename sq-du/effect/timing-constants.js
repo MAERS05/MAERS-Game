@@ -22,6 +22,7 @@ export const EffectTimingLabel = Object.freeze({
   ACTION_END: '行动期结束后触发',
   // 生效类（持续到某阶段结束，两句话）
   TURN_PHASE: '回合开始后，回合结束前生效',
+  TURN_START_PHASE: '回合开始后触发',
   EQUIP_PHASE: '装配期开始后，装配期结束前生效',
   DECISION_PHASE: '决策期开始后，决策期结束前生效',
   EXPOSE_PHASE: '暴露期开始后，暴露期结束前生效',

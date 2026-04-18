@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file ai-extra.js
  * @description 博弈战斗系统 — AI 效果及扩展逻辑层
  *
@@ -113,15 +113,15 @@ export class AIExtraLayer {
       [EffectId.PARALYZE]:     action === Action.ATTACK ? B       : -5,
       // ── AI 攻击技能 ──
       [EffectId.BLOOD_DRINK]:  action === Action.ATTACK ? B - 0.1 + (aiLowHp ? 0.8 : 0) : -5,
-      [EffectId.CHARGE]:       action === Action.ATTACK ? B       : -5,
-      [EffectId.SHATTER_POINT]:action === Action.ATTACK ? B + 0.1 : -5,
-      [EffectId.FRENZY]:       action === Action.ATTACK ? B + 0.1 + (aiLowHp ? -0.3 : 0) : -5,
+      [EffectId.CHARGE]:       action === Action.ATTACK ? B       + ((ai.chargeBoost || 0) > 0 ? -0.6 : 0) + (ai.stamina >= 3 ? 0.3 : 0) + (playerLowHp ? -0.4 : 0) : -5,
+      [EffectId.SHATTER_POINT]:action === Action.ATTACK ? B       + (player?.healBlocked ? -0.6 : 0) + (playerLowHp ? 0.3 : 0) : -5,
+      [EffectId.FRENZY]:       action === Action.ATTACK ? B + 0.1 : -5,
       [EffectId.PURSUIT]:      action === Action.ATTACK ? B       + ((ai.agilityBoost || 0) > 0 ? 0.3 : 0) : -5,
 
       // ── 共享守备技能 ──
       [EffectId.RESTORE]:      action === Action.GUARD  ? B - 0.1 + (aiLowHp ? 0.6 : 0) : -5,
-      [EffectId.SHOCKWAVE]:    action === Action.GUARD  ? B + 0.1 : -5,
-      [EffectId.MUSTER]:       action === Action.GUARD  ? B       : -5,
+      [EffectId.SHOCKWAVE]:    action === Action.GUARD  ? B + 0.1 + ((player?.ptsDebuff || 0) > 0 ? -0.5 : 0) : -5,
+      [EffectId.MUSTER]:       action === Action.GUARD  ? B       + (readBonus(ai.attackPtsBonus) > 0 ? -0.5 : 0) + (ai.stamina <= 2 ? 0.3 : 0) : -5,
       // ── AI 守备技能 ──
       [EffectId.STEADY]:       action === Action.GUARD  ? B + 0.1 + ((ai.guardBoost || 0) > 0 ? -0.6 : 0) : -5,
       [EffectId.INVIGORATE]:   action === Action.GUARD  ? B       + ((ai.staminaDiscount || 0) > 0 ? -0.4 : 0) : -5,
@@ -129,12 +129,12 @@ export class AIExtraLayer {
 
       // ── 共享闪避技能 ──
       [EffectId.LURE]:         action === Action.DODGE  ? B + 0.1 : -5,
-      [EffectId.SEE_THROUGH]:  action === Action.DODGE  ? B       : -5,
-      [EffectId.NIMBLE]:       action === Action.DODGE  ? B       : -5,
+      [EffectId.SEE_THROUGH]:  action === Action.DODGE  ? B       + (ai.speedAdjustBlocked ? -0.4 : 0) : -5,
+      [EffectId.NIMBLE]:       action === Action.DODGE  ? B       + (ai.speedAdjustBlocked ? -0.5 : 0) : -5,
       // ── AI 闪避技能 ──
       [EffectId.DISARM]:       action === Action.DODGE  ? B       + ((player?.guardBoost || 0) > 0 ? 0.4 : 0) + ((player?.crackedArmor || 0) > 0 ? -0.5 : 0) : -5,
-      [EffectId.EQUITY]:       action === Action.DODGE  ? B - 0.1 : -5,
-      [EffectId.FURY]:         action === Action.DODGE  ? B       : -5,
+      [EffectId.EQUITY]:       action === Action.DODGE  ? B       + (aiLowHp ? 0.3 : 0) + ((player?.dodgeBoost || 0) > 0 ? -0.3 : 0) : -5,
+      [EffectId.FURY]:         action === Action.DODGE  ? B       + (aiLowHp ? -0.5 : 0) + (ai.hp >= 3 ? 0.3 : 0) : -5,
     };
 
     let total = score + (byId[id] ?? 0);
