@@ -442,7 +442,8 @@ export class AIBaseLogic {
 
   static pickSpeed(snap, action, ai) {
     const BASE = DefaultStats.BASE_SPEED;
-    if (action === Action.STANDBY) return BASE;
+    // 就绪/蓄备行为无先手收益，不提速
+    if (action === Action.READY || action === Action.PREPARE) return BASE;
 
     const aiEffectiveStamina = this.getEffectiveStamina(ai);
     const availableForBoost = aiEffectiveStamina - 1;

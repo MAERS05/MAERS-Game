@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file ai-judge.js
  * @description 博弈战斗系统 — AI 决策整合层（纯编排，无策略逻辑）
  *
@@ -42,7 +42,13 @@ export class AIJudgeLayer {
       { action, enhance, speed, effects },
       { ai, player, history, revealedAction: null, isRedecide: false }
     );
-    return maesConstrainDecision(base, { ai, player, history, revealedAction: null, isRedecide: false });
+    const final = maesConstrainDecision(base, { ai, player, history, revealedAction: null, isRedecide: false });
+
+    // 约束层可能将 action 改为被动行为（如蓄力→蓄备），此时先手无意义，重置以节省精力
+    if (final.action === Action.READY || final.action === Action.PREPARE) {
+      final.speed = DefaultStats.BASE_SPEED;
+    }
+    return final;
   }
 
   /**
@@ -73,7 +79,13 @@ export class AIJudgeLayer {
       { action, enhance, speed, effects },
       { ai, player, history, revealedAction, isRedecide: true }
     );
-    return maesConstrainDecision(base, { ai, player, history, revealedAction, isRedecide: true });
+    const final = maesConstrainDecision(base, { ai, player, history, revealedAction, isRedecide: true });
+
+    // 约束层可能将 action 改为被动行为，此时先手无意义，重置以节省精力
+    if (final.action === Action.READY || final.action === Action.PREPARE) {
+      final.speed = DefaultStats.BASE_SPEED;
+    }
+    return final;
   }
 
   /**

@@ -1,4 +1,4 @@
-﻿import {
+import {
   Action,
   Clash,
   ClashName,
@@ -31,11 +31,27 @@ export class JudgeLayer {
 
     const log = this._executeTimeline(timeline, bs);
 
+    // 先手蓄势预恢复：蓄势先手 > 对方 → 精力在战斗前恢复，影响处决判定
+    let p1Eff = p1EntryEffective;
+    let p2Eff = p2EntryEffective;
+    if (p1CtxEff.action === Action.STANDBY && p1CtxEff.speed > p2CtxEff.speed
+        && !p1State.restRecoverBlocked && !p1State.staminaGainBlocked) {
+      const rec = Math.max(0, 1 + (p1State.restRecoverBonus || 0) + (p1State.permRestRecoverBonus || 0)
+                               - (p1State.restRecoverPenalty || 0) - (p1State.permRestRecoverPenalty || 0));
+      p1Eff += rec;
+    }
+    if (p2CtxEff.action === Action.STANDBY && p2CtxEff.speed > p1CtxEff.speed
+        && !p2State.restRecoverBlocked && !p2State.staminaGainBlocked) {
+      const rec = Math.max(0, 1 + (p2State.restRecoverBonus || 0) + (p2State.permRestRecoverBonus || 0)
+                               - (p2State.restRecoverPenalty || 0) - (p2State.permRestRecoverPenalty || 0));
+      p2Eff += rec;
+    }
+
     const derived = this._deriveClash(
       log, p1CtxEff, p2CtxEff, p1State, p2State,
       bs[PlayerId.P1].dmgReceived,
       bs[PlayerId.P2].dmgReceived,
-      p1EntryEffective, p2EntryEffective
+      p1Eff, p2Eff
     );
 
     return { log, bs, derived };
@@ -197,7 +213,7 @@ export class JudgeLayer {
     const actName = this._getActName(ctx.action);
     const pronoun = isP1 ? '你' : '敌方';
     if (ctx.action === Action.STANDBY || ctx.action === Action.HEAL || ctx.action === Action.READY || ctx.action === Action.PREPARE) {
-      return `${pronoun}执行了${actName}`;
+      return `${pronoun}执行了${actName}(先手${ctx.speed})`;
     }
     return `${pronoun}执行了${actName}(先手${ctx.speed}，点数${ctx.pts})`;
   }
@@ -474,26 +490,41 @@ export class JudgeLayer {
     clash, clashDesc, damageToP1, damageToP2, executeP1, executeP2,
     p1ExposedEffects, p2ExposedEffects
   ) {
-    // 命数结算
-    const rawP1Hp = p1State.hp - damageToP1;
-    const rawP2Hp = p2State.hp - damageToP2;
+    // 识破时行动被取消
+    const isInsightClash = clash === Clash.INSIGHT_CLASH;
+
+    // ═══ 先手恢复时序 ═══
+    // 蓄势/疗愈的恢复默认在回合结束后生效（先伤后愈）。
+    // 但若先手高于对方，恢复提前到战斗前生效（先愈后伤），可避免处决/击杀。
+
+    // ── 疗愈恢复量（不含时序）──
+    const p1HealBase = (!isInsightClash && p1Ctx.action === Action.HEAL && !p1State.healRecoverBlocked && !p1State.hpGainBlocked)
+      ? Math.max(0, 1 + (p1State.healRecoverBonus || 0) + (p1State.permHealRecoverBonus || 0)
+                     - (p1State.healRecoverPenalty || 0) - (p1State.permHealRecoverPenalty || 0)) : 0;
+    const p2HealBase = (!isInsightClash && p2Ctx.action === Action.HEAL && !p2State.healRecoverBlocked && !p2State.hpGainBlocked)
+      ? Math.max(0, 1 + (p2State.healRecoverBonus || 0) + (p2State.permHealRecoverBonus || 0)
+                     - (p2State.healRecoverPenalty || 0) - (p2State.permHealRecoverPenalty || 0)) : 0;
+
+    // 疗愈先手判定：先手 > 对方 → 先愈后伤（处决时不适用——处决是精力耗尽必杀）
+    const p1HealPre = (p1HealBase > 0 && !executeP1 && p1Ctx.speed > p2Ctx.speed) ? p1HealBase : 0;
+    const p2HealPre = (p2HealBase > 0 && !executeP2 && p2Ctx.speed > p1Ctx.speed) ? p2HealBase : 0;
+    const p1HealPost = p1HealBase - p1HealPre;  // 剩余在战斗后恢复
+    const p2HealPost = p2HealBase - p2HealPre;
+
+    // 命数结算（先愈后伤 → 先加预恢复再扣伤害）
+    const rawP1Hp = p1State.hp + p1HealPre - damageToP1;
+    const rawP2Hp = p2State.hp + p2HealPre - damageToP2;
     const newP1Hp = Math.max(0, rawP1Hp);
     const newP2Hp = Math.max(0, rawP2Hp);
     // 命数负溢出：伤害超过剩余命数
     const p1HpOverkill = rawP1Hp < 0 ? -rawP1Hp : 0;
     const p2HpOverkill = rawP2Hp < 0 ? -rawP2Hp : 0;
 
-    // 识破时行动被取消
-    const isInsightClash = clash === Clash.INSIGHT_CLASH;
 
     // 命数正溢出（回血超上限）
-    // 疗愈行动：先伤后愈 —— 伤害致死则疗愈无效
-    const p1HealAmount = (newP1Hp > 0 && !isInsightClash && p1Ctx.action === Action.HEAL && !p1State.healRecoverBlocked && !p1State.hpGainBlocked)
-      ? Math.max(0, 1 + (p1State.healRecoverBonus || 0) + (p1State.permHealRecoverBonus || 0)
-                     - (p1State.healRecoverPenalty || 0) - (p1State.permHealRecoverPenalty || 0)) : 0;
-    const p2HealAmount = (newP2Hp > 0 && !isInsightClash && p2Ctx.action === Action.HEAL && !p2State.healRecoverBlocked && !p2State.hpGainBlocked)
-      ? Math.max(0, 1 + (p2State.healRecoverBonus || 0) + (p2State.permHealRecoverBonus || 0)
-                     - (p2State.healRecoverPenalty || 0) - (p2State.permHealRecoverPenalty || 0)) : 0;
+    // 疗愈后置部分：仅存活时生效（先伤后愈路径 / 先愈后伤路径的剩余量）
+    const p1HealAmount = (newP1Hp > 0) ? p1HealPost : 0;
+    const p2HealAmount = (newP2Hp > 0) ? p2HealPost : 0;
     const rawP1HealedHp = newP1Hp + (p1State.hpGainBlocked ? 0 : (p1State.hpBonus || 0)) + p1HealAmount;
     const p1HpOverflow = rawP1HealedHp > DefaultStats.MAX_HP ? rawP1HealedHp - DefaultStats.MAX_HP : 0;
     const finalP1Hp = Math.min(DefaultStats.MAX_HP, rawP1HealedHp);
@@ -501,16 +532,23 @@ export class JudgeLayer {
     const p2HpOverflow = rawP2HealedHp > DefaultStats.MAX_HP ? rawP2HealedHp - DefaultStats.MAX_HP : 0;
     const finalP2Hp = Math.min(DefaultStats.MAX_HP, rawP2HealedHp);
 
-    // 精力结算（行动精力消耗在此处统一扣除，resolve 接收的是扣费前精力）
-    const p1ActionCost = isInsightClash ? 0 : (p1Ctx.cost || 0);
-    const p2ActionCost = isInsightClash ? 0 : (p2Ctx.cost || 0);
-    // 仅蓄势恢复精力，就绪不恢复；识破时行动取消，蓄势也不生效
-    const p1Recovery = (!isInsightClash && p1Ctx.action === Action.STANDBY && !p1State.restRecoverBlocked && !p1State.staminaGainBlocked)
+    // ── 蓄势恢复量（不含时序）──
+    const p1RecoveryBase = (!isInsightClash && p1Ctx.action === Action.STANDBY && !p1State.restRecoverBlocked && !p1State.staminaGainBlocked)
       ? Math.max(0, 1 + (p1State.restRecoverBonus || 0) + (p1State.permRestRecoverBonus || 0)
                      - (p1State.restRecoverPenalty || 0) - (p1State.permRestRecoverPenalty || 0)) : 0;
-    const p2Recovery = (!isInsightClash && p2Ctx.action === Action.STANDBY && !p2State.restRecoverBlocked && !p2State.staminaGainBlocked)
+    const p2RecoveryBase = (!isInsightClash && p2Ctx.action === Action.STANDBY && !p2State.restRecoverBlocked && !p2State.staminaGainBlocked)
       ? Math.max(0, 1 + (p2State.restRecoverBonus || 0) + (p2State.permRestRecoverBonus || 0)
                      - (p2State.restRecoverPenalty || 0) - (p2State.permRestRecoverPenalty || 0)) : 0;
+
+    // 蓄势先手判定：先手 > 对方 → 精力在战斗前恢复（影响处决判定）
+    const p1RestPre = (p1RecoveryBase > 0 && p1Ctx.speed > p2Ctx.speed) ? p1RecoveryBase : 0;
+    const p2RestPre = (p2RecoveryBase > 0 && p2Ctx.speed > p1Ctx.speed) ? p2RecoveryBase : 0;
+
+    // 精力结算
+    const p1ActionCost = isInsightClash ? 0 : (p1Ctx.cost || 0);
+    const p2ActionCost = isInsightClash ? 0 : (p2Ctx.cost || 0);
+    const p1Recovery = p1RecoveryBase;  // 总恢复量不变
+    const p2Recovery = p2RecoveryBase;
     const rawP1Stamina = p1State.stamina - p1ActionCost + (p1State.staminaGainBlocked ? 0 : (p1State.staminaBonus || 0)) + p1Recovery;
     const newP1Stamina = Math.min(DefaultStats.MAX_STAMINA, Math.max(0, rawP1Stamina));
     const p1StaminaBonusOverflow = rawP1Stamina > DefaultStats.MAX_STAMINA ? rawP1Stamina - DefaultStats.MAX_STAMINA : 0;
