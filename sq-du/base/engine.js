@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file engine.js
  * @description 博弈战斗系统 — 战斗引擎（状态机 + 事件总线）
  *
@@ -291,6 +291,7 @@ export class BattleEngine {
   constructor(mode = EngineMode.PVE, options = {}) {
     this._mode = mode;
     this._instant = options.instant || false;
+    this._noEffects = options.noEffects || false;
     this._bus = new EventBus();
     this._state = EngineState.IDLE;
     this._turn = 0;
@@ -351,6 +352,19 @@ export class BattleEngine {
   startGame(options = {}) {
     if (this._state !== EngineState.IDLE) return;
     if (options.instant != null) this._instant = options.instant;
+    if (options.noEffects != null) this._noEffects = options.noEffects;
+
+    // 普通模式：清除双方已应用的永久数值加值
+    if (this._noEffects) {
+      [PlayerId.P1, PlayerId.P2].forEach(id => {
+        const p = this._players[id];
+        p.attackPtsBonus = 0;
+        p.guardPtsBonus = 0;
+        p.dodgePtsBonus = 0;
+        p.speedBonus = 0;
+      });
+    }
+
     this._beginTurn();
   }
 
@@ -733,6 +747,17 @@ export class BattleEngine {
     // 重新应用定制化（玩家 P1 / AI P2）
     applyPlayerCustomization(this._players[PlayerId.P1]);
     applyMaesAI(this._players[PlayerId.P2]);
+
+    // 普通模式：清除永久数值加值
+    if (this._noEffects) {
+      [PlayerId.P1, PlayerId.P2].forEach(id => {
+        const p = this._players[id];
+        p.attackPtsBonus = 0;
+        p.guardPtsBonus = 0;
+        p.dodgePtsBonus = 0;
+        p.speedBonus = 0;
+      });
+    }
 
     this._bus.emit(EngineEvent.STATE_CHANGED, { state: EngineState.IDLE });
     this.startGame();

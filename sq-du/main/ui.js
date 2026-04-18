@@ -1764,6 +1764,24 @@ modeInstantBtn.addEventListener('click', (e) => {
   engine.startGame({ instant: true });
 });
 
+// 普通模式（无技能）
+const modeNormalTimedBtn = document.getElementById('modeNormalTimedBtn');
+const modeNormalInstantBtn = document.getElementById('modeNormalInstantBtn');
+
+modeNormalTimedBtn?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  gameMode = 'timed';
+  closeModeSelect();
+  engine.startGame({ instant: false, noEffects: true });
+});
+
+modeNormalInstantBtn?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  gameMode = 'instant';
+  closeModeSelect();
+  engine.startGame({ instant: true, noEffects: true });
+});
+
 // 即时模式：装配期手动关闭按钮
 document.getElementById('equipCloseBtn').addEventListener('click', () => {
   engine.skipEquip();
