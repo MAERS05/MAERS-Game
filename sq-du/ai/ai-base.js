@@ -102,7 +102,7 @@ export class AIBaseLogic {
       : DefaultStats.MAX_STAMINA;
     const oppAggression = recent.length
       ? recent.filter(h => h.opponentAction === Action.ATTACK).length / recent.length
-      : 0.33;
+      : 0;  // 第一回合无数据：基础层保持中性，差异化由 AI 定制层（tuning）决定
     const lastAction = recent.length ? recent[recent.length - 1].opponentAction : null;
     const lastOppStamina = recent.length
       ? recent[recent.length - 1].opponentStamina ?? DefaultStats.MAX_STAMINA
@@ -172,7 +172,7 @@ export class AIBaseLogic {
   // ═══════════════════════════════════════════════════════════
 
   static pickAction(snap, ai) {
-    const w = { attack: 1.0, guard: 1.0, dodge: 1.0, standby: 0.2, heal: 0.0 };
+    const w = { attack: 1.0, guard: 1.0, dodge: 1.0, standby: 1.0, heal: 1.0 };
 
     const aiEffectiveStamina = this.getEffectiveStamina(ai);
     const indicators = this.buildIndicators(snap, aiEffectiveStamina);
@@ -182,6 +182,8 @@ export class AIBaseLogic {
     w.attack += tuning.attackBias || 0;
     w.guard += tuning.guardBias || 0;
     w.dodge += tuning.dodgeBias || 0;
+    w.standby += tuning.standbyBias || 0;
+    w.heal += tuning.healBias || 0;
 
     // ── 处决窗口（对手真实精力耗尽）：果断出击 ──────
     if (indicators.executeWindow > 0) {

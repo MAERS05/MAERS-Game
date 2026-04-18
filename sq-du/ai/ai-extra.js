@@ -103,6 +103,7 @@ export class AIExtraLayer {
     const aiLowHp = ai.hp <= AI_EFFECT_LOW_HP_THRESHOLD;
     const playerLowHp = player ? player.hp <= 2 : false;
     const playerLowStamina = player ? player.stamina <= 1 : false;
+    const isEarlyGame = !scene?.isRedecide && (!ai._aiHistory || ai._aiHistory.length <= 1);
     const score = 1;
 
     // ── 基础权重（B）：所有技能拉平至 1.3~1.5 ──
@@ -113,7 +114,7 @@ export class AIExtraLayer {
       [EffectId.PARALYZE]:     action === Action.ATTACK ? B       : -5,
       // ── AI 攻击技能 ──
       [EffectId.BLOOD_DRINK]:  action === Action.ATTACK ? B - 0.1 + (aiLowHp ? 0.8 : 0) : -5,
-      [EffectId.CHARGE]:       action === Action.ATTACK ? B       + ((ai.chargeBoost || 0) > 0 ? -0.6 : 0) + (ai.stamina >= 3 ? 0.3 : 0) + (playerLowHp ? -0.4 : 0) : -5,
+      [EffectId.CHARGE]:       action === Action.ATTACK ? B + 0.1 + ((ai.chargeBoost || 0) > 0 ? -0.6 : 0) + (playerLowHp ? -0.4 : 0) + (isEarlyGame ? -0.2 : 0) : -5,
       [EffectId.SHATTER_POINT]:action === Action.ATTACK ? B       + (player?.healBlocked ? -0.6 : 0) + (playerLowHp ? 0.3 : 0) : -5,
       [EffectId.FRENZY]:       action === Action.ATTACK ? B + 0.1 : -5,
       [EffectId.PURSUIT]:      action === Action.ATTACK ? B       + ((ai.agilityBoost || 0) > 0 ? 0.3 : 0) : -5,
@@ -123,7 +124,7 @@ export class AIExtraLayer {
       [EffectId.SHOCKWAVE]:    action === Action.GUARD  ? B + 0.1 + ((player?.ptsDebuff || 0) > 0 ? -0.5 : 0) : -5,
       [EffectId.MUSTER]:       action === Action.GUARD  ? B       + (readBonus(ai.attackPtsBonus) > 0 ? -0.5 : 0) + (ai.stamina <= 2 ? 0.3 : 0) : -5,
       // ── AI 守备技能 ──
-      [EffectId.STEADY]:       action === Action.GUARD  ? B + 0.1 + ((ai.guardBoost || 0) > 0 ? -0.6 : 0) : -5,
+      [EffectId.STEADY]:       action === Action.GUARD  ? B + 0.1 + ((ai.guardBoost || 0) > 0 ? -0.6 : 0) + (isEarlyGame ? -0.2 : 0) : -5,
       [EffectId.INVIGORATE]:   action === Action.GUARD  ? B       + ((ai.staminaDiscount || 0) > 0 ? -0.4 : 0) : -5,
       [EffectId.TREMOR]:       action === Action.GUARD  ? B + 0.1 : -5,
 
