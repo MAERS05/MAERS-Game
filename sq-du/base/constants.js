@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file constants.js
  * @description 博弈战斗系统 — 核心常量与枚举定义
  * 
@@ -80,11 +80,11 @@ export const Clash = Object.freeze({
   MUTUAL_STANDBY: 'MUTUAL_STANDBY',       // 相持
   /** 一方攻击另一方蓄势 */
   ONE_SIDE_ATTACK: 'ONE_SIDE_ATTACK',      // 遇袭
-  /** 双方攻击，动速、点数均相同 */
+  /** 双方攻击，先手、点数均相同 */
   CONFRONT: 'CONFRONT',                    // 交击
-  /** 双方攻击，动速不同（速度高的先攻，速度低的后攻） */
+  /** 双方攻击，先手不同（先手高的先攻，先手低的后攻） */
   PREEMPT: 'PREEMPT',                      // 错击
-  /** 双方攻击，动速相同，一方点数大于另一方（仅点数大的造成攻击） */
+  /** 双方攻击，先手相同，一方点数大于另一方（仅点数大的造成攻击） */
   SUPPRESS: 'SUPPRESS',                    // 压制
   /** 对方精力为 0 时发动攻击，直接清空命数 */
   EXECUTE: 'EXECUTE',                      // 处决
@@ -96,15 +96,15 @@ export const Clash = Object.freeze({
   RETREAT: 'RETREAT',                      // 退让
   /** 一方闪避，一方守备 */
   PROBE: 'PROBE',                          // 试探
-  /** 守备速度低于攻击速度，攻击方造成攻击 */
+  /** 守备先手低于攻击先手，攻击方造成攻击 */
   RAID: 'RAID',                            // 突击
-  /** 守备点数 ≥ 攻击点数 且 守备速度 ≥ 攻击速度，守备方抵抗掉攻击 */
+  /** 守备点数 ≥ 攻击点数 且 守备先手 ≥ 攻击先手，守备方抵抗掉攻击 */
   FORTIFY: 'FORTIFY',                      // 稳固
-  /** 守备点数 < 攻击点数 且 守备速度 ≥ 攻击速度，攻击方造成攻击 */
+  /** 守备点数 < 攻击点数 且 守备先手 ≥ 攻击先手，攻击方造成攻击 */
   BREAK: 'BREAK',                          // 破甲
-  /** 闪避速度低于攻击速度，攻击方造成攻击 */
+  /** 闪避先手低于攻击先手，攻击方造成攻击 */
   SWIFT_STRIKE: 'SWIFT_STRIKE',            // 迅攻
-  /** 闪避速度 > 攻击速度，闪避方躲开攻击 */
+  /** 闪避先手 > 攻击先手，闪避方躲开攻击 */
   EVADE: 'EVADE',                          // 迅闪
   /** 同速，闪避点数 > 攻击点数，闪避方躲开攻击 */
   DODGE_OUTMANEUVERED: 'DODGE_OUTMANEUVERED', // 规避
@@ -208,7 +208,7 @@ export const Phase = Object.freeze({
 export const DefaultStats = Object.freeze({
   MAX_HP: 3,      // 命数上限
   MAX_STAMINA: 3,  // 精力上限
-  BASE_SPEED: 1,   // 基础动速
+  BASE_SPEED: 1,   // 基础先手
   MAX_PTS: 3,      // 行为点数上限（攻击/守备/闪避）
   MIN_PTS: 0,      // 行为点数下限
 });
@@ -596,7 +596,7 @@ export function readBonus(val) {
  * @typedef {Object} ActionCtx
  * @property {string}   action
  * @property {number}   enhance   - 强化次数
- * @property {number}   speed     - 当前动速
+ * @property {number}   speed     - 当前先手
  * @property {number}   pts       - 点数（attack/guard: 1+enhance, dodge: 1+enhance）
  * @property {number}   cost
  * @property {boolean}  insightUsed
@@ -609,7 +609,7 @@ export function readBonus(val) {
  * @property {string}  id          - PlayerId
  * @property {number}  hp          - 当前命数
  * @property {number}  stamina     - 当前精力
- * @property {number}  speed       - 当前动速（回合内数值）
+ * @property {number}  speed       - 当前先手（回合内数值）
  * @property {boolean} ready       - 是否已就绪
  * @property {boolean} insightUsed - 本回合是否已使用主动洞察
  * @property {boolean} wasInsighted - 本回合是否经历了洞察（主动或被动）

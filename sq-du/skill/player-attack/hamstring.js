@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 import { Action, EffectId } from '../../base/constants.js';
 import { createSkillEffect } from '../../effect/function/skill-factory.js';
@@ -6,7 +6,7 @@ import { EffectLayer } from '../../main/effect.js';
 
 /**
  * 断筋（玩家专属攻击技能）
- * 攻击命中时，为对方附加1级[沉重]，持续2回合（动速-1）。
+ * 攻击命中时，为对方附加1级[沉重]，持续2回合（先手-1）。
  */
 export const HamstringEffect = createSkillEffect({
   id: EffectId.HAMSTRING,

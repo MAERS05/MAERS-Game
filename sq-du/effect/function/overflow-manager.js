@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 import { DefaultStats, EngineEvent } from '../../base/constants.js';
 
@@ -13,8 +13,8 @@ import { DefaultStats, EngineEvent } from '../../base/constants.js';
  *  - 命数负溢出 → 下回合行动期后 创伤(n)
  *  - 精力正溢出 → 下回合开始 兴奋(n)
  *  - 精力负溢出 → 下回合开始 疲惫(n)
- *  - 动速正溢出 → 下回合开始 轻盈(n)
- *  - 动速负溢出 → 下回合开始 沉重(n)
+ *  - 先手正溢出 → 下回合开始 轻盈(n)
+ *  - 先手负溢出 → 下回合开始 沉重(n)
  *  - 攻击正溢出 → 下回合开始 力量(n)
  *  - 攻击负溢出 → 下回合开始 虚弱(n)
  *  - 守备正溢出 → 下回合开始 坚固(n)
@@ -48,7 +48,7 @@ const OVERFLOW_MAP = Object.freeze({
     positiveTiming: EngineEvent.TURN_START_PHASE,
     negativeTiming: EngineEvent.TURN_START_PHASE,
   },
-  // 动速溢出
+  // 先手溢出
   speed: {
     overflowField: 'speedOverflow',
     underflowField: 'speedUnderflow',

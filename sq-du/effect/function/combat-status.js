@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 import { Action } from '../../base/constants.js';
 import { createStatusEffect } from './status-factory.js';
@@ -6,7 +6,7 @@ import { createStatusEffect } from './status-factory.js';
 export const HeavyEffect = createStatusEffect({
   id: 'heavy',
   name: '沉重',
-  desc: '动速 -1',
+  desc: '先手 -1',
   applicableTo: [Action.ATTACK, Action.GUARD, Action.DODGE],
   timingDisplay: 'phase',
   apply(state) {
@@ -17,7 +17,7 @@ export const HeavyEffect = createStatusEffect({
 export const LightEffect = createStatusEffect({
   id: 'light',
   name: '轻盈',
-  desc: '动速 +1',
+  desc: '先手 +1',
   applicableTo: [Action.ATTACK, Action.GUARD, Action.DODGE],
   timingDisplay: 'phase',
   apply(state) {
@@ -28,7 +28,7 @@ export const LightEffect = createStatusEffect({
 export const ShackledEffect = createStatusEffect({
   id: 'shackled',
   name: '禁锢',
-  desc: '无法提升动速',
+  desc: '无法提升先手',
   applicableTo: [Action.ATTACK, Action.GUARD, Action.DODGE],
   timingDisplay: 'phase',
   apply(state) {

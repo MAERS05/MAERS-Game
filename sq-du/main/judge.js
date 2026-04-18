@@ -1,4 +1,4 @@
-import {
+﻿import {
   Action,
   Clash,
   ClashName,
@@ -134,10 +134,10 @@ export class JudgeLayer {
       const best = target.evasions.reduce((b, e) => e.speed > b.speed ? e : b);
 
       if (best.speed > attack.speed) {
-        // 迅闪：闪避速度 > 攻击速度
+        // 迅闪：闪避先手 > 攻击先手
         log.push({ kind: 'EVADE', attackerId: attack.actorId, dodgerId: attack.targetId, atkSpeed: attack.speed, dodgeSpeed: best.speed, dodgePts: best.pts, atkPts: attack.pts });
       } else if (best.speed < attack.speed) {
-        // 迅攻：闪避速度 < 攻击速度
+        // 迅攻：闪避先手 < 攻击先手
         bs[attack.targetId].dmgReceived += 1;
         log.push({ kind: 'SWIFT_STRIKE', attackerId: attack.actorId, dodgerId: attack.targetId, atkSpeed: attack.speed, dodgeSpeed: best.speed, dodgePts: best.pts, atkPts: attack.pts });
       } else {
@@ -157,11 +157,11 @@ export class JudgeLayer {
       return;
     }
 
-    // ── 守备判定：必须守备速度 ≥ 攻击速度 才能进入稳固/破甲，否则为突击 ──
+    // ── 守备判定：必须守备先手 ≥ 攻击先手 才能进入稳固/破甲，否则为突击 ──
     if (target.shields.length > 0) {
       const best = target.shields.reduce((b, s) => s.pts > b.pts ? s : b);
       if (best.speed >= attack.speed) {
-        // 守备速度 ≥ 攻击速度
+        // 守备先手 ≥ 攻击先手
         if (best.pts >= attack.pts) {
           // 稳固：守备点数 ≥ 攻击点数
           log.push({ kind: 'FORTIFY', attackerId: attack.actorId, defenderId: attack.targetId, shieldPts: best.pts, shieldSpeed: best.speed, atkPts: attack.pts, atkSpeed: attack.speed });
@@ -171,7 +171,7 @@ export class JudgeLayer {
           log.push({ kind: 'BREAK', attackerId: attack.actorId, defenderId: attack.targetId, shieldPts: best.pts, shieldSpeed: best.speed, atkPts: attack.pts, atkSpeed: attack.speed });
         }
       } else {
-        // 突击：守备速度 < 攻击速度
+        // 突击：守备先手 < 攻击先手
         bs[attack.targetId].dmgReceived += 1;
         log.push({ kind: 'RAID', attackerId: attack.actorId, defenderId: attack.targetId, shieldPts: best.pts, shieldSpeed: best.speed, atkPts: attack.pts, atkSpeed: attack.speed });
       }
@@ -199,7 +199,7 @@ export class JudgeLayer {
     if (ctx.action === Action.STANDBY || ctx.action === Action.HEAL || ctx.action === Action.READY || ctx.action === Action.PREPARE) {
       return `${pronoun}执行了${actName}`;
     }
-    return `${pronoun}执行了${actName}(动速${ctx.speed}，点数${ctx.pts})`;
+    return `${pronoun}执行了${actName}(先手${ctx.speed}，点数${ctx.pts})`;
   }
 
   static _deriveClash(log, p1Ctx, p2Ctx, p1State, p2State, rawDmgP1, rawDmgP2, p1EntryEffective = 0, p2EntryEffective = 0) {
@@ -554,7 +554,7 @@ export class JudgeLayer {
     p1NewState.staminaUnderflow = p1StaminaUnderflow;
     p2NewState.staminaOverflow = p2StaminaBonusOverflow;
     p2NewState.staminaUnderflow = p2StaminaUnderflow;
-    // 攻击/守备/闪避/动速溢出（由 effect.js processPreEffects → clampPts 写入 p1State/p2State，
+    // 攻击/守备/闪避/先手溢出（由 effect.js processPreEffects → clampPts 写入 p1State/p2State，
     // _buildPlayerNewState 创建的是新对象不含这些字段，必须手动复制）
     p1NewState.attackPtsOverflow = p1State.attackPtsOverflow || 0;
     p1NewState.attackPtsUnderflow = p1State.attackPtsUnderflow || 0;

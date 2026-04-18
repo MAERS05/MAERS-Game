@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 import { Action, EffectId } from '../../base/constants.js';
 import { createSkillEffect } from '../../effect/function/skill-factory.js';
@@ -6,7 +6,7 @@ import { EffectLayer } from '../../main/effect.js';
 
 /**
  * 轻身（共享闪避技能）
- * 若闪避成功（未受伤），为自身附加1级[轻盈]（动速+1），下回合开始后触发。
+ * 若闪避成功（未受伤），为自身附加1级[轻盈]（先手+1），下回合开始后触发。
  */
 export const NimbleEffect = createSkillEffect({
   id: EffectId.NIMBLE,

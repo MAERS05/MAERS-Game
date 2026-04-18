@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file engine.js
  * @description 博弈战斗系统 — 战斗引擎（状态机 + 事件总线）
  *
@@ -128,7 +128,7 @@ function createPlayerState(id, overrides = {}) {
     pendingPassiveReveal: false,
     canRedecide: false,
     didRedecide: false,
-    speedDiscountSpent: 0,                        // 本回合因提速消耗的 discount 计数
+    speedDiscountSpent: 0,                        // 本回合因先手消耗的 discount 计数
     actionDiscountSpent: 0,                       // 本回合因行动成本消耗的 discount 计数
 
     // ═══════════════════════════════════════════
@@ -162,10 +162,10 @@ function createPlayerState(id, overrides = {}) {
     dodgeBoost: 0,                                // 闪避点数增益（一次性消费）
     dodgePtsBonus: 0,                             // 闪避点数加值（N | { value, turns }）
     dodgeDebuff: 0,                               // 闪避点数减益
-    // 动速
-    agilityBoost: 0,                              // 动速增益
-    agilityDebuff: 0,                             // 动速减益
-    speedBonus: 0,                                // 动速加值（N | { value, turns }）
+    // 先手
+    agilityBoost: 0,                              // 先手增益
+    agilityDebuff: 0,                             // 先手减益
+    speedBonus: 0,                                // 先手加值（N | { value, turns }）
     // 精力消耗
     staminaPenalty: 0,                            // 精力消耗增加
     staminaDiscount: 0,                           // 精力消耗减少
@@ -231,7 +231,7 @@ function createPlayerState(id, overrides = {}) {
     permAttackPtsBonus: 0,    permPtsDebuff: 0,             // 攻击
     permGuardPtsBonus: 0,     permGuardDebuff: 0,           // 守备
     permDodgePtsBonus: 0,     permDodgeDebuff: 0,           // 闪避
-    permAgilityBoost: 0,      permAgilityDebuff: 0,         // 动速
+    permAgilityBoost: 0,      permAgilityDebuff: 0,         // 先手
     permStaminaPenalty: 0,    permStaminaDiscount: 0,       // 精力消耗
     permRestRecoverBonus: 0,  permRestRecoverPenalty: 0,    // 蓄势恢复
     permHealRecoverBonus: 0,  permHealRecoverPenalty: 0,    // 疗愈恢复
@@ -427,12 +427,12 @@ export class BattleEngine {
     };
 
 
-    // ── AI 动速消耗同步 ──────────────────────────────────
+    // ── AI 先手消耗同步 ──────────────────────────────────
     // AI 绕过了 adjustSpeed()，直接在 patch 中提交 speed 值。
     // 此处将 speed 差值转化为精力扣除，与 adjustSpeed 行为一致。
     if (patch.speed != null) {
       const targetSpeed = patch.speed;
-      const currentSpeed = p.speed; // 当前动速（回合初始为 BASE_SPEED）
+      const currentSpeed = p.speed; // 当前先手（回合初始为 BASE_SPEED）
       const delta = targetSpeed - currentSpeed;
 
       if (delta > 0) {
@@ -454,7 +454,7 @@ export class BattleEngine {
         p.speed = currentSpeed + actualBoost;
         p.actionCtx.speed = p.speed;
       } else if (delta < 0) {
-        // 降速：归还精力（重决策时可能改用更低动速）
+        // 降速：归还精力（重决策时可能改用更低先手）
         const refund = Math.abs(delta);
         p.speed = Math.max(DefaultStats.BASE_SPEED, targetSpeed);
         for (let i = 0; i < refund; i++) {
@@ -473,7 +473,7 @@ export class BattleEngine {
     p.actionCtx.pts = this._calcPts(p.actionCtx, p);
     p.actionCtx.cost = calcActionCost(p.actionCtx, p);
 
-    // 行动成本即时结算：按差额扣/退（与洞察、提速一致）
+    // 行动成本即时结算：按差额扣/退（与洞察、先手一致）
     this._reconcileActionCostDelta(p, prevCtx, p.actionCtx);
 
     this._bus.emit(EngineEvent.ACTION_UPDATED, {
@@ -483,16 +483,16 @@ export class BattleEngine {
   }
 
   /**
-   * 玩家调整动速（消耗精力/释放精力）
+   * 玩家调整先手（消耗精力/释放精力）
    * @param {string} playerId
-   * @param {number} delta - +1 提速（消耗精力），-1 降速（归还精力）
+   * @param {number} delta - +1 先手（消耗精力），-1 降速（归还精力）
    */
   adjustSpeed(playerId, delta) {
     const p = this._players[playerId];
     if (!EffectLayer.canAdjustSpeed(p, delta)) return;
 
     if (delta > 0) {
-      // 提速：单次消耗 1 点有效精力
+      // 先手：单次消耗 1 点有效精力
       if (p.staminaDiscount > 0) {
         p.staminaDiscount--;
         p.speedDiscountSpent = (p.speedDiscountSpent || 0) + 1;
@@ -502,7 +502,7 @@ export class BattleEngine {
       p.speed++;
     } else if (delta < 0) {
       p.speed--;
-      // 降速归还时需对齐提速时的扣减来源，避免 discount->stamina 套利
+      // 降速归还时需对齐先手时的扣减来源，避免 discount->stamina 套利
       if ((p.speedDiscountSpent || 0) > 0) {
         p.speedDiscountSpent--;
         p.staminaDiscount = (p.staminaDiscount || 0) + 1;
@@ -514,7 +514,7 @@ export class BattleEngine {
       }
     }
 
-    // 同步更新行动配置中的动速
+    // 同步更新行动配置中的先手
     if (p.actionCtx) {
       p.actionCtx.speed = p.speed;
       p.actionCtx.pts = this._calcPts(p.actionCtx, p);
@@ -1230,7 +1230,7 @@ export class BattleEngine {
     this._applyPlayerResult(this._players[PlayerId.P1], result.newState.p1);
     this._applyPlayerResult(this._players[PlayerId.P2], result.newState.p2);
 
-    // 回合末动速归 BASE_SPEED（加速为临时性的）
+    // 回合末先手归 BASE_SPEED（加速为临时性的）
     this._players[PlayerId.P1].speed = DefaultStats.BASE_SPEED;
     this._players[PlayerId.P2].speed = DefaultStats.BASE_SPEED;
 
@@ -1476,7 +1476,7 @@ export class BattleEngine {
 
   /** 计算行动点数
    * 攻击/守备/闪避均为 1 + enhance
-   * 闪避点数已与动速解耦，动速仅影响时序
+   * 闪避点数已与先手解耦，先手仅影响时序
    */
   _calcPts(ctx, _playerState) {
     if (ctx.action === Action.STANDBY || ctx.action === Action.READY || ctx.action === Action.PREPARE) return 0;

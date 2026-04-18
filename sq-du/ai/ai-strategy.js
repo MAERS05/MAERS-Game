@@ -1,10 +1,10 @@
-/**
+﻿/**
  * @file ai-strategy.js
  * @description 博弈战斗系统 — AI 完美信息策略层
  *
  * 职责：
  *  仅在已知对手底牌（重决策场景）时被调用。
- *  基于已知的对手行动，给出最优克制决策（行动类型、动速、强化）。
+ *  基于已知的对手行动，给出最优克制决策（行动类型、先手、强化）。
  *
  * 与 ai-base.js 的区别：
  *  - ai-base.js：盲决策权重，不知道对手意图
@@ -66,7 +66,7 @@ export class AIStrategyLayer {
         return this._counterGuard(revealedPts, snap, ai, effectiveStamina);
 
       case Action.DODGE:
-        // 对手闪避时：攻击可能被闪开，关键在于动速
+        // 对手闪避时：攻击可能被闪开，关键在于先手
         // 有余量加速超越时，出攻击；否则待命
         return effectiveStamina >= 2 ? Action.ATTACK : Action.STANDBY;
 
@@ -151,19 +151,19 @@ export class AIStrategyLayer {
   }
 
   // ─────────────────────────────────────────────────────────
-  // 动速选择（完美信息下的动速博弈）
+  // 先手选择（完美信息下的先手博弈）
   // ─────────────────────────────────────────────────────────
 
   /**
-   * 守备/闪避克制攻击时：动速必须 > 对手攻击动速，才能提前就位。
-   * 攻击克制闪避时：动速必须 > 对手闪避动速，否则攻击被闪开。
+   * 守备/闪避克制攻击时：先手必须 > 对手攻击先手，才能提前就位。
+   * 攻击克制闪避时：先手必须 > 对手闪避先手，否则攻击被闪开。
    * 攻击克制待命/守备时：不需要特别高速，节省精力。
    */
   static _pickSpeed(revealedAct, revealedSpd, snap, action, effectiveStamina) {
     const BASE = DefaultStats.BASE_SPEED;
-    const canBoost = effectiveStamina >= 2; // 基础1 + 动速1
+    const canBoost = effectiveStamina >= 2; // 基础1 + 先手1
 
-    // 守备/闪避 vs 对手攻击：动速竞争
+    // 守备/闪避 vs 对手攻击：先手竞争
     if (revealedAct === Action.ATTACK && (action === Action.GUARD || action === Action.DODGE)) {
       if (!canBoost) return BASE;
       // 对手加速攻击：必须跟着加速才能提前就位
@@ -172,14 +172,14 @@ export class AIStrategyLayer {
       return Math.random() < 0.40 ? BASE + 1 : BASE;
     }
 
-    // 攻击 vs 对手闪避：动速必须严格超过闪避动速
+    // 攻击 vs 对手闪避：先手必须严格超过闪避先手
     if (revealedAct === Action.DODGE && action === Action.ATTACK) {
       if (!canBoost) return BASE; // 无法加速时攻击很可能被闪开（由_pickAction层面已考虑）
-      // 无论对手闪避速度高低，加速至 BASE+1 均可超越或同速凭点数胜出
+      // 无论对手闪避先手高低，加速至 BASE+1 均可超越或同速凭点数胜出
       return BASE + 1;
     }
 
-    // 攻击 vs 待命/守备：动速无关紧要，保守
+    // 攻击 vs 待命/守备：先手无关紧要，保守
     if (action === Action.ATTACK) {
       if (!canBoost) return BASE;
       const playerWeakness = 1 - Math.max(snap.playerHpRatio, snap.playerStaminaRatio);

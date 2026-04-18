@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file ai-extra.js
  * @description 博弈战斗系统 — AI 效果及扩展逻辑层
  *
@@ -154,7 +154,7 @@ export class AIExtraLayer {
     // AI 已有增益时，同类 buff 效益递减
     const boostMap = {
       [EffectId.STEADY]:    'guardBoost',     // 稳固 → 守备增益
-      [EffectId.DEFERRED]:  'agilityBoost',   // 延迟 → 动速增益
+      [EffectId.DEFERRED]:  'agilityBoost',   // 延迟 → 先手增益
     };
     const boostField = boostMap[id];
     if (boostField && (ai[boostField] || 0) > 0) total -= 0.5;

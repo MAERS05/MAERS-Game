@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 import {
   Action,
@@ -160,7 +160,7 @@ export class EffectLayer {
       cp2.pts = clampPts(raw, 'dodgePtsOverflow', 'dodgePtsUnderflow', p2State);
     }
 
-    // ── 动速：应用轻盈(agilityBoost)和沉重(agilityDebuff)，含永久层 ──
+    // ── 先手：应用轻盈(agilityBoost)和沉重(agilityDebuff)，含永久层 ──
     const p1SpeedRaw = (cp1.speed || DefaultStats.BASE_SPEED) + (p1State.agilityBoost || 0) + readBonus(p1State.speedBonus)
       + (p1State.permAgilityBoost || 0) - (p1State.agilityDebuff || 0) - (p1State.permAgilityDebuff || 0);
     cp1.speed = clampPts(p1SpeedRaw, 'speedOverflow', 'speedUnderflow', p1State);

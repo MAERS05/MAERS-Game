@@ -5,7 +5,7 @@
  * 职责：
  *  - 局面快照（snapshot）：将当前双方状态转换为打分维度
  *  - 行动打分（pickAction）：基于快照权重决定最优行动类型
- *  - 动速打分（pickSpeed）：基于快照权重决定是否提速
+ *  - 先手打分（pickSpeed）：基于快照权重决定是否先手
  *  - 强化打分（pickEnhance）：基于快照权重决定是否强化
  *
  * 本层不包含任何 I/O（setTimeout/useInsight 等），
@@ -150,7 +150,7 @@ export class AIBaseLogic {
       aiChargeBoost: ai.chargeBoost || 0,  // 蓄力增益
       aiStaminaPenalty: ai.staminaPenalty || 0,  // 精力消耗增加
       aiHealBlocked: !!ai.healBlocked,         // 被禁疗愈
-      aiSpeedBlocked: !!ai.speedAdjustBlocked,  // 被禁提速
+      aiSpeedBlocked: !!ai.speedAdjustBlocked,  // 被禁先手
       // AI bonus 加值（用于点数判断和强化决策）
       aiAttackBonus: readBonus(ai.attackPtsBonus),
       aiGuardBonus: readBonus(ai.guardPtsBonus),
@@ -432,7 +432,7 @@ export class AIBaseLogic {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // Axis 2：动速打分
+  // Axis 2：先手打分
   // ═══════════════════════════════════════════════════════════
 
   static pickSpeed(snap, action, ai) {
@@ -442,43 +442,43 @@ export class AIBaseLogic {
     const aiEffectiveStamina = this.getEffectiveStamina(ai);
     const availableForBoost = aiEffectiveStamina - 1;
 
-    if (availableForBoost <= 0) return BASE; // 精力不足以提速
+    if (availableForBoost <= 0) return BASE; // 精力不足以先手
 
     const { attack: pAtk, guard: pGrd, dodge: pDodge } = snap.predictNext;
 
-    // 绝杀窗口无条件提速确保先手致命一击
+    // 绝杀窗口无条件先手确保先手致命一击
     const killWindow = (snap.playerHpRatio <= this.TUNING.executeHpLine && snap.playerStaminaRatio <= 0.34 && aiEffectiveStamina >= 2) ? 1 : 0;
     const executeWindow = snap.playerStamina <= 0 ? 1 : 0;
     if ((killWindow || executeWindow) && availableForBoost >= 1 && action === Action.ATTACK) {
       return BASE + 1;
     }
 
-    // 动态博弈：预期对手闪避，我方攻击 -> 必须提速以咬住并超越闪避速度
+    // 动态博弈：预期对手闪避，我方攻击 -> 必须先手以咬住并超越闪避先手
     if (action === Action.ATTACK && pDodge > 0.40 && availableForBoost >= 1) {
       return BASE + 1;
     }
 
-    // 动态博弈：预期对手攻击，且对手有提速习惯，我方防御/闪避 -> 提速先手部署防线
+    // 动态博弈：预期对手攻击，且对手有先手习惯，我方防御/闪避 -> 抢先部署防线
     if ((action === Action.GUARD || action === Action.DODGE) && pAtk > 0.45 && snap.oppSpeedTrend > DefaultStats.BASE_SPEED + 0.3) {
       if (availableForBoost >= 1) return BASE + 1;
     }
 
-    // 血线告急时的特殊本能反应保命提速
+    // 血线告急时的特殊本能反应保命先手
     if (snap.aiHpRatio <= 0.3 && action !== Action.ATTACK && pAtk > 0.35 && availableForBoost >= 1) {
       return BASE + 1;
     }
 
-    // ── 精力充裕时主动提速（tuning 驱动）──
+    // ── 精力充裕时主动先手（tuning 驱动）──
     const tuning = ai.aiTuning || {};
     const speedBias = tuning.speedBoostBias || 0;
 
-    // 攻击时精力 ≥ 3：有余量提速施压
+    // 攻击时精力 ≥ 3：有余量先手施压
     if (action === Action.ATTACK && availableForBoost >= 2) {
       const prob = Math.min(0.75, 0.30 + speedBias);
       if (Math.random() < prob) return BASE + 1;
     }
 
-    // 守备/闪避时精力 ≥ 3：适度提速先手部署
+    // 守备/闪避时精力 ≥ 3：适度抢先部署
     if ((action === Action.GUARD || action === Action.DODGE) && availableForBoost >= 2) {
       const prob = Math.min(0.60, 0.20 + speedBias);
       if (Math.random() < prob) return BASE + 1;

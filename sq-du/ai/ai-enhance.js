@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file ai-enhace.js
  * @description 博弈战斗系统 — AI 场景约束层（规则底线，不参与权重）
  *
@@ -50,7 +50,7 @@ export class AIEnhanceLayer {
       };
     }
 
-    // 底线2：没有绝杀时机，仅剩 1 点有效精力，禁止高风险提速（节省精力用于行动）。
+    // 底线2：没有绝杀时机，仅剩 1 点有效精力，禁止高风险先手（节省精力用于行动）。
     if (
       normalized.action !== Action.STANDBY &&
       normalized.speed > DefaultStats.BASE_SPEED &&

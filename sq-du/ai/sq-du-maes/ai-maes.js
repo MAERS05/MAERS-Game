@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file ai-maes.js
  * @description AI 定制化入口 — MAES
  *
@@ -102,12 +102,12 @@ export const MaesProfile = {
   attackPtsBonus: { value: 1, turns: Infinity },  // 攻击点数 +1（永久）
   guardPtsBonus: { value: 1, turns: Infinity },  // 守备点数 +1（永久）
   dodgePtsBonus: 0,                              // 闪避点数加值
-  speedBonus: 0,                              // 动速加值
+  speedBonus: 0,                              // 先手加值
 
   // ── 永久禁用（true = 整局禁用，不受回合衰减影响） ──
   permInsightBlocked: false,      // 永久禁洞察
   permRedecideBlocked: false,     // 永久禁重筹
-  permSpeedAdjustBlocked: false,  // 永久禁提速/降速
+  permSpeedAdjustBlocked: false,  // 永久禁先手/降速
   permReadyBlocked: false,        // 永久禁手动就绪
   permStandbyBlocked: false,      // 永久禁蓄势
   permActionBlocked: [],  // 永久禁用行为列表
@@ -125,7 +125,7 @@ export const MaesProfile = {
     insightThreshold: 0.8,   // 洞察评分阈值（低=更积极洞察；默认 1.8）
     insightMaxProb: 0.90,  // 洞察最大概率（默认 0.65）
     redecideBias: 0.20,  // 重决策概率偏移（加到各情境概率上）
-    speedBoostBias: 0.1,  // 提速概率偏移（正=更爱提速）
+    speedBoostBias: 0.1,  // 先手概率偏移（正=更爱先手）
     passiveExploitBias: 1.5,   // 对手被动行为时攻击加成（蓄势/疗愈=白给）
     effectSkipChance: 0.10,    // 10% 概率不携带效果（轻出手）
   },

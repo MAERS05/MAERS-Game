@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file ui.js
  * @description 博弈战斗系统 — UI 交互层
  *
@@ -80,7 +80,7 @@ const ui = {
   ptDodge: $('pt-dodge'),
   ptGuard: $('pt-guard'),
   ptAttack: $('pt-attack'),
-  // 动速调节
+  // 先手调节
   p1SpeedUp: $('p1SpeedUp'),
   p1SpeedDown: $('p1SpeedDown'),
   // 指令区
@@ -149,7 +149,7 @@ let _pickerScrollPos = {};        // 各行动技能表的滚动位置记忆（k
 let enemyFogState = {
   hp: 3, // 默认初始命数
   stamina: 3, // 默认初始精力
-  speed: 1, // 默认初始动速
+  speed: 1, // 默认初始先手
 };
 
 /**
@@ -300,7 +300,7 @@ function refreshPoints() {
   // 取消行为按钮：只要有行动被选中就显示
   ui.cancelActionBtn.classList.toggle('visible', !!selectedAction);
 
-  // 只要还有有效精力即可提速；是否透支行动由玩家自行选择
+  // 只要还有有效精力即可先手；是否透支行动由玩家自行选择
   ui.p1SpeedUp.disabled = effectiveStamina <= 0;
   ui.p1SpeedDown.disabled = p1.speed <= DefaultStats.BASE_SPEED;
 }
@@ -451,7 +451,7 @@ function resetForNewTurn() {
   refreshPoints();
 
   // 新回合开始时，记录敌方目前的真实状态作为本回合的基础情报
-  // 若本回合未执行洞察，玩家看到的敌方血量、精力、速度将一直“锁定”在这个初始快照
+  // 若本回合未执行洞察，玩家看到的敌方血量、精力、先手将一直“锁定”在这个初始快照
   const p2 = snap.players[PlayerId.P2];
   enemyFogState = {
     hp: p2.hp,
@@ -766,7 +766,7 @@ engine.on(EngineEvent.PHASE_STATE_SYNC, ({ state, phaseEvent: syncPhase }) => {
   if (forceP2Sync || enemyInfoUnlocked) {
     updateStatusIcons(PlayerId.P2, p2);
   }
-  refreshPoints(); // 包含速度、可用行为状态的刷新
+  refreshPoints(); // 包含先手、可用行为状态的刷新
 });
 
 engine.on(EngineEvent.ACTIVE_INSIGHT, ({ casterId, revealedAction, revealed }) => {
@@ -1025,8 +1025,8 @@ const EFFECT_ICON_META = {
   [EffectId.SIDE_STEP]: { icon: 'avoid.svg', name: '侧身', resource: '闪避点数', sign: +1 },
   'side_step_state': { icon: 'avoid.svg', name: '侧身', resource: '闪避点数', sign: +1 },
   [EffectId.CLUMSY]: { icon: 'heavy.svg', name: '僵硬', resource: '闪避点数', sign: -1 },
-  [EffectId.LIGHT]: { icon: 'fast.svg', name: '轻盈', resource: '动速', sign: +1 },
-  [EffectId.HEAVY]: { icon: 'fast.svg', name: '沉重', resource: '动速', sign: -1 },
+  [EffectId.LIGHT]: { icon: 'fast.svg', name: '轻盈', resource: '先手', sign: +1 },
+  [EffectId.HEAVY]: { icon: 'fast.svg', name: '沉重', resource: '先手', sign: -1 },
   [EffectId.WOUNDED]: { icon: 'wound.svg', name: '创伤', resource: '命数', sign: -1 },
   [EffectId.FORTIFIED]: { icon: 'treat.svg', name: '治愈', resource: '命数', sign: +1 },
   [EffectId.REJUVENATED]: { icon: 'uplifting.svg', name: '振奋', resource: '精力', sign: +1 },
@@ -1183,8 +1183,8 @@ function updateStatusIcons(playerId, state) {
     { field: 'guardDebuff', eid: EffectId.CRACKED_ARMOR, sign: -1, resource: '守备点数', name: '碎甲', icon: 'broken-shield.svg' },
     { field: 'dodgeBoost', eid: EffectId.SIDE_STEP, sign: +1, resource: '闪避点数', name: '侧身', icon: 'avoid.svg' },
     { field: 'dodgeDebuff', eid: EffectId.CLUMSY, sign: -1, resource: '闪避点数', name: '僵硬', icon: 'heavy.svg' },
-    { field: 'agilityBoost', eid: EffectId.LIGHT, sign: +1, resource: '动速', name: '轻盈', icon: 'fast.svg' },
-    { field: 'agilityDebuff', eid: EffectId.HEAVY, sign: -1, resource: '动速', name: '沉重', icon: 'fast.svg' },
+    { field: 'agilityBoost', eid: EffectId.LIGHT, sign: +1, resource: '先手', name: '轻盈', icon: 'fast.svg' },
+    { field: 'agilityDebuff', eid: EffectId.HEAVY, sign: -1, resource: '先手', name: '沉重', icon: 'fast.svg' },
     { field: 'staminaPenalty', eid: EffectId.EXHAUSTED, sign: +1, resource: '精力消耗', name: '疲惫', icon: 'tired.svg' },
     { field: 'staminaDiscount', eid: EffectId.EXCITED, sign: -1, resource: '精力消耗', name: '兴奋', icon: 'excited.svg' },
     { field: 'hpDrain', eid: EffectId.WOUNDED, sign: -1, resource: '命数', name: '创伤', icon: 'wound.svg' },
@@ -1209,7 +1209,7 @@ function updateStatusIcons(playerId, state) {
     { field: 'attackPtsBonus', icon: 'strong.svg', name: '攻击强化', resource: '攻击点数和槽位' },
     { field: 'guardPtsBonus', icon: 'shield.svg', name: '守备强化', resource: '守备点数和槽位' },
     { field: 'dodgePtsBonus', icon: 'avoid.svg', name: '闪避强化', resource: '闪避点数和槽位' },
-    { field: 'speedBonus', icon: 'fast.svg', name: '速度强化', resource: '动速' },
+    { field: 'speedBonus', icon: 'fast.svg', name: '先手强化', resource: '先手' },
   ];
   for (const { field, icon, name, resource } of bonusChecks) {
     const raw = state[field];

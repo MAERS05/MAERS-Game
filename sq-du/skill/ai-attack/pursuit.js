@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 import { Action, EffectId } from '../../base/constants.js';
 import { createSkillEffect } from '../../effect/function/skill-factory.js';
@@ -6,7 +6,7 @@ import { EffectLayer } from '../../main/effect.js';
 
 /**
  * 追杀（AI 专属攻击技能）
- * 若攻击成功，为自身附加1级[轻盈]，下回合开始后、回合结束前生效（动速+1）。
+ * 若攻击成功，为自身附加1级[轻盈]，下回合开始后、回合结束前生效（先手+1）。
  */
 export const PursuitEffect = createSkillEffect({
   id: EffectId.PURSUIT,
