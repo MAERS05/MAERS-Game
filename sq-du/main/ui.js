@@ -1787,12 +1787,16 @@ if (intelClose) {
 
 if (ui.globalPauseBtn) {
   const pauseOverlay = $('pauseOverlay');
+  const bgmEl = document.getElementById('bgm');
   ui.globalPauseBtn.addEventListener('click', () => {
     const isPaused = engine.togglePause();
     ui.globalPauseBtn.textContent = isPaused ? '▶︎' : '⏸︎';
     ui.globalPauseBtn.classList.toggle('is-paused', isPaused);
-    if (pauseOverlay) {
-      pauseOverlay.classList.toggle('active', isPaused);
+    if (pauseOverlay) pauseOverlay.classList.toggle('active', isPaused);
+    // 同步暂停/恢复背景音乐
+    if (bgmEl) {
+      if (isPaused) bgmEl.pause();
+      else bgmEl.play().catch(() => {});
     }
   });
 }
