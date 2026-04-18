@@ -119,7 +119,7 @@ export const MaesProfile = {
 
   // ── MAES 行为调优（注入 AI 状态，被 ai-base / ai-scheduler 读取） ──
   tuning: {
-    attackBias: 0.47,   // 攻击权重偏移（正=更好斗）
+    attackBias: 0.48,   // 攻击权重偏移（正=更好斗）
     guardBias: 0.45,   // 守备权重偏移
     dodgeBias: 0.38,   // 闪避权重偏移
     standbyBias: 0.1,  // 蓄势权重偏移
@@ -129,7 +129,7 @@ export const MaesProfile = {
     redecideBias: 0.20,  // 重决策概率偏移（加到各情境概率上）
     speedBoostBias: 0.1,  // 先手概率偏移（正=更爱先手）
     passiveExploitBias: 1.5,   // 对手被动行为时攻击加成（蓄势/疗愈=白给）
-    effectSkipChance: 0.1,    // 5% 概率不携带效果（轻出手）
+    effectSkipChance: 0.1,    // 10% 概率不携带效果（轻出手）
   },
 };
 
