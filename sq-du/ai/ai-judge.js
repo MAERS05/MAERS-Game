@@ -44,8 +44,9 @@ export class AIJudgeLayer {
     );
     const final = maesConstrainDecision(base, { ai, player, history, revealedAction: null, isRedecide: false });
 
-    // 约束层可能将 action 改为被动行为（如蓄力→蓄备），此时先手无意义，重置以节省精力
-    if (final.action === Action.READY || final.action === Action.PREPARE) {
+    // 约束层可能将 action 改为被动行为，此时先手无意义，重置以节省精力
+    if (final.action === Action.STANDBY || final.action === Action.HEAL ||
+        final.action === Action.READY  || final.action === Action.PREPARE) {
       final.speed = DefaultStats.BASE_SPEED;
     }
     return final;
@@ -82,7 +83,8 @@ export class AIJudgeLayer {
     const final = maesConstrainDecision(base, { ai, player, history, revealedAction, isRedecide: true });
 
     // 约束层可能将 action 改为被动行为，此时先手无意义，重置以节省精力
-    if (final.action === Action.READY || final.action === Action.PREPARE) {
+    if (final.action === Action.STANDBY || final.action === Action.HEAL ||
+        final.action === Action.READY  || final.action === Action.PREPARE) {
       final.speed = DefaultStats.BASE_SPEED;
     }
     return final;

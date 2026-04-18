@@ -6,7 +6,7 @@ import { createStatusEffect } from './status-factory.js';
 export const PowerEffect = createStatusEffect({
   id: EffectId.POWER,
   name: '力量',
-  desc: '本回合行动期开始时攻击点数 +1',
+  desc: '攻击点数 +1',
   applicableTo: [Action.ATTACK],
   timingDisplay: 'phase',
   apply(state) {
@@ -17,7 +17,7 @@ export const PowerEffect = createStatusEffect({
 export const WeakEffect = createStatusEffect({
   id: 'weak',
   name: '虚弱',
-  desc: '本回合行动期开始时攻击点数 -1',
+  desc: '攻击点数 -1',
   applicableTo: [Action.ATTACK],
   timingDisplay: 'phase',
   apply(state) {

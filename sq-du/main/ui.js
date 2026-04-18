@@ -55,6 +55,72 @@ function getEffectMeta(effectId) {
   };
 }
 
+// ─── 词条提示系统 ──────────────────────────────────────
+// 构建 效果名称 → 描述 的查找表
+const _termDescMap = (() => {
+  const map = {};
+  const allIds = [...new Set([
+    ...Object.keys(EffectHandlers),
+    ...Object.keys(EffectDefs),
+  ])];
+  for (const id of allIds) {
+    const meta = getEffectMeta(id);
+    if (meta.name && meta.desc) map[meta.name] = meta.desc;
+  }
+  return map;
+})();
+
+// 将文本中的 [词条] 替换为可点击 span
+function renderDescWithTooltips(text) {
+  return text.replace(/\[([^\]]+)\]/g, (_, term) => {
+    const hasDesc = !!_termDescMap[term];
+    return hasDesc
+      ? `<span class="term-link" data-term="${term}">[${term}]</span>`
+      : `[${term}]`;
+  });
+}
+
+// 全局词条 tooltip 容器（单例）
+let _termTooltipEl = null;
+let _termTooltipTimer = null;
+function showTermTooltip(term, anchorEl) {
+  const desc = _termDescMap[term];
+  if (!desc) return;
+  if (!_termTooltipEl) {
+    _termTooltipEl = document.createElement('div');
+    _termTooltipEl.id = 'term-tooltip';
+    _termTooltipEl.style.cssText = [
+      'position:fixed', 'z-index:9999', 'pointer-events:none',
+      'background:rgba(15,23,42,0.95)', 'color:#e2e8f0',
+      'font-size:0.78rem', 'padding:5px 10px', 'border-radius:6px',
+      'border:1px solid rgba(255,255,255,0.12)', 'white-space:nowrap',
+      'opacity:0', 'transition:opacity 0.15s',
+    ].join(';');
+    document.body.appendChild(_termTooltipEl);
+  }
+  clearTimeout(_termTooltipTimer);
+  _termTooltipEl.textContent = desc;
+  // 定位到词条正上方
+  const rect = anchorEl.getBoundingClientRect();
+  _termTooltipEl.style.left = `${rect.left + rect.width / 2}px`;
+  _termTooltipEl.style.top = `${rect.top - 32}px`;
+  _termTooltipEl.style.transform = 'translateX(-50%)';
+  _termTooltipEl.style.opacity = '1';
+  _termTooltipTimer = setTimeout(() => {
+    if (_termTooltipEl) _termTooltipEl.style.opacity = '0';
+  }, 1000);
+}
+
+// 全局代理：捕获阶段拦截词条点击，阻止事件冒泡到父级技能/效果点击处理器
+document.addEventListener('click', e => {
+  const el = e.target.closest('.term-link');
+  if (!el) return;
+  e.stopPropagation();  // 阻止冒泡，防止触发父级 item 的点击事件
+  e.preventDefault();
+  showTermTooltip(el.dataset.term, el);
+}, true); // true = 捕获阶段，先于冒泡阶段执行
+
+
 // ─── DOM 引用 ─────────────────────────────────────────
 const $ = id => document.getElementById(id);
 
@@ -369,7 +435,7 @@ function updateConfigPanel() {
       item.innerHTML = `
         <div class="effect-item-main">
           <div class="effect-item-name">${meta.name}</div>
-          <div class="effect-item-desc">${meta.desc}</div>
+          <div class="effect-item-desc">${renderDescWithTooltips(meta.desc)}</div>
         </div>
       `;
     } else {
@@ -1380,7 +1446,7 @@ function openEffectPicker(action, slot) {
     item.innerHTML = `
       <div class="effect-item-main">
         <div class="effect-item-name">${meta.name}</div>
-        <div class="effect-item-desc">${meta.desc}</div>
+        <div class="effect-item-desc">${renderDescWithTooltips(meta.desc)}</div>
       </div>
     `;
 
@@ -1671,7 +1737,7 @@ function updateIntelBox() {
       const meta = getEffectMeta(effectId);
       const tag = document.createElement('div');
       tag.className = 'intel-tag';
-      tag.innerHTML = `<strong>${meta.name}</strong><span>${meta.desc}</span>`;
+      tag.innerHTML = `<strong>${meta.name}</strong><span>${renderDescWithTooltips(meta.desc)}</span>`;
       tagsDiv.appendChild(tag);
     });
 
