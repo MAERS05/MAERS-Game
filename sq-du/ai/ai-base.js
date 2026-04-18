@@ -446,7 +446,7 @@ export class AIBaseLogic {
     const BASE = DefaultStats.BASE_SPEED;
     // 被动行为无先手收益（先手恢复时序为玩家策略，AI不做此判断）
     if (action === Action.STANDBY || action === Action.HEAL ||
-        action === Action.READY  || action === Action.PREPARE) return BASE;
+      action === Action.READY || action === Action.PREPARE) return BASE;
 
     const aiEffectiveStamina = this.getEffectiveStamina(ai);
     const availableForBoost = aiEffectiveStamina - 1;
@@ -510,8 +510,8 @@ export class AIBaseLogic {
 
     // AI 当前行动的有效基础点数（含 bonus）
     const aiBasePts = 1 + (action === Action.ATTACK ? snap.aiAttackBonus
-                        :  action === Action.GUARD  ? snap.aiGuardBonus
-                        :                             snap.aiDodgeBonus);
+      : action === Action.GUARD ? snap.aiGuardBonus
+        : snap.aiDodgeBonus);
 
     // 绝杀斩杀阶段：无脑拉满伤害
     const killWindow = (snap.playerHpRatio <= this.TUNING.executeHpLine && snap.playerStaminaRatio <= 0.34 && aiEffectiveStamina >= 2) ? 1 : 0;

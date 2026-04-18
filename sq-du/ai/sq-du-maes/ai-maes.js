@@ -119,11 +119,11 @@ export const MaesProfile = {
 
   // ── MAES 行为调优（注入 AI 状态，被 ai-base / ai-scheduler 读取） ──
   tuning: {
-    attackBias: 0.48,   // 攻击权重偏移（正=更好斗）
-    guardBias: 0.45,   // 守备权重偏移
-    dodgeBias: 0.38,   // 闪避权重偏移
-    standbyBias: 0.1,  // 蓄势权重偏移
-    healBias: -0.1,    // 疗愈权重偏移（负=更少疗愈）
+    attackBias: 0.8,   // 攻击权重偏移（正=更好斗）
+    guardBias: 0.4,   // 守备权重偏移
+    dodgeBias: 0.2,   // 闪避权重偏移
+    standbyBias: -0.3,  // 蓄势权重偏移
+    healBias: -0.3,    // 疗愈权重偏移（负=更少疗愈）
     insightThreshold: 0.8,   // 洞察评分阈值（低=更积极洞察；默认 1.8）
     insightMaxProb: 0.90,  // 洞察最大概率（默认 0.65）
     redecideBias: 0.20,  // 重决策概率偏移（加到各情境概率上）

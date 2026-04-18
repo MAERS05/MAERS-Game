@@ -12,7 +12,7 @@
 
 'use strict';
 
-import { Action, DefaultStats } from '../base/constants.js';
+import { Action, DefaultStats, EffectId } from '../base/constants.js';
 import { AIBaseLogic } from './ai-base.js';
 import { AIExtraLayer } from './ai-extra.js';
 import { AIStrategyLayer } from './ai-strategy.js';
@@ -47,6 +47,10 @@ export class AIJudgeLayer {
     // 约束层可能将 action 改为被动行为，此时先手无意义，重置以节省精力
     if (final.action === Action.STANDBY || final.action === Action.HEAL ||
         final.action === Action.READY  || final.action === Action.PREPARE) {
+      final.speed = DefaultStats.BASE_SPEED;
+    }
+    // setup 技能（蓄力/稳重）会将行动转为蓄备/就绪，提速无意义
+    if (Array.isArray(final.effects) && final.effects.some(id => id === EffectId.CHARGE || id === EffectId.STEADY)) {
       final.speed = DefaultStats.BASE_SPEED;
     }
     return final;
@@ -85,6 +89,10 @@ export class AIJudgeLayer {
     // 约束层可能将 action 改为被动行为，此时先手无意义，重置以节省精力
     if (final.action === Action.STANDBY || final.action === Action.HEAL ||
         final.action === Action.READY  || final.action === Action.PREPARE) {
+      final.speed = DefaultStats.BASE_SPEED;
+    }
+    // setup 技能（蓄力/稳重）会将行动转为蓄备/就绪，提速无意义
+    if (Array.isArray(final.effects) && final.effects.some(id => id === EffectId.CHARGE || id === EffectId.STEADY)) {
       final.speed = DefaultStats.BASE_SPEED;
     }
     return final;
