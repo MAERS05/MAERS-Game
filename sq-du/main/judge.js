@@ -446,6 +446,8 @@ export class JudgeLayer {
       insightDebuff: state.insightDebuff || 0,
       restRecoverBonus: state.restRecoverBonus || 0,
       restRecoverPenalty: state.restRecoverPenalty || 0,
+      healRecoverBonus: state.healRecoverBonus || 0,
+      healRecoverPenalty: state.healRecoverPenalty || 0,
       insightBlocked: state.insightBlocked || false,
       insightBlockNextTurn: state.insightBlockNextTurn || false,
       redecideBlocked: state.redecideBlocked || false,
@@ -486,12 +488,16 @@ export class JudgeLayer {
 
     // 命数正溢出（回血超上限）
     // 疗愈行动：先伤后愈 —— 伤害致死则疗愈无效
-    const p1HealBonus = (newP1Hp > 0 && !isInsightClash && p1Ctx.action === Action.HEAL) ? 1 : 0;
-    const p2HealBonus = (newP2Hp > 0 && !isInsightClash && p2Ctx.action === Action.HEAL) ? 1 : 0;
-    const rawP1HealedHp = newP1Hp + (p1State.hpBonus || 0) + p1HealBonus;
+    const p1HealAmount = (newP1Hp > 0 && !isInsightClash && p1Ctx.action === Action.HEAL && !p1State.healRecoverBlocked && !p1State.hpGainBlocked)
+      ? Math.max(0, 1 + (p1State.healRecoverBonus || 0) + (p1State.permHealRecoverBonus || 0)
+                     - (p1State.healRecoverPenalty || 0) - (p1State.permHealRecoverPenalty || 0)) : 0;
+    const p2HealAmount = (newP2Hp > 0 && !isInsightClash && p2Ctx.action === Action.HEAL && !p2State.healRecoverBlocked && !p2State.hpGainBlocked)
+      ? Math.max(0, 1 + (p2State.healRecoverBonus || 0) + (p2State.permHealRecoverBonus || 0)
+                     - (p2State.healRecoverPenalty || 0) - (p2State.permHealRecoverPenalty || 0)) : 0;
+    const rawP1HealedHp = newP1Hp + (p1State.hpGainBlocked ? 0 : (p1State.hpBonus || 0)) + p1HealAmount;
     const p1HpOverflow = rawP1HealedHp > DefaultStats.MAX_HP ? rawP1HealedHp - DefaultStats.MAX_HP : 0;
     const finalP1Hp = Math.min(DefaultStats.MAX_HP, rawP1HealedHp);
-    const rawP2HealedHp = newP2Hp + (p2State.hpBonus || 0) + p2HealBonus;
+    const rawP2HealedHp = newP2Hp + (p2State.hpGainBlocked ? 0 : (p2State.hpBonus || 0)) + p2HealAmount;
     const p2HpOverflow = rawP2HealedHp > DefaultStats.MAX_HP ? rawP2HealedHp - DefaultStats.MAX_HP : 0;
     const finalP2Hp = Math.min(DefaultStats.MAX_HP, rawP2HealedHp);
 
@@ -499,15 +505,17 @@ export class JudgeLayer {
     const p1ActionCost = isInsightClash ? 0 : (p1Ctx.cost || 0);
     const p2ActionCost = isInsightClash ? 0 : (p2Ctx.cost || 0);
     // 仅蓄势恢复精力，就绪不恢复；识破时行动取消，蓄势也不生效
-    const p1Recovery = (!isInsightClash && p1Ctx.action === Action.STANDBY)
-      ? Math.max(0, 1 + (p1State.restRecoverBonus || 0) - (p1State.restRecoverPenalty || 0)) : 0;
-    const p2Recovery = (!isInsightClash && p2Ctx.action === Action.STANDBY)
-      ? Math.max(0, 1 + (p2State.restRecoverBonus || 0) - (p2State.restRecoverPenalty || 0)) : 0;
-    const rawP1Stamina = p1State.stamina - p1ActionCost + (p1State.staminaBonus || 0) + p1Recovery;
+    const p1Recovery = (!isInsightClash && p1Ctx.action === Action.STANDBY && !p1State.restRecoverBlocked && !p1State.staminaGainBlocked)
+      ? Math.max(0, 1 + (p1State.restRecoverBonus || 0) + (p1State.permRestRecoverBonus || 0)
+                     - (p1State.restRecoverPenalty || 0) - (p1State.permRestRecoverPenalty || 0)) : 0;
+    const p2Recovery = (!isInsightClash && p2Ctx.action === Action.STANDBY && !p2State.restRecoverBlocked && !p2State.staminaGainBlocked)
+      ? Math.max(0, 1 + (p2State.restRecoverBonus || 0) + (p2State.permRestRecoverBonus || 0)
+                     - (p2State.restRecoverPenalty || 0) - (p2State.permRestRecoverPenalty || 0)) : 0;
+    const rawP1Stamina = p1State.stamina - p1ActionCost + (p1State.staminaGainBlocked ? 0 : (p1State.staminaBonus || 0)) + p1Recovery;
     const newP1Stamina = Math.min(DefaultStats.MAX_STAMINA, Math.max(0, rawP1Stamina));
     const p1StaminaBonusOverflow = rawP1Stamina > DefaultStats.MAX_STAMINA ? rawP1Stamina - DefaultStats.MAX_STAMINA : 0;
     const p1StaminaUnderflow = rawP1Stamina < 0 ? Math.abs(rawP1Stamina) : 0;
-    const rawP2Stamina = p2State.stamina - p2ActionCost + (p2State.staminaBonus || 0) + p2Recovery;
+    const rawP2Stamina = p2State.stamina - p2ActionCost + (p2State.staminaGainBlocked ? 0 : (p2State.staminaBonus || 0)) + p2Recovery;
     const newP2Stamina = Math.min(DefaultStats.MAX_STAMINA, Math.max(0, rawP2Stamina));
     const p2StaminaBonusOverflow = rawP2Stamina > DefaultStats.MAX_STAMINA ? rawP2Stamina - DefaultStats.MAX_STAMINA : 0;
     const p2StaminaUnderflow = rawP2Stamina < 0 ? Math.abs(rawP2Stamina) : 0;
@@ -523,6 +531,16 @@ export class JudgeLayer {
     if (p2Recovery > 0 || p2Ctx.action === Action.STANDBY) {
       p2NewState.restRecoverBonus = 0;
       p2NewState.restRecoverPenalty = 0;
+    }
+
+    // 疗愈已消费 healRecoverBonus/Penalty，在 newState 中清零防止下回合重复使用
+    if (p1HealAmount > 0 || p1Ctx.action === Action.HEAL) {
+      p1NewState.healRecoverBonus = 0;
+      p1NewState.healRecoverPenalty = 0;
+    }
+    if (p2HealAmount > 0 || p2Ctx.action === Action.HEAL) {
+      p2NewState.healRecoverBonus = 0;
+      p2NewState.healRecoverPenalty = 0;
     }
 
     // ── 溢出管道：将所有溢出字段转化为下回合 pendingEffects ──

@@ -21,12 +21,8 @@ export class EffectTimingLayer {
         if (expectedPhase === 'TURN_START') expectedPhase = EngineEvent.TURN_START_PHASE;
         else if (expectedPhase === 'ACTION_START') expectedPhase = EngineEvent.ACTION_START;
         else if (expectedPhase === 'ACTION_END') expectedPhase = EngineEvent.ACTION_END;
-        else if (expectedPhase === 'RESOLVE_END') expectedPhase = EngineEvent.RESOLVE_END;
-        else if (expectedPhase === 'TURN_END') expectedPhase = EngineEvent.TURN_END_PHASE;
         else if (expectedPhase === 'EQUIP_START') expectedPhase = EngineEvent.EQUIP_START;
-        else if (expectedPhase === 'EQUIP_END') expectedPhase = EngineEvent.EQUIP_END;
         else if (expectedPhase === 'DECISION_START') expectedPhase = EngineEvent.DECISION_START;
-        else if (expectedPhase === 'DECISION_END') expectedPhase = EngineEvent.DECISION_END;
 
         const phaseOk = !expectedPhase || expectedPhase === phaseEvent;
         const turnOk = readyAt.turn == null || readyAt.turn <= (engine?.turn || 0);

@@ -342,48 +342,50 @@ export const EffectId = Object.freeze({
   SIDE_STEP: 'side_step',
   CLUMSY: 'clumsy',
   SHACKLED_DODGE: 'shackled_dodge',
-  // ── 共享攻击技能（skill/attack/）──
+  MERIDIAN_BLOCK: 'meridian_block',
+  HEAL_BLOCK: 'heal_block',
+  ATTACK_ENHANCE: 'attack_enhance',
+  ATTACK_SLOT0_BLOCK: 'attack_slot0_block',
+  GUARD_SLOT0_BLOCK: 'guard_slot0_block',
+  DODGE_SLOT0_BLOCK: 'dodge_slot0_block',
+  GUARD_ENHANCE: 'guard_enhance',
+  DODGE_ENHANCE: 'dodge_enhance',
+  // ── 玩家攻击技能（skill/player-attack/）──
   BREAK_QI: 'break_qi',
-  RECKLESS: 'reckless',
-  DRAIN: 'drain',
-  OBSCURE: 'obscure',
-  EXHILARATE: 'exhilarate',
-  CHAINLOCK: 'chainlock',
+  HAMSTRING: 'hamstring',
+  FATIGUE: 'fatigue',
+  // ── 共享攻击技能（skill/attack/）──
+  PARALYZE: 'paralyze',
+  CHARGE: 'charge',
+  SHATTER_POINT: 'shatter_point',
   // ── 共享守备技能（skill/guard/）──
-  BLOOD_SHIELD: 'blood_shield',
-  BASTION: 'bastion',
-  IRON_WALL: 'iron_wall',
-  ABSORB_QI: 'absorb_qi',
-  INTERCEPT: 'intercept',
   RESTORE: 'restore',
+  REDIRECT: 'redirect',
+  BACKLASH: 'backlash',
+  BLINDING: 'blinding',
   SHOCKWAVE: 'shockwave',
+  MUSTER: 'muster',
   // ── 共享闪避技能（skill/dodge/）──
-  AGILITY: 'agility',
-  ABANDON: 'abandon',
-  MOMENTUM: 'momentum',
-  DISARM: 'disarm',
-  DISRUPT: 'disrupt',
+  // ── 玩家闪避技能（skill/player-dodge/）──
   HIDE: 'hide',
+  DEFERRED: 'deferred',
+  PILFER: 'pilfer',
   LURE: 'lure',
   SEE_THROUGH: 'see-through',
-  // ── 玩家攻击技能（skill/player-attack/）──
-  CHARGE: 'charge',
-  POUNCE: 'pounce',
-  CAUTIOUS: 'cautious',
-  // ── 玩家守备技能（skill/player-guard/）──
-  RIGID: 'rigid',
-  REDIRECT: 'redirect',
+  NIMBLE: 'nimble',
   // ── 玩家闪避技能（skill/player-dodge/）──
-  LIGHTBODY: 'lightbody',
   // ── AI 攻击技能（skill/ai-attack/）──
   BLOOD_DRINK: 'blood_drink',
-  HEAVY_PRESS: 'heavy_press',
-  BRUTE_FORCE: 'brute_force',
+  FRENZY: 'frenzy',
+  PURSUIT: 'pursuit',
   // ── AI 守备技能（skill/ai-guard/）──
-  TREMOR: 'tremor',
   STEADY: 'steady',
+  INVIGORATE: 'invigorate',
+  TREMOR: 'tremor',
   // ── AI 闪避技能（skill/ai-dodge/）──
-  DEFERRED: 'deferred',
+  DISARM: 'disarm',
+  EQUITY: 'equity',
+  FURY: 'fury',
 });
 
 
@@ -404,54 +406,37 @@ export const EffectId = Object.freeze({
  * 目前保留空壳结构，引擎按 EffectId 分支处理时若找不到定义则跳过。
  */
 export const EffectDefs = Object.freeze({
-  // ── 共享攻击技能（skill/attack/）──
+  // ── 玩家攻击技能（skill/player-attack/）──
   [EffectId.BREAK_QI]: {
     id: EffectId.BREAK_QI, name: '泣命',
     applicableTo: [Action.ATTACK],
     hpCost: 1,
+    playerOnly: true,
   },
-  [EffectId.RECKLESS]: {
-    id: EffectId.RECKLESS, name: '舍身',
+  [EffectId.HAMSTRING]: {
+    id: EffectId.HAMSTRING, name: '断筋',
+    applicableTo: [Action.ATTACK],
+    playerOnly: true,
+  },
+  [EffectId.FATIGUE]: {
+    id: EffectId.FATIGUE, name: '疲兵',
+    applicableTo: [Action.ATTACK],
+    playerOnly: true,
+  },
+  // ── 共享攻击技能（skill/attack/）──
+  [EffectId.PARALYZE]: {
+    id: EffectId.PARALYZE, name: '麻痹',
     applicableTo: [Action.ATTACK],
   },
-  [EffectId.DRAIN]: {
-    id: EffectId.DRAIN, name: '汲取',
+  [EffectId.CHARGE]: {
+    id: EffectId.CHARGE, name: '蓄力',
     applicableTo: [Action.ATTACK],
   },
-  [EffectId.OBSCURE]: {
-    id: EffectId.OBSCURE, name: '障目',
-    applicableTo: [Action.ATTACK],
-  },
-  [EffectId.EXHILARATE]: {
-    id: EffectId.EXHILARATE, name: '激昂',
-    applicableTo: [Action.ATTACK],
-  },
-  [EffectId.CHAINLOCK]: {
-    id: EffectId.CHAINLOCK, name: '束缚',
+  [EffectId.SHATTER_POINT]: {
+    id: EffectId.SHATTER_POINT, name: '崩穴',
     applicableTo: [Action.ATTACK],
   },
   // ── 共享守备技能（skill/guard/）──
-  [EffectId.BLOOD_SHIELD]: {
-    id: EffectId.BLOOD_SHIELD, name: '血盾',
-    applicableTo: [Action.GUARD],
-    hpCost: 1,
-  },
-  [EffectId.BASTION]: {
-    id: EffectId.BASTION, name: '磐石',
-    applicableTo: [Action.GUARD],
-  },
-  [EffectId.IRON_WALL]: {
-    id: EffectId.IRON_WALL, name: '铁壁',
-    applicableTo: [Action.GUARD],
-  },
-  [EffectId.ABSORB_QI]: {
-    id: EffectId.ABSORB_QI, name: '纳气',
-    applicableTo: [Action.GUARD],
-  },
-  [EffectId.INTERCEPT]: {
-    id: EffectId.INTERCEPT, name: '截脉',
-    applicableTo: [Action.GUARD],
-  },
   [EffectId.RESTORE]: {
     id: EffectId.RESTORE, name: '恢复',
     applicableTo: [Action.GUARD],
@@ -460,64 +445,42 @@ export const EffectDefs = Object.freeze({
     id: EffectId.SHOCKWAVE, name: '崩震',
     applicableTo: [Action.GUARD],
   },
-  // ── 玩家攻击技能（skill/player-attack/）──
-  [EffectId.CHARGE]: {
-    id: EffectId.CHARGE, name: '蓄力',
-    applicableTo: [Action.ATTACK],
-    playerOnly: true,
-  },
-  [EffectId.POUNCE]: {
-    id: EffectId.POUNCE, name: '猛扑',
-    applicableTo: [Action.ATTACK],
-    playerOnly: true,
-  },
-  [EffectId.CAUTIOUS]: {
-    id: EffectId.CAUTIOUS, name: '谨慎',
-    applicableTo: [Action.ATTACK],
-    playerOnly: true,
+  [EffectId.MUSTER]: {
+    id: EffectId.MUSTER, name: '整备',
+    applicableTo: [Action.GUARD],
   },
   // ── 玩家守备技能（skill/player-guard/）──
-  [EffectId.RIGID]: {
-    id: EffectId.RIGID, name: '硬体',
-    applicableTo: [Action.GUARD],
-    playerOnly: true,
-  },
   [EffectId.REDIRECT]: {
     id: EffectId.REDIRECT, name: '化劲',
     applicableTo: [Action.GUARD],
     playerOnly: true,
   },
-  // ── 玩家闪避技能（skill/player-dodge/）──
-  [EffectId.LIGHTBODY]: {
-    id: EffectId.LIGHTBODY, name: '轻身',
-    applicableTo: [Action.DODGE],
+  [EffectId.BACKLASH]: {
+    id: EffectId.BACKLASH, name: '反噬',
+    applicableTo: [Action.GUARD],
+    playerOnly: true,
+  },
+  [EffectId.BLINDING]: {
+    id: EffectId.BLINDING, name: '盲目',
+    applicableTo: [Action.GUARD],
     playerOnly: true,
   },
   // ── 共享闪避技能（skill/dodge/）──
-  [EffectId.AGILITY]: {
-    id: EffectId.AGILITY, name: '灵巧',
-    applicableTo: [Action.DODGE],
-  },
-  [EffectId.ABANDON]: {
-    id: EffectId.ABANDON, name: '弃身',
-    applicableTo: [Action.DODGE],
-    hpCost: 1,
-  },
-  [EffectId.MOMENTUM]: {
-    id: EffectId.MOMENTUM, name: '借势',
-    applicableTo: [Action.DODGE],
-  },
-  [EffectId.DISARM]: {
-    id: EffectId.DISARM, name: '解甲',
-    applicableTo: [Action.DODGE],
-  },
-  [EffectId.DISRUPT]: {
-    id: EffectId.DISRUPT, name: '乱心',
-    applicableTo: [Action.DODGE],
-  },
+  // ── 玩家闪避技能（skill/player-dodge/）──
   [EffectId.HIDE]: {
     id: EffectId.HIDE, name: '隐匿',
     applicableTo: [Action.DODGE],
+    playerOnly: true,
+  },
+  [EffectId.DEFERRED]: {
+    id: EffectId.DEFERRED, name: '延付',
+    applicableTo: [Action.DODGE],
+    playerOnly: true,
+  },
+  [EffectId.PILFER]: {
+    id: EffectId.PILFER, name: '窃取',
+    applicableTo: [Action.DODGE],
+    playerOnly: true,
   },
   [EffectId.LURE]: {
     id: EffectId.LURE, name: '引诱',
@@ -527,36 +490,55 @@ export const EffectDefs = Object.freeze({
     id: EffectId.SEE_THROUGH, name: '看破',
     applicableTo: [Action.DODGE],
   },
+  [EffectId.NIMBLE]: {
+    id: EffectId.NIMBLE, name: '轻身',
+    applicableTo: [Action.DODGE],
+  },
   // ── AI 攻击技能（skill/ai-attack/）──
   [EffectId.BLOOD_DRINK]: {
     id: EffectId.BLOOD_DRINK, name: '饮血',
     applicableTo: [Action.ATTACK],
     aiOnly: true,
   },
-  [EffectId.HEAVY_PRESS]: {
-    id: EffectId.HEAVY_PRESS, name: '猛压',
+  [EffectId.FRENZY]: {
+    id: EffectId.FRENZY, name: '狂热',
     applicableTo: [Action.ATTACK],
     aiOnly: true,
   },
-  [EffectId.BRUTE_FORCE]: {
-    id: EffectId.BRUTE_FORCE, name: '蛮力',
+  [EffectId.PURSUIT]: {
+    id: EffectId.PURSUIT, name: '追杀',
     applicableTo: [Action.ATTACK],
     aiOnly: true,
   },
   // ── AI 守备技能（skill/ai-guard/）──
-  [EffectId.TREMOR]: {
-    id: EffectId.TREMOR, name: '震颤',
-    applicableTo: [Action.GUARD],
-    aiOnly: true,
-  },
   [EffectId.STEADY]: {
     id: EffectId.STEADY, name: '稳重',
     applicableTo: [Action.GUARD],
     aiOnly: true,
   },
+  [EffectId.INVIGORATE]: {
+    id: EffectId.INVIGORATE, name: '振神',
+    applicableTo: [Action.GUARD],
+    aiOnly: true,
+  },
+  [EffectId.TREMOR]: {
+    id: EffectId.TREMOR, name: '强震',
+    applicableTo: [Action.GUARD],
+    aiOnly: true,
+  },
   // ── AI 闪避技能（skill/ai-dodge/）──
-  [EffectId.DEFERRED]: {
-    id: EffectId.DEFERRED, name: '延付',
+  [EffectId.DISARM]: {
+    id: EffectId.DISARM, name: '解甲',
+    applicableTo: [Action.DODGE],
+    aiOnly: true,
+  },
+  [EffectId.EQUITY]: {
+    id: EffectId.EQUITY, name: '公平',
+    applicableTo: [Action.DODGE],
+    aiOnly: true,
+  },
+  [EffectId.FURY]: {
+    id: EffectId.FURY, name: '愤怒',
     applicableTo: [Action.DODGE],
     aiOnly: true,
   },
@@ -575,7 +557,7 @@ export const EFFECT_SLOTS = 3;
  * 规则：
  *  - 直接就绪（READY）：零消耗，不触发任何效果。
  *  - 蓄势（STANDBY）：零消耗，但可触发蓄势类技能。
- *  - 攻/守/闪：按 1 + enhance 基础计算，再加 penalty 减 discount。
+ *  - 攻/守/闪/疗愈：按 1 + enhance 基础计算，再加 penalty 减 discount。
  *
  * @param {{ action: string, enhance?: number }} ctx
  * @param {{ staminaPenalty?: number, staminaDiscount?: number } | null} [playerState]
@@ -584,7 +566,7 @@ export const EFFECT_SLOTS = 3;
 export function calcActionCost(ctx, playerState) {
   if (ctx.action === Action.READY) return 0;
   if (ctx.action === Action.STANDBY) return 0;
-  if (ctx.action === Action.HEAL) return 0;
+  if (playerState?.staminaCostFree) return 0;
   const base = 1 + (ctx.enhance || 0);
   const pen = playerState?.staminaPenalty || 0;
   const dis = playerState?.staminaDiscount || 0;

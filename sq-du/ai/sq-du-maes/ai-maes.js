@@ -43,40 +43,32 @@ export { AIEnhanceLayer } from '../ai-enhance.js';
 
 /** MAES AI 攻击技能池 */
 const MAES_ATTACK_EFFECTS = [
-  EffectId.BREAK_QI,      // 泣命
-  EffectId.RECKLESS,      // 舍身
-  EffectId.DRAIN,         // 汲取
-  EffectId.CHAINLOCK,     // 束缚
-  EffectId.OBSCURE,       // 障目
+  EffectId.PARALYZE,      // 麻痹
+  EffectId.CHARGE,        // 蓄力（共享）
+  EffectId.SHATTER_POINT, // 崩穴（共享）
   EffectId.BLOOD_DRINK,   // 饮血（AI 专属）
-  EffectId.HEAVY_PRESS,   // 猛压（AI 专属）
-  EffectId.BRUTE_FORCE,   // 蛮力（AI 专属）
+  EffectId.FRENZY,        // 狂热（AI 专属）
+  EffectId.PURSUIT,       // 追杀（AI 专属）
 ];
 
 /** MAES AI 守备技能池 */
 const MAES_GUARD_EFFECTS = [
-  EffectId.BLOOD_SHIELD,  // 血盾
-  EffectId.BASTION,       // 磐石
-  EffectId.IRON_WALL,     // 铁壁
-  EffectId.ABSORB_QI,     // 纳气
-  EffectId.INTERCEPT,     // 截脉
   EffectId.RESTORE,       // 恢复
   EffectId.SHOCKWAVE,     // 崩震
-  EffectId.TREMOR,        // 震颤（AI 专属）
+  EffectId.MUSTER,        // 整备（共享）
   EffectId.STEADY,        // 稳重（AI 专属）
+  EffectId.INVIGORATE,    // 振神（AI 专属）
+  EffectId.TREMOR,        // 强震（AI 专属）
 ];
 
 /** MAES AI 闪避技能池 */
 const MAES_DODGE_EFFECTS = [
-  EffectId.AGILITY,       // 灵巧
-  EffectId.ABANDON,       // 弃身
-  EffectId.MOMENTUM,      // 借势
-  EffectId.DISRUPT,       // 乱心
-  EffectId.HIDE,          // 隐匿
   EffectId.LURE,          // 引诱
   EffectId.SEE_THROUGH,   // 看破
-  EffectId.DISARM,        // 解甲
-  EffectId.DEFERRED,      // 延付（AI 专属）
+  EffectId.NIMBLE,        // 轻身（共享）
+  EffectId.DISARM,        // 解甲（AI 专属）
+  EffectId.EQUITY,        // 公平（AI 专属）
+  EffectId.FURY,          // 愤怒（AI 专属）
 ];
 
 /**

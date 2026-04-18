@@ -34,8 +34,9 @@ export const RejuvenatedEffect = createStatusEffect({
 export const ExhaustedEffect = createStatusEffect({
   id: 'exhausted',
   name: '疲惫',
-  desc: '本回合精力消耗 +1',
+  desc: '精力消耗 +1',
   applicableTo: [Action.ATTACK, Action.GUARD, Action.DODGE],
+  timingDisplay: 'phase',
   apply(state) {
     state.staminaPenalty = (state.staminaPenalty || 0) + 1;
   },
@@ -44,8 +45,9 @@ export const ExhaustedEffect = createStatusEffect({
 export const ExcitedEffect = createStatusEffect({
   id: 'excited',
   name: '兴奋',
-  desc: '本回合精力消耗 -1',
+  desc: '精力消耗 -1',
   applicableTo: [Action.ATTACK, Action.GUARD, Action.DODGE],
+  timingDisplay: 'phase',
   apply(state) {
     state.staminaDiscount = (state.staminaDiscount || 0) + 1;
   },

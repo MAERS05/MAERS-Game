@@ -15,58 +15,55 @@ import { EffectId } from './constants.js';
 import { SluggishEffect, RejuvenatedEffect, ExhaustedEffect, ExcitedEffect } from '../effect/function/energy.js';
 import { HeavyEffect, LightEffect, ShackledEffect, InsightfulEffect, DullEffect, BlindedEffect } from '../effect/function/combat-status.js';
 import { FortifiedEffect, WoundedEffect } from '../effect/function/combat-identity.js';
-import { PowerEffect, WeakEffect, BrokenBladeEffect, ChainlockEffect } from '../effect/function/attack-status.js';
+import { PowerEffect, WeakEffect, BrokenBladeEffect } from '../effect/function/attack-status.js';
 import { SolidEffect, CrackedArmorEffect, BrokenArmorEffect } from '../effect/function/defense-status.js';
 import { SideStepEffect, ClumsyEffect, ShackledDodgeEffect } from '../effect/function/dodge-status.js';
-
-// ── 共享攻击技能（skill/attack/）──
-import { BreakQiEffect } from '../skill/attack/break_qi.js';
-import { RecklessEffect } from '../skill/attack/reckless.js';
-import { DrainEffect } from '../skill/attack/drain.js';
-import { ObscureEffect } from '../skill/attack/obscure.js';
-import { ChainLock } from '../skill/attack/chainlock.js';
-import { ExhilarateEffect } from '../skill/attack/exhilarate.js';
-
-// ── 共享守备技能（skill/guard/）──
-import { BloodShieldEffect } from '../skill/guard/blood_shield.js';
-import { RedirectEffect } from '../skill/player-guard/redirect.js';
-import { BastionEffect } from '../skill/guard/bastion.js';
-import { IronWallEffect } from '../skill/guard/iron_wall.js';
-import { AbsorbQiEffect } from '../skill/guard/absorb_qi.js';
-import { InterceptEffect } from '../skill/guard/intercept.js';
-import { Restore } from '../skill/guard/restore.js';
-import { ShockwaveEffect } from '../skill/guard/shockwave.js';
+import { MeridianBlockEffect, HealBlockEffect, AttackEnhanceEffect, AttackSlot0BlockEffect, GuardSlot0BlockEffect, DodgeSlot0BlockEffect, GuardEnhanceEffect, DodgeEnhanceEffect } from '../effect/function/utility-status.js';
 
 // ── 玩家攻击技能（skill/player-attack/）──
-import { ChargeEffect } from '../skill/player-attack/charge.js';
-import { PounceEffect } from '../skill/player-attack/pounce.js';
-import { CautiousEffect } from '../skill/player-attack/cautious.js';
+import { BreakQiEffect } from '../skill/player-attack/break_qi.js';
+import { HamstringEffect } from '../skill/player-attack/hamstring.js';
+import { FatigueEffect } from '../skill/player-attack/fatigue.js';
+
+// ── 共享攻击技能（skill/attack/）──
+import { ParalyzeEffect } from '../skill/attack/paralyze.js';
+import { ChargeEffect } from '../skill/attack/charge.js';
+import { ShatterPointEffect } from '../skill/attack/shatter_point.js';
 
 // ── 玩家守备技能（skill/player-guard/）──
-import { RigidEffect } from '../skill/player-guard/rigid.js';
+import { RedirectEffect } from '../skill/player-guard/redirect.js';
+import { BacklashEffect } from '../skill/player-guard/backlash.js';
+import { BlindingEffect } from '../skill/player-guard/blinding.js';
 
-// ── 闪避技能（skill/dodge/ 及 skill/player-dodge/）──
-import { AgilityEffect } from '../skill/dodge/agility.js';
-import { AbandonEffect } from '../skill/dodge/abandon.js';
-import { MomentumEffect } from '../skill/dodge/momentum.js';
-import { LightfootEffect } from '../skill/player-dodge/lightfoot.js';
-import { DisarmEffect } from '../skill/dodge/disarm.js';
-import { DisruptEffect } from '../skill/dodge/disrupt.js';
-import { Hide } from '../skill/dodge/hide.js';
+// ── 共享守备技能（skill/guard/）──
+import { Restore } from '../skill/guard/restore.js';
+import { ShockwaveEffect } from '../skill/guard/shockwave.js';
+import { MusterEffect } from '../skill/guard/muster.js';
+
+// ── 玩家闪避技能（skill/player-dodge/）──
+import { Hide } from '../skill/player-dodge/hide.js';
+import { DeferredEffect } from '../skill/player-dodge/deferred.js';
+import { PilferEffect } from '../skill/player-dodge/pilfer.js';
+
+// ── 共享闪避技能（skill/dodge/）──
 import { Lure } from '../skill/dodge/lure.js';
 import { SeeThrough } from '../skill/dodge/see-through.js';
+import { NimbleEffect } from '../skill/dodge/nimble.js';
+
+// ── AI 闪避技能（skill/ai-dodge/）──
+import { DisarmEffect } from '../skill/ai-dodge/disarm.js';
+import { EquityEffect } from '../skill/ai-dodge/equity.js';
+import { FuryEffect } from '../skill/ai-dodge/fury.js';
 
 // ── AI 攻击技能（skill/ai-attack/）──
 import { BloodDrinkEffect } from '../skill/ai-attack/blood_drink.js';
-import { HeavyPressEffect } from '../skill/ai-attack/heavy_press.js';
-import { BruteForceEffect } from '../skill/ai-attack/brute_force.js';
+import { FrenzyEffect } from '../skill/ai-attack/frenzy.js';
+import { PursuitEffect } from '../skill/ai-attack/pursuit.js';
 
 // ── AI 守备技能（skill/ai-guard/）──
-import { TremorEffect } from '../skill/ai-guard/tremor.js';
 import { SteadyEffect } from '../skill/ai-guard/steady.js';
-
-// ── AI 闪避技能（skill/ai-dodge/）──
-import { DeferredEffect } from '../skill/ai-dodge/deferred.js';
+import { InvigorateEffect } from '../skill/ai-guard/invigorate.js';
+import { TremorEffect } from '../skill/ai-guard/tremor.js';
 
 /**
  * 效果处理器映射表（EffectId → handler）
@@ -77,48 +74,42 @@ import { DeferredEffect } from '../skill/ai-dodge/deferred.js';
  *   onPhase(args)                              → void（阶段接口触发时机）
  */
 const RawEffectHandlers = {
-  // ── 共享攻击技能 ──
+  // ── 玩家攻击技能 ──
   [EffectId.BREAK_QI]: BreakQiEffect,
-  [EffectId.RECKLESS]: RecklessEffect,
-  [EffectId.DRAIN]: DrainEffect,
-  [EffectId.OBSCURE]: ObscureEffect,
-  [EffectId.CHAINLOCK]: ChainLock,
-  [EffectId.EXHILARATE]: ExhilarateEffect,
-  // ── 共享守备技能 ──
-  [EffectId.BLOOD_SHIELD]: BloodShieldEffect,
+  [EffectId.HAMSTRING]: HamstringEffect,
+  [EffectId.FATIGUE]: FatigueEffect,
+  // ── 共享攻击技能 ──
+  [EffectId.PARALYZE]: ParalyzeEffect,
+  [EffectId.CHARGE]: ChargeEffect,
+  [EffectId.SHATTER_POINT]: ShatterPointEffect,
+  // ── 玩家守备技能 ──
   [EffectId.REDIRECT]: RedirectEffect,
-  [EffectId.BASTION]: BastionEffect,
-  [EffectId.IRON_WALL]: IronWallEffect,
-  [EffectId.ABSORB_QI]: AbsorbQiEffect,
-  [EffectId.INTERCEPT]: InterceptEffect,
+  [EffectId.BACKLASH]: BacklashEffect,
+  [EffectId.BLINDING]: BlindingEffect,
+  // ── 共享守备技能 ──
   [EffectId.RESTORE]: Restore,
   [EffectId.SHOCKWAVE]: ShockwaveEffect,
-  // ── 玩家攻击技能 ──
-  [EffectId.CHARGE]: ChargeEffect,
-  [EffectId.POUNCE]: PounceEffect,
-  [EffectId.CAUTIOUS]: CautiousEffect,
-  // ── 玩家守备技能 ──
-  [EffectId.RIGID]: RigidEffect,
+  [EffectId.MUSTER]: MusterEffect,
   // ── 玩家闪避技能 ──
-  [EffectId.AGILITY]: AgilityEffect,
-  [EffectId.ABANDON]: AbandonEffect,
-  [EffectId.MOMENTUM]: MomentumEffect,
-  [EffectId.LIGHTBODY]: LightfootEffect,
-  [EffectId.DISARM]: DisarmEffect,
-  [EffectId.DISRUPT]: DisruptEffect,
   [EffectId.HIDE]: Hide,
+  [EffectId.DEFERRED]: DeferredEffect,
+  [EffectId.PILFER]: PilferEffect,
+  // ── 共享闪避技能 ──
   [EffectId.LURE]: Lure,
   [EffectId.SEE_THROUGH]: SeeThrough,
+  [EffectId.NIMBLE]: NimbleEffect,
+  // ── AI 闪避技能 ──
+  [EffectId.DISARM]: DisarmEffect,
+  [EffectId.EQUITY]: EquityEffect,
+  [EffectId.FURY]: FuryEffect,
   // ── AI 攻击技能 ──
   [EffectId.BLOOD_DRINK]: BloodDrinkEffect,
-  [EffectId.CHAINLOCK]: ChainLock,
-  [EffectId.HEAVY_PRESS]: HeavyPressEffect,
-  [EffectId.BRUTE_FORCE]: BruteForceEffect,
+  [EffectId.FRENZY]: FrenzyEffect,
+  [EffectId.PURSUIT]: PursuitEffect,
   // ── AI 守备技能 ──
-  [EffectId.TREMOR]: TremorEffect,
   [EffectId.STEADY]: SteadyEffect,
-  // ── AI 闪避技能 ──
-  [EffectId.DEFERRED]: DeferredEffect,
+  [EffectId.INVIGORATE]: InvigorateEffect,
+  [EffectId.TREMOR]: TremorEffect,
   // ── 状态效果（effect/function/）──
   sluggish: SluggishEffect,
   rejuvenated: RejuvenatedEffect,
@@ -135,13 +126,20 @@ const RawEffectHandlers = {
   weak: WeakEffect,
   power: PowerEffect,
   broken_blade: BrokenBladeEffect,
-  chainlock_state: ChainlockEffect,
   solid: SolidEffect,
   cracked_armor: CrackedArmorEffect,
   broken_armor: BrokenArmorEffect,
   side_step: SideStepEffect,
   clumsy: ClumsyEffect,
   shackled_dodge: ShackledDodgeEffect,
+  meridian_block: MeridianBlockEffect,
+  heal_block: HealBlockEffect,
+  attack_enhance: AttackEnhanceEffect,
+  attack_slot0_block: AttackSlot0BlockEffect,
+  guard_slot0_block: GuardSlot0BlockEffect,
+  dodge_slot0_block: DodgeSlot0BlockEffect,
+  guard_enhance: GuardEnhanceEffect,
+  dodge_enhance: DodgeEnhanceEffect,
 };
 
 /**

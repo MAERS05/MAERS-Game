@@ -6,12 +6,12 @@ import { EffectLayer } from '../../main/effect.js';
 
 /**
  * 饮血（AI 专属攻击技能）
- * 若攻击成功，为自身附加1级[治愈]并在下回合开始后，装配期开始前生效。
+ * 若攻击成功，为自身附加1级[治愈]并在下回合开始后触发。
  */
 export const BloodDrinkEffect = createSkillEffect({
   id: EffectId.BLOOD_DRINK,
   name: '饮血',
-  desc: '若攻击成功，为自身附加1级[治愈]并在下回合开始后，装配期开始前生效',
+  desc: '若攻击成功，为自身附加1级[治愈]并在下回合开始后触发',
   applicableTo: [Action.ATTACK],
 
   onPost(ctx, owner, opponent, selfDmg, oppDmg) {

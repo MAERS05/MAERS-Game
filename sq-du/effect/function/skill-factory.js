@@ -2,7 +2,7 @@
 
 import { EffectLayer } from '../../main/effect.js';
 
-export function createSkillEffect({ id, name, desc, applicableTo, timing = null, triggerOnFail = false, onPre, onPost, onPhase }) {
+export function createSkillEffect({ id, name, desc, applicableTo, timing = null, triggerOnFail = false, triggerOnMutualHit = false, onPre, onPost, onPhase }) {
   return Object.freeze({
     id,
     name,
@@ -10,6 +10,7 @@ export function createSkillEffect({ id, name, desc, applicableTo, timing = null,
     applicableTo,
     timing,
     triggerOnFail,
+    triggerOnMutualHit,
     onPre: onPre || (() => {}),
     onPost: onPost || (() => {}),
     onPhase: onPhase || ((ctx, owner, opponent, meta = {}) => {

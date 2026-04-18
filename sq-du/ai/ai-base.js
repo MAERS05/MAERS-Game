@@ -305,9 +305,9 @@ export class AIBaseLogic {
       w.standby += 4.0;
       w.attack -= 1.5;
       w.dodge -= 0.5;
-      // 疗愈消耗 0 精力 —— 危机期低血时是零成本最优解
-      if (!ai.healBlocked && ai.hp < 3) {
-        w.heal += (3 - ai.hp) * 1.5; // hp=1: +3.0, hp=2: +1.5
+      // 疗愈消耗 1 精力——危机期只有精力=1且血量危急时才考虑
+      if (!ai.healBlocked && ai.hp <= 1 && aiEffectiveStamina >= 1) {
+        w.heal += 2.0;
       }
     }
     // ── 阶段2：保守（精力 = 2）─ 可行动一次但不留余量 ──
@@ -395,8 +395,8 @@ export class AIBaseLogic {
     w.dodge += indicators.aiDanger * indicators.antiAttackNeed * 0.6;
     w.attack -= indicators.aiDanger * indicators.antiAttackNeed * 0.4;
 
-    // ── 疗愈评估（低血量 + 未被禁止时考虑）─────────
-    if (!ai.healBlocked && ai.hp < 3) {
+    // ── 疗愈评估（低血量 + 未被禁止 + 精力充足时考虑）─────────
+    if (!ai.healBlocked && ai.hp < 3 && aiEffectiveStamina >= 1) {
       // 血量越低越想疗愈
       const hpUrgency = (3 - ai.hp) / 2; // hp=1→1.0, hp=2→0.5
       w.heal += hpUrgency * 2.5;

@@ -40,6 +40,7 @@ import { resolve } from './resolver.js';
 import { collectOverflows } from '../effect/function/overflow-manager.js';
 import { JudgeLayer } from '../main/judge.js';
 import { scheduleAI, scheduleAIRedecide, accelerateAI, applyCustomization as applyMaesAI } from '../ai/sq-du-maes/ai-maes.js';
+import { applyPlayerCustomization } from '../main/player-profile.js';
 
 // ─────────────────────────────────────────────
 // 事件总线（内部工具类）
@@ -108,10 +109,18 @@ function createPlayerState(id, overrides = {}) {
   const emptySlots = () => Array(EFFECT_SLOTS).fill(null);
 
   return {
+    // ═══════════════════════════════════════════
+    // 核心属性
+    // ═══════════════════════════════════════════
     id,
     hp: DefaultStats.MAX_HP,
     stamina: DefaultStats.MAX_STAMINA,
     speed: DefaultStats.BASE_SPEED,
+    actionCtx: null,
+
+    // ═══════════════════════════════════════════
+    // 回合控制
+    // ═══════════════════════════════════════════
     ready: false,
     insightUsed: false,
     wasInsighted: false,
@@ -119,81 +128,71 @@ function createPlayerState(id, overrides = {}) {
     pendingPassiveReveal: false,
     canRedecide: false,
     didRedecide: false,
-    actionCtx: null,
-    // 效果相关状态：每个行动独立维护自己的效果库
+    speedDiscountSpent: 0,                        // 本回合因提速消耗的 discount 计数
+    actionDiscountSpent: 0,                       // 本回合因行动成本消耗的 discount 计数
+
+    // ═══════════════════════════════════════════
+    // 效果系统
+    // ═══════════════════════════════════════════
     effectInventory: {
       [Action.ATTACK]: [...allAttackEffects],
       [Action.GUARD]: [...allGuardEffects],
       [Action.DODGE]: [...allDodgeEffects],
     },
-    equippedEffects: {                            // 跨回合缓存的快捷槽担
+    equippedEffects: {                            // 跨回合缓存的快捷槽
       [Action.ATTACK]: emptySlots(),
       [Action.GUARD]: emptySlots(),
       [Action.DODGE]: emptySlots(),
     },
     effectIntel: [],                              // 已获取的敌方效果情报
-    speedDiscountSpent: 0,                        // 本回合因提速消耗的 discount 计数（用于精确归还）
-    actionDiscountSpent: 0,                       // 本回合因行动成本消耗的 discount 计数（用于精确归还）
-    insightDebuff: 0,                             // 洞察成本修正（正=增加消耗，负=减少消耗）
-    // ── 溢出字段（由 overflow-manager 每回合结算后填充，下回合开始时消费） ──
-    hpOverflow: 0,                                // 命数正溢出
-    hpUnderflow: 0,                               // 命数负溢出
-    staminaOverflow: 0,                           // 精力正溢出
-    staminaUnderflow: 0,                          // 精力负溢出
-    staminaDebuff: 0,                             // 精力消耗增加（兼容旧逻辑）
-    speedOverflow: 0,                             // 动速正溢出
-    speedUnderflow: 0,                            // 动速负溢出
-    attackPtsOverflow: 0,                         // 攻击点数正溢出
-    attackPtsUnderflow: 0,                        // 攻击点数负溢出
-    guardPtsOverflow: 0,                          // 守备点数正溢出
-    guardPtsUnderflow: 0,                         // 守备点数负溢出
-    dodgePtsOverflow: 0,                          // 闪避点数正溢出
-    dodgePtsUnderflow: 0,                         // 闪避点数负溢出
-    hpBonusNextTurn: 0,                           // 旧兼容：命数正溢出
-    hpDrain: 0,                                   // 旧兼容：持续伤害
-    hpDebuff: 0,                                  // 旧兼容：命数负溢出
-    restRecoverBonus: 0,                          // 蓄气恢复加值
-    restRecoverPenalty: 0,                        // 蓄气恢复减值
-    agilityDebuff: 0,                             // 动速减益
-    agilityBoost: 0,                              // 动速增益
-    chargeBoost: 0,                               // 攻击点数增益
-    attackPtsBonus: 0,                             // 攻击点数加值（N | { value, turns }，每回合衰减，Infinity=永久）
-    guardPtsBonus: 0,                              // 守备点数加值（N | { value, turns }，每回合衰减，Infinity=永久）
-    dodgePtsBonus: 0,                              // 闪避点数加值（N | { value, turns }，每回合衰减，Infinity=永久）
-    speedBonus: 0,                                 // 动速加值（N | { value, turns }，每回合衰减，Infinity=永久）
+    pendingEffects: [],                           // 待触发效果队列
+
+    // ═══════════════════════════════════════════
+    // 临时增减（每回合衰减，由技能/效果写入）
+    // ═══════════════════════════════════════════
+    // 攻击
+    chargeBoost: 0,                               // 攻击点数增益（一次性消费）
+    attackPtsBonus: 0,                            // 攻击点数加值（N | { value, turns }）
     ptsDebuff: 0,                                 // 攻击点数减益
-    guardBoost: 0,                                // 守备点数增益
+    // 守备
+    guardBoost: 0,                                // 守备点数增益（一次性消费）
+    guardPtsBonus: 0,                             // 守备点数加值（N | { value, turns }）
     guardDebuff: 0,                               // 守备点数减益
-    dodgeBoost: 0,                                // 闪避点数增益
+    // 闪避
+    dodgeBoost: 0,                                // 闪避点数增益（一次性消费）
+    dodgePtsBonus: 0,                             // 闪避点数加值（N | { value, turns }）
     dodgeDebuff: 0,                               // 闪避点数减益
+    // 动速
+    agilityBoost: 0,                              // 动速增益
+    agilityDebuff: 0,                             // 动速减益
+    speedBonus: 0,                                // 动速加值（N | { value, turns }）
+    // 精力消耗
     staminaPenalty: 0,                            // 精力消耗增加
     staminaDiscount: 0,                           // 精力消耗减少
-    insightBlocked: false,                        // 本回合禁洞察
-    insightBlockNextTurn: false,                  // 下回合禁洞察预约
-    redecideBlocked: false,                       // 本回合禁重筹
-    redecideBlockNextTurn: false,                 // 下回合禁重筹预约
-    speedAdjustBlocked: false,                    // 本回合禁提速/降速
-    speedAdjustBlockNextTurn: false,              // 下回合禁提速/降速预约
-    readyBlocked: false,                          // 本回合禁手动就绪（只能等倒计时/蓄势）
-    readyBlockNextTurn: false,                    // 下回合禁手动就绪预约
-    standbyBlocked: false,                        // 本回合禁蓄势
-    standbyBlockNextTurn: false,                  // 下回合禁蓄势预约
-    healBlocked: false,                           // 本回合禁疗愈
-    healBlockNextTurn: false,                     // 下回合禁疗愈预约
-    actionBlocked: [],                            // 本回合禁用动作列表（Action 值）
-    actionBlockNextTurn: [],                      // 下回合禁用动作预约
-    // ── 永久禁用（不衰减、不清零，由 AI/玩家定制文件写入） ──
-    permInsightBlocked: false,                    // 永久禁洞察
-    permRedecideBlocked: false,                   // 永久禁重筹
-    permSpeedAdjustBlocked: false,                // 永久禁提速/降速
-    permReadyBlocked: false,                      // 永久禁手动就绪
-    permStandbyBlocked: false,                    // 永久禁蓄势
-    permActionBlocked: [],                        // 永久禁用动作列表（Action 值）
-    permSlotBlocked: {                             // 永久禁用槽位（每个行动下的指定槽位）
-      [Action.ATTACK]: [false, false, false],
-      [Action.GUARD]: [false, false, false],
-      [Action.DODGE]: [false, false, false],
-    },
+    // 蓄势恢复
+    restRecoverBonus: 0,                          // 蓄势恢复加值
+    restRecoverPenalty: 0,                        // 蓄势恢复减值
+    // 疗愈恢复
+    healRecoverBonus: 0,                          // 疗愈恢复加值
+    healRecoverPenalty: 0,                        // 疗愈恢复减值
+    // 洞察
+    insightDebuff: 0,                             // 洞察成本修正（正=增加，负=减少）
+
+    // ═══════════════════════════════════════════
+    // 临时封锁（本回合/下回合预约，由技能/效果写入）
+    // ═══════════════════════════════════════════
+    insightBlocked: false,                        insightBlockNextTurn: false,
+    redecideBlocked: false,                       redecideBlockNextTurn: false,
+    speedAdjustBlocked: false,                    speedAdjustBlockNextTurn: false,
+    readyBlocked: false,                          readyBlockNextTurn: false,
+    standbyBlocked: false,                        standbyBlockNextTurn: false,
+    healBlocked: false,                           healBlockNextTurn: false,
+    restRecoverBlocked: false,                    restRecoverBlockNextTurn: false,
+    healRecoverBlocked: false,                    healRecoverBlockNextTurn: false,
+    staminaCostFree: false,                       staminaCostFreeNextTurn: false,
+    staminaGainBlocked: false,                    staminaGainBlockNextTurn: false,
+    hpGainBlocked: false,                         hpGainBlockNextTurn: false,
+    actionBlocked: [],                            actionBlockNextTurn: [],
     slotBlocked: {
       [Action.ATTACK]: [false, false, false],
       [Action.GUARD]: [false, false, false],
@@ -204,7 +203,59 @@ function createPlayerState(id, overrides = {}) {
       [Action.GUARD]: [false, false, false],
       [Action.DODGE]: [false, false, false],
     },
-    pendingEffects: [],                           // 待触发效果队列
+
+    // ═══════════════════════════════════════════
+    // 永久封锁（不衰减、不清零，由 AI/玩家定制文件写入）
+    // ═══════════════════════════════════════════
+    permInsightBlocked: false,
+    permRedecideBlocked: false,
+    permSpeedAdjustBlocked: false,
+    permReadyBlocked: false,
+    permStandbyBlocked: false,
+    permHealBlocked: false,
+    permRestRecoverBlocked: false,
+    permHealRecoverBlocked: false,
+    permStaminaCostFree: false,
+    permStaminaGainBlocked: false,
+    permHpGainBlocked: false,
+    permActionBlocked: [],
+    permSlotBlocked: {
+      [Action.ATTACK]: [false, false, false],
+      [Action.GUARD]: [false, false, false],
+      [Action.DODGE]: [false, false, false],
+    },
+
+    // ═══════════════════════════════════════════
+    // 永久修正（不衰减、不清零，支持多源叠加）
+    // ═══════════════════════════════════════════
+    permAttackPtsBonus: 0,    permPtsDebuff: 0,             // 攻击
+    permGuardPtsBonus: 0,     permGuardDebuff: 0,           // 守备
+    permDodgePtsBonus: 0,     permDodgeDebuff: 0,           // 闪避
+    permAgilityBoost: 0,      permAgilityDebuff: 0,         // 动速
+    permStaminaPenalty: 0,    permStaminaDiscount: 0,       // 精力消耗
+    permRestRecoverBonus: 0,  permRestRecoverPenalty: 0,    // 蓄势恢复
+    permHealRecoverBonus: 0,  permHealRecoverPenalty: 0,    // 疗愈恢复
+    permInsightDebuff: 0,     permInsightDiscount: 0,       // 洞察
+
+    // ═══════════════════════════════════════════
+    // 溢出/管道字段（由系统自动管理，每回合重置）
+    // ═══════════════════════════════════════════
+    hpOverflow: 0,            hpUnderflow: 0,
+    staminaOverflow: 0,       staminaUnderflow: 0,
+    staminaDebuff: 0,                             // reconcile 精力不足产生的欠费
+    speedOverflow: 0,         speedUnderflow: 0,
+    attackPtsOverflow: 0,     attackPtsUnderflow: 0,
+    guardPtsOverflow: 0,      guardPtsUnderflow: 0,
+    dodgePtsOverflow: 0,      dodgePtsUnderflow: 0,
+    hpBonusNextTurn: 0,                           // 命数正溢出管道：超上限转下回合
+    hpDrain: 0,                                   // 持续伤害管道：负溢出累积，下回合扣血
+    hpDebuff: 0,                                  // 即时扣血管道：本回合结束扣血（每回合重置）
+
+    // ═══════════════════════════════════════════
+    // 周期效果调度器
+    // ═══════════════════════════════════════════
+    /** @type {Array<{ field: string, value: any, interval: number, offset?: number }>} */
+    periodicEffects: [],
     ...overrides,
   };
 }
@@ -254,7 +305,8 @@ export class BattleEngine {
       [PlayerId.P1]: createPlayerState(PlayerId.P1),
       [PlayerId.P2]: createPlayerState(PlayerId.P2),
     };
-    // 应用 AI 定制化
+    // 应用定制化（玩家 P1 / AI P2）
+    applyPlayerCustomization(this._players[PlayerId.P1]);
     applyMaesAI(this._players[PlayerId.P2]);
 
     // 初始化计时器（回调绑定到引擎方法）
@@ -678,7 +730,8 @@ export class BattleEngine {
       [PlayerId.P1]: createPlayerState(PlayerId.P1),
       [PlayerId.P2]: createPlayerState(PlayerId.P2),
     };
-    // 重新应用 AI 定制化
+    // 重新应用定制化（玩家 P1 / AI P2）
+    applyPlayerCustomization(this._players[PlayerId.P1]);
     applyMaesAI(this._players[PlayerId.P2]);
 
     this._bus.emit(EngineEvent.STATE_CHANGED, { state: EngineState.IDLE });
@@ -757,6 +810,22 @@ export class BattleEngine {
         p.readyBlockNextTurn = false;
         p.standbyBlocked = !!p.standbyBlockNextTurn || !!p.permStandbyBlocked;
         p.standbyBlockNextTurn = false;
+        p.healBlocked = !!p.healBlockNextTurn || !!p.permHealBlocked;
+        p.healBlockNextTurn = false;
+        p.restRecoverBlocked = !!p.restRecoverBlockNextTurn || !!p.permRestRecoverBlocked;
+        p.restRecoverBlockNextTurn = false;
+        p.healRecoverBlocked = !!p.healRecoverBlockNextTurn || !!p.permHealRecoverBlocked;
+        p.healRecoverBlockNextTurn = false;
+        p.staminaCostFree = !!p.staminaCostFreeNextTurn || !!p.permStaminaCostFree;
+        p.staminaCostFreeNextTurn = false;
+        p.staminaGainBlocked = !!p.staminaGainBlockNextTurn || !!p.permStaminaGainBlocked;
+        p.staminaGainBlockNextTurn = false;
+        p.hpGainBlocked = !!p.hpGainBlockNextTurn || !!p.permHpGainBlocked;
+        p.hpGainBlockNextTurn = false;
+        // 精力消耗永久修正：临时层会衰减，永久层每回合叠加
+        p.staminaPenalty = (p.staminaPenalty || 0) + (p.permStaminaPenalty || 0);
+        p.staminaDiscount = (p.staminaDiscount || 0) + (p.permStaminaDiscount || 0);
+        p.insightDebuff = (p.insightDebuff || 0) + (p.permInsightDebuff || 0) - (p.permInsightDiscount || 0);
         const permActions = Array.isArray(p.permActionBlocked) ? p.permActionBlocked : [];
         p.actionBlocked = [
           ...(Array.isArray(p.actionBlockNextTurn) ? p.actionBlockNextTurn : []),
@@ -780,6 +849,19 @@ export class BattleEngine {
           [Action.GUARD]: [false, false, false],
           [Action.DODGE]: [false, false, false],
         };
+        // ── 周期效果调度（每隔 N 回合自动施加） ──
+        if (Array.isArray(p.periodicEffects)) {
+          for (const pe of p.periodicEffects) {
+            if ((this._turn + (pe.offset || 0)) % pe.interval === 0) {
+              if (typeof pe.value === 'boolean') {
+                p[pe.field] = p[pe.field] || pe.value;
+              } else {
+                p[pe.field] = (p[pe.field] || 0) + pe.value;
+              }
+            }
+          }
+        }
+
         p.speed = DefaultStats.BASE_SPEED;
         p.actionCtx = createActionCtx(Action.READY);
 
@@ -799,7 +881,7 @@ export class BattleEngine {
         p.guardPtsUnderflow = 0;
         p.dodgePtsOverflow = 0;
         p.dodgePtsUnderflow = 0;
-        // 旧兼容字段清理
+        // 管道字段重置（上回合值已在 TURN_START_PHASE 消费完毕）
         p.hpBonusNextTurn = 0;
         p.hpDrain = 0;
       });
@@ -871,10 +953,10 @@ export class BattleEngine {
     // 此处完整逆转，让 resolve 使用决策前的精力/折扣值
     const p1Snap = { ...p1 };
     const p2Snap = { ...p2 };
-    const calcGross = (ctx, penalty) =>
-      (!ctx || ctx.action === Action.STANDBY || ctx.action === Action.READY || ctx.action === Action.HEAL) ? 0 : 1 + (ctx.enhance || 0) + (penalty || 0);
+    const calcGross = (ctx, penalty, player) =>
+      (!ctx || ctx.action === Action.STANDBY || ctx.action === Action.READY || player?.staminaCostFree) ? 0 : 1 + (ctx.enhance || 0) + (penalty || 0);
     // P1 逆转
-    const p1Gross = calcGross(p1.actionCtx, p1.staminaPenalty);
+    const p1Gross = calcGross(p1.actionCtx, p1.staminaPenalty, p1);
     const p1DiscSpent = p1.actionDiscountSpent || 0;
     const p1Debuff = p1.staminaDebuff || 0;  // staminaDebuff 在 _beginTurn 已重置为 0，此处值全是 reconcile 产生的
     const p1StaDeducted = Math.max(0, p1Gross - p1DiscSpent - p1Debuff);
@@ -882,7 +964,7 @@ export class BattleEngine {
     p1Snap.staminaDiscount = (p1.staminaDiscount || 0) + p1DiscSpent;
     p1Snap.staminaDebuff = 0;  // debuff 是成本溢出产物，还原后不应存在
     // P2 逆转
-    const p2Gross = calcGross(p2.actionCtx, p2.staminaPenalty);
+    const p2Gross = calcGross(p2.actionCtx, p2.staminaPenalty, p2);
     const p2DiscSpent = p2.actionDiscountSpent || 0;
     const p2Debuff = p2.staminaDebuff || 0;
     const p2StaDeducted = Math.max(0, p2Gross - p2DiscSpent - p2Debuff);
@@ -1196,6 +1278,8 @@ export class BattleEngine {
     player.insightDebuff = ns.insightDebuff ?? 0;
     player.restRecoverBonus = ns.restRecoverBonus ?? 0;
     player.restRecoverPenalty = ns.restRecoverPenalty ?? 0;
+    player.healRecoverBonus = ns.healRecoverBonus ?? 0;
+    player.healRecoverPenalty = ns.healRecoverPenalty ?? 0;
     player.insightBlockNextTurn = ns.insightBlockNextTurn ?? false;
     player.insightBlocked = ns.insightBlocked ?? player.insightBlocked ?? false;
     player.redecideBlocked = ns.redecideBlocked ?? player.redecideBlocked ?? false;
@@ -1304,7 +1388,8 @@ export class BattleEngine {
 
     // 计算不含折扣修正的"毛成本"（用于追踪折扣消耗量）
     const calcGrossCost = (ctx) => {
-      if (!ctx || ctx.action === Action.STANDBY || ctx.action === Action.READY || ctx.action === Action.HEAL) return 0;
+      if (!ctx || ctx.action === Action.STANDBY || ctx.action === Action.READY) return 0;
+      if (player.staminaCostFree) return 0;
       return 1 + (ctx.enhance || 0) + (player.staminaPenalty || 0);
     };
 

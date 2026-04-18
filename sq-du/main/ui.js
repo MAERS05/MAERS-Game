@@ -24,7 +24,7 @@ import {
 } from '../base/constants.js';
 import { EffectHandlers } from '../base/effect-handlers.js';
 import { EffectLayer } from './effect.js';
-import { EffectTimingLabel } from '../effect/timing-constants.js';
+import { EffectTimingLabel, TriggerToPhaseKey } from '../effect/timing-constants.js';
 
 // ─── 常量 ─────────────────────────────────────────────
 const RING_CIRC = 226.195; // 2π × 36（SVG 弧长）
@@ -435,17 +435,19 @@ function resetForNewTurn() {
   });
   ui.actionConfigPanel.classList.remove('show');
   ui.p1RingWrap.classList.remove('is-ready');
-  ui.standbyBtn.disabled = false;
+
+  const snap = engine.getSnapshot();
+  const p1 = snap.players[PlayerId.P1];
+
+  ui.standbyBtn.disabled = p1.standbyBlocked || false;
   ui.readyBtn.disabled = false;
-  ui.healBtn.disabled = false;
+  ui.healBtn.disabled = p1.healBlocked || getEffectiveStamina(p1) < 1;
   ui.p1SpeedUp.disabled = false;
   ui.p1SpeedDown.disabled = false;
   ui.redecideBtn.classList.remove('show');
   ui.declineRedecideBtn.classList.remove('show');
   ui.waitingLabel.classList.remove('show');
 
-  const snap = engine.getSnapshot();
-  const p1 = snap.players[PlayerId.P1];
   refreshPoints();
 
   // 新回合开始时，记录敌方目前的真实状态作为本回合的基础情报
@@ -518,6 +520,7 @@ ui.healBtn.addEventListener('click', () => {
   const p1 = snap.players[PlayerId.P1];
   if (p1.ready) return;
   if (p1.healBlocked) return; // 禁止疗愈
+  if (getEffectiveStamina(p1) < 1) return; // 精力不足
 
   document.querySelectorAll('.act-btn').forEach(b => b.classList.remove('selected'));
   selectedAction = null;
@@ -677,7 +680,7 @@ engine.on(EngineEvent.PLAYER_READY, ({ playerId, ready }) => {
   if (playerId === PlayerId.P1) {
     ui.p1RingWrap.classList.toggle('is-ready', p1.ready);
     ui.standbyBtn.disabled = ready || p1.standbyBlocked;
-    ui.healBtn.disabled = ready || p1.healBlocked;
+    ui.healBtn.disabled = ready || p1.healBlocked || getEffectiveStamina(p1) < 1;
     ui.readyBtn.disabled = ready;
     ui.waitingLabel.classList.toggle('show', ready && !p2.ready);
     if (ready) {
@@ -707,13 +710,14 @@ engine.on(EngineEvent.REDECIDED, ({ playerId }) => {
   if (playerId === PlayerId.P1) {
     // 重新决策：只恢复操作控件的可用性，不清除已选行动
     // 玩家知道对手意图，允许在已有选择基础上微调（或保持原选择直接就绪）
-    ui.standbyBtn.disabled = false;
+    const snap = engine.getSnapshot();
+    const p1State = snap.players[PlayerId.P1];
+    ui.standbyBtn.disabled = p1State.standbyBlocked || false;
+    ui.healBtn.disabled = p1State.healBlocked || getEffectiveStamina(p1State) < 1;
     ui.readyBtn.disabled = false;
     ui.p1SpeedUp.disabled = false;
     ui.p1SpeedDown.disabled = false;
     ui.waitingLabel.classList.remove('show');
-    const snap = engine.getSnapshot();
-    const p1State = snap.players[PlayerId.P1];
     ui.insightBtn.disabled = p1State.insightUsed || getEffectiveStamina(p1State) < 1 || p1State.insightBlocked;
   }
 });
@@ -1036,6 +1040,9 @@ const EFFECT_ICON_META = {
   [EffectId.BROKEN_ARMOR]: { icon: 'close-shield.svg', name: '废甲', resource: '禁止守备', binary: true },
   [EffectId.SHACKLED]: { icon: 'close-fast.svg', name: '禁锢', resource: '禁止调速', binary: true },
   [EffectId.SHACKLED_DODGE]: { icon: 'close-avoid.svg', name: '锁链', resource: '禁止闪避', binary: true },
+  [EffectId.MERIDIAN_BLOCK]: { icon: 'close-saving.svg', name: '截脉', resource: '禁止蓄势', binary: true },
+  [EffectId.HEAL_BLOCK]: { icon: 'close-treat.svg', name: '禁愈', resource: '禁止疗愈', binary: true },
+  [EffectId.ATTACK_ENHANCE]: { icon: 'strong.svg', name: '攻击强化', resource: '攻击点数和槽位', sign: +1 },
 };
 
 /** 生成效果文本（动态 n 值） */
@@ -1087,7 +1094,8 @@ function updateStatusIcons(playerId, state) {
       }
 
       document.querySelectorAll('.status-tooltip').forEach(el => el.classList.remove('show'));
-      const timingLabel = timingKey ? (EffectTimingLabel[timingKey] || timingKey) : null;
+      const normalizedKey = timingKey ? timingKey.toUpperCase() : null;
+      const timingLabel = normalizedKey ? (EffectTimingLabel[normalizedKey] || timingKey) : null;
       // 四段式：名称 / 效果 / 回合 / 时期
       const parts = effectText.split('：');
       const effName = parts[0] || '';
@@ -1112,15 +1120,16 @@ function updateStatusIcons(playerId, state) {
     const eid = entry.effectId;
     const phase = entry.readyAt?.phaseEvent || '';
     const turn = entry.readyAt?.turn ?? null;
-    const key = `${eid}|${phase}`;
+    const duration = entry.duration ?? null;
+    const interval = entry.interval ?? null;
+    const key = `${eid}|${phase}|${turn}|${duration}|${interval}`;
+    
     if (groups.has(key)) {
-      const g = groups.get(key);
-      g.n += 1;
-      if (turn !== null && (g.minTurn === null || turn < g.minTurn)) g.minTurn = turn;
+      groups.get(key).n += 1;
     } else {
       groups.set(key, {
         effectId: eid, phaseEvent: phase, n: 1, minTurn: turn,
-        duration: entry.duration ?? null, interval: entry.interval ?? null, maxTriggers: entry.maxTriggers ?? null
+        duration: duration, interval: interval, maxTriggers: entry.maxTriggers ?? null
       });
     }
   }
@@ -1136,7 +1145,7 @@ function updateStatusIcons(playerId, state) {
       if (group.maxTriggers != null && group.maxTriggers > 0) return `${base}（共${group.maxTriggers}次）`;
       return `${base}（永久）`;
     }
-    if (group.duration != null && group.duration > 1) return `${group.duration}回合内`;
+    if (group.duration != null && group.duration > 0) return `剩余${group.duration}回合`;
     const targetTurn = group.minTurn;
     if (targetTurn == null) return '本回合';
     const delta = targetTurn - currentTurn;
@@ -1152,7 +1161,13 @@ function updateStatusIcons(playerId, state) {
     const meta = EFFECT_ICON_META[group.effectId];
     if (!meta) continue;
     const label = formatEffectLabel(meta, group.n);
-    addIcon(meta.icon, label, group.phaseEvent, getTurnLabel(group));
+    // 持续型效果（timingDisplay='phase'）使用生效格式（如 TURN_START → TURN_PHASE）
+    const handler = EffectHandlers[group.effectId];
+    const rawPhase = group.phaseEvent ? group.phaseEvent.toUpperCase() : '';
+    const displayPhase = handler?.timingDisplay === 'phase'
+      ? (TriggerToPhaseKey[rawPhase] || rawPhase)
+      : rawPhase;
+    addIcon(meta.icon, label, displayPhase, getTurnLabel(group));
     rendered.add(group.effectId);
   }
 
@@ -1184,7 +1199,7 @@ function updateStatusIcons(playerId, state) {
     if (val <= 0) continue;
     if (rendered.has(eid)) continue;
     const display = sign * val;
-    addIcon(icon, `${name}：${resource} ${display > 0 ? '+' : ''}${display}`, 'ACTION_START', decayTurnLabel(val));
+    addIcon(icon, `${name}：${resource} ${display > 0 ? '+' : ''}${display}`, state._effectMeta?.[eid] || 'ACTION_START', decayTurnLabel(val));
     rendered.add(eid);
   }
 
@@ -1207,23 +1222,33 @@ function updateStatusIcons(playerId, state) {
 
   // 洞察相关
   if (!rendered.has(EffectId.DULL) && state.insightDebuff > 0)
-    addIcon('weak-eye.svg', `愚钝：洞察消耗 +${state.insightDebuff}`, 'TURN_PHASE', decayTurnLabel(state.insightDebuff));
+    addIcon('weak-eye.svg', `愚钝：洞察消耗 +${state.insightDebuff}`, state._effectMeta?.[EffectId.DULL] || 'TURN_PHASE', decayTurnLabel(state.insightDebuff));
   if (!rendered.has(EffectId.INSIGHTFUL) && state.insightDebuff < 0)
-    addIcon('eye.svg', `先机：洞察消耗 ${state.insightDebuff}`, 'TURN_PHASE', decayTurnLabel(Math.abs(state.insightDebuff)));
+    addIcon('eye.svg', `先机：洞察消耗 ${state.insightDebuff}`, state._effectMeta?.[EffectId.INSIGHTFUL] || 'TURN_PHASE', decayTurnLabel(Math.abs(state.insightDebuff)));
   if (!rendered.has(EffectId.BLINDED) && state.insightBlocked)
-    addIcon('close-eye.svg', `蒙蔽：禁止洞察`, 'TURN_PHASE', '本回合');
+    addIcon('close-eye.svg', `蒙蔽：禁止洞察`, state._effectMeta?.[EffectId.BLINDED] || 'TURN_PHASE', '本回合');
   if (!rendered.has(EffectId.SHACKLED) && state.speedAdjustBlocked)
-    addIcon('fast.svg', `禁锢：禁止调速`, 'TURN_PHASE', '本回合');
+    addIcon('fast.svg', `禁锢：禁止调速`, state._effectMeta?.[EffectId.SHACKLED] || 'TURN_PHASE', '本回合');
 
   // 行动禁止
   if (state.actionBlocked) {
     if (!rendered.has(EffectId.BROKEN_BLADE) && state.actionBlocked.includes(Action.ATTACK))
-      addIcon('close-knife.svg', `碎刃：禁止攻击`, 'TURN_PHASE', '本回合');
+      addIcon('close-knife.svg', `碎刃：禁止攻击`, state._effectMeta?.[EffectId.BROKEN_BLADE] || 'TURN_PHASE', '本回合');
     if (!rendered.has(EffectId.SHACKLED_DODGE) && state.actionBlocked.includes(Action.DODGE))
-      addIcon('close-avoid.svg', `锁链：禁止闪避`, 'TURN_PHASE', '本回合');
+      addIcon('close-avoid.svg', `锁链：禁止闪避`, state._effectMeta?.[EffectId.SHACKLED_DODGE] || 'TURN_PHASE', '本回合');
     if (!rendered.has(EffectId.BROKEN_ARMOR) && state.actionBlocked.includes(Action.GUARD))
-      addIcon('close-shield.svg', `废甲：禁止守备`, 'TURN_PHASE', '本回合');
+      addIcon('close-shield.svg', `废甲：禁止守备`, state._effectMeta?.[EffectId.BROKEN_ARMOR] || 'TURN_PHASE', '本回合');
+    if (!rendered.has(EffectId.MERIDIAN_BLOCK) && state.actionBlocked.includes(Action.STANDBY))
+      addIcon('close-saving.svg', `截脉：禁止蓄势`, state._effectMeta?.[EffectId.MERIDIAN_BLOCK] || 'TURN_PHASE', '本回合');
+    if (!rendered.has(EffectId.HEAL_BLOCK) && state.actionBlocked.includes(Action.HEAL))
+      addIcon('close-treat.svg', `禁愈：禁止疗愈`, state._effectMeta?.[EffectId.HEAL_BLOCK] || 'TURN_PHASE', '本回合');
   }
+
+  // 独立禁用字段（截脉/禁愈使用 standbyBlocked/healBlocked）
+  if (!rendered.has(EffectId.MERIDIAN_BLOCK) && state.standbyBlocked)
+    addIcon('close-saving.svg', `截脉：禁止蓄势`, state._effectMeta?.[EffectId.MERIDIAN_BLOCK] || 'TURN_PHASE', '本回合');
+  if (!rendered.has(EffectId.HEAL_BLOCK) && state.healBlocked)
+    addIcon('close-treat.svg', `禁愈：禁止疗愈`, state._effectMeta?.[EffectId.HEAL_BLOCK] || 'TURN_PHASE', '本回合');
 
   // 槽位封锁（任意行动的技能槽位被禁用）
   if (state.slotBlocked) {
@@ -1580,8 +1605,8 @@ engine.on(EngineEvent.EQUIP_PHASE_END, () => {
   const p1 = snap.players[PlayerId.P1];
 
   if (!p1.ready) {
-    ui.standbyBtn.disabled = false;
-    ui.healBtn.disabled = false;
+    ui.standbyBtn.disabled = p1.standbyBlocked || false;
+    ui.healBtn.disabled = p1.healBlocked || getEffectiveStamina(p1) < 1;
     ui.readyBtn.disabled = false;
     ui.insightBtn.disabled = p1.insightUsed || getEffectiveStamina(p1) < 1 || p1.insightBlocked;
   }

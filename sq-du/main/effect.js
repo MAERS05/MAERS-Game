@@ -61,6 +61,12 @@ export class EffectLayer {
   }
 
   static dispatchPhaseEffects(phaseEvent, payload, players, engine) {
+    // 每回合开始时清除上回合残留的效果时期元数据
+    if (phaseEvent === EngineEvent.TURN_START_PHASE) {
+      if (players?.[PlayerId.P1]) players[PlayerId.P1]._effectMeta = {};
+      if (players?.[PlayerId.P2]) players[PlayerId.P2]._effectMeta = {};
+    }
+
     // 行动期开始：结算上回合遗留的 hpDrain（创伤扣血）
     if (phaseEvent === EngineEvent.ACTION_START) {
       const p1 = players?.[PlayerId.P1];
@@ -118,41 +124,49 @@ export class EffectLayer {
       }
     }
 
-    // ── 攻击点数：应用力量(chargeBoost)和虚弱(ptsDebuff) ──
+    // ── 攻击点数：应用力量(chargeBoost)和虚弱(ptsDebuff)，含永久层 ──
     if (cp1.action === Action.ATTACK) {
-      const raw = (cp1.pts || 0) + (p1State.chargeBoost || 0) + readBonus(p1State.attackPtsBonus) - (p1State.ptsDebuff || 0);
+      const raw = (cp1.pts || 0) + (p1State.chargeBoost || 0) + readBonus(p1State.attackPtsBonus)
+        + (p1State.permAttackPtsBonus || 0) - (p1State.ptsDebuff || 0) - (p1State.permPtsDebuff || 0);
       cp1.pts = clampPts(raw, 'attackPtsOverflow', 'attackPtsUnderflow', p1State);
     }
     if (cp2.action === Action.ATTACK) {
-      const raw = (cp2.pts || 0) + (p2State.chargeBoost || 0) + readBonus(p2State.attackPtsBonus) - (p2State.ptsDebuff || 0);
+      const raw = (cp2.pts || 0) + (p2State.chargeBoost || 0) + readBonus(p2State.attackPtsBonus)
+        + (p2State.permAttackPtsBonus || 0) - (p2State.ptsDebuff || 0) - (p2State.permPtsDebuff || 0);
       cp2.pts = clampPts(raw, 'attackPtsOverflow', 'attackPtsUnderflow', p2State);
     }
 
-    // ── 守备点数：应用坚固(guardBoost)和碎甲(guardDebuff) ──
+    // ── 守备点数：应用坚固(guardBoost)和碎甲(guardDebuff)，含永久层 ──
     if (cp1.action === Action.GUARD) {
-      const raw = (cp1.pts || 0) + (p1State.guardBoost || 0) + readBonus(p1State.guardPtsBonus) - (p1State.guardDebuff || 0);
+      const raw = (cp1.pts || 0) + (p1State.guardBoost || 0) + readBonus(p1State.guardPtsBonus)
+        + (p1State.permGuardPtsBonus || 0) - (p1State.guardDebuff || 0) - (p1State.permGuardDebuff || 0);
       cp1.pts = clampPts(raw, 'guardPtsOverflow', 'guardPtsUnderflow', p1State);
     }
     if (cp2.action === Action.GUARD) {
-      const raw = (cp2.pts || 0) + (p2State.guardBoost || 0) + readBonus(p2State.guardPtsBonus) - (p2State.guardDebuff || 0);
+      const raw = (cp2.pts || 0) + (p2State.guardBoost || 0) + readBonus(p2State.guardPtsBonus)
+        + (p2State.permGuardPtsBonus || 0) - (p2State.guardDebuff || 0) - (p2State.permGuardDebuff || 0);
       cp2.pts = clampPts(raw, 'guardPtsOverflow', 'guardPtsUnderflow', p2State);
     }
 
-    // ── 闪避点数：应用侧身(dodgeBoost)和僵硬(dodgeDebuff) ──
+    // ── 闪避点数：应用侧身(dodgeBoost)和僵硬(dodgeDebuff)，含永久层 ──
     if (cp1.action === Action.DODGE) {
-      const raw = (cp1.pts || 0) + (p1State.dodgeBoost || 0) + readBonus(p1State.dodgePtsBonus) - (p1State.dodgeDebuff || 0);
+      const raw = (cp1.pts || 0) + (p1State.dodgeBoost || 0) + readBonus(p1State.dodgePtsBonus)
+        + (p1State.permDodgePtsBonus || 0) - (p1State.dodgeDebuff || 0) - (p1State.permDodgeDebuff || 0);
       cp1.pts = clampPts(raw, 'dodgePtsOverflow', 'dodgePtsUnderflow', p1State);
     }
     if (cp2.action === Action.DODGE) {
-      const raw = (cp2.pts || 0) + (p2State.dodgeBoost || 0) + readBonus(p2State.dodgePtsBonus) - (p2State.dodgeDebuff || 0);
+      const raw = (cp2.pts || 0) + (p2State.dodgeBoost || 0) + readBonus(p2State.dodgePtsBonus)
+        + (p2State.permDodgePtsBonus || 0) - (p2State.dodgeDebuff || 0) - (p2State.permDodgeDebuff || 0);
       cp2.pts = clampPts(raw, 'dodgePtsOverflow', 'dodgePtsUnderflow', p2State);
     }
 
-    // ── 动速：应用轻盈(agilityBoost)和沉重(agilityDebuff)，并裁剪上下限 ──
-    const p1SpeedRaw = (cp1.speed || DefaultStats.BASE_SPEED) + (p1State.agilityBoost || 0) + readBonus(p1State.speedBonus) - (p1State.agilityDebuff || 0);
+    // ── 动速：应用轻盈(agilityBoost)和沉重(agilityDebuff)，含永久层 ──
+    const p1SpeedRaw = (cp1.speed || DefaultStats.BASE_SPEED) + (p1State.agilityBoost || 0) + readBonus(p1State.speedBonus)
+      + (p1State.permAgilityBoost || 0) - (p1State.agilityDebuff || 0) - (p1State.permAgilityDebuff || 0);
     cp1.speed = clampPts(p1SpeedRaw, 'speedOverflow', 'speedUnderflow', p1State);
 
-    const p2SpeedRaw = (cp2.speed || DefaultStats.BASE_SPEED) + (p2State.agilityBoost || 0) + readBonus(p2State.speedBonus) - (p2State.agilityDebuff || 0);
+    const p2SpeedRaw = (cp2.speed || DefaultStats.BASE_SPEED) + (p2State.agilityBoost || 0) + readBonus(p2State.speedBonus)
+      + (p2State.permAgilityBoost || 0) - (p2State.agilityDebuff || 0) - (p2State.permAgilityDebuff || 0);
     cp2.speed = clampPts(p2SpeedRaw, 'speedOverflow', 'speedUnderflow', p2State);
 
     // ── 消费本回合一次性 boost/debuff（已应用到 pts/speed，清零等待衰减填充下回合） ──
@@ -191,6 +205,7 @@ export class EffectLayer {
       'staminaPenalty', 'staminaDiscount',
       'insightDebuff',
       'restRecoverBonus', 'restRecoverPenalty',
+      'healRecoverBonus', 'healRecoverPenalty',
     ];
     for (const field of simpleDecayFields) {
       const val = state[field] || 0;
@@ -447,34 +462,38 @@ export class EffectLayer {
     // 计算双方的攻击/守备/闪避是否成功（侥幸 MUTUAL_HIT 时全部为 false）
     const p1Flags = result ? this._deriveTriggerFlags(result, PlayerId.P1, p1CtxEff, p2CtxEff, p1DmgReceived, p2DmgReceived) : null;
     const p2Flags = result ? this._deriveTriggerFlags(result, PlayerId.P2, p2CtxEff, p1CtxEff, p2DmgReceived, p1DmgReceived) : null;
+    const isMutualHit = result?.clash === Clash.MUTUAL_HIT;
 
     // P1 的技能 onPost 钩子
     for (const effectId of (p1TriggeredEffects || [])) {
       const handler = EffectHandlers[effectId];
       if (!handler?.onPost) continue;
-      // 按行动类型检查是否成功，不成功则跳过
-      // 但 triggerOnFail 标记的技能在行动失败时触发
-      if (p1Flags) {
+      // 侥幸触发通道：仅限 triggerOnMutualHit 标记的技能
+      if (isMutualHit) {
+        if (!handler.triggerOnMutualHit) continue;
+      } else if (p1Flags) {
         const act = p1CtxEff?.action;
         const isFail = handler.triggerOnFail;
         if (act === Action.ATTACK && (isFail ? p1Flags.attackSuccess : !p1Flags.attackSuccess)) continue;
         if (act === Action.DODGE  && (isFail ? p1Flags.dodgeSuccess  : !p1Flags.dodgeSuccess))  continue;
         if (act === Action.GUARD  && (isFail ? p1Flags.guardSuccess  : !p1Flags.guardSuccess))  continue;
       }
-      handler.onPost(p1CtxEff, p1State, p2State, p1DmgReceived, p2DmgReceived, p2CtxEff);
+      handler.onPost(p1CtxEff, p1State, p2State, p1DmgReceived, p2DmgReceived, p2CtxEff, result);
     }
     // P2 的技能 onPost 钩子
     for (const effectId of (p2TriggeredEffects || [])) {
       const handler = EffectHandlers[effectId];
       if (!handler?.onPost) continue;
-      if (p2Flags) {
+      if (isMutualHit) {
+        if (!handler.triggerOnMutualHit) continue;
+      } else if (p2Flags) {
         const act = p2CtxEff?.action;
         const isFail = handler.triggerOnFail;
         if (act === Action.ATTACK && (isFail ? p2Flags.attackSuccess : !p2Flags.attackSuccess)) continue;
         if (act === Action.DODGE  && (isFail ? p2Flags.dodgeSuccess  : !p2Flags.dodgeSuccess))  continue;
         if (act === Action.GUARD  && (isFail ? p2Flags.guardSuccess  : !p2Flags.guardSuccess))  continue;
       }
-      handler.onPost(p2CtxEff, p2State, p1State, p2DmgReceived, p1DmgReceived, p1CtxEff);
+      handler.onPost(p2CtxEff, p2State, p1State, p2DmgReceived, p1DmgReceived, p1CtxEff, result);
     }
   }
 
