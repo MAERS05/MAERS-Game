@@ -234,6 +234,29 @@ export class EffectLayer {
 
   static _rewriteBlockedAction(ctx, state) {
     if (!ctx || !state) return ctx;
+
+    // ── 独立封锁字段：截脉封蓄势 / 禁愈封疗愈 ──
+    if (ctx.action === Action.STANDBY && state.standbyBlocked) {
+      return {
+        ...ctx,
+        action: Action.READY,
+        enhance: 0,
+        pts: 0,
+        cost: 0,
+        effects: Array(EFFECT_SLOTS).fill(null),
+      };
+    }
+    if (ctx.action === Action.HEAL && state.healBlocked) {
+      return {
+        ...ctx,
+        action: Action.READY,
+        enhance: 0,
+        pts: 0,
+        cost: 0,
+        effects: Array(EFFECT_SLOTS).fill(null),
+      };
+    }
+
     if (ctx.action === Action.STANDBY) return ctx;
 
     const blocked = Array.isArray(state.actionBlocked) ? state.actionBlocked : [];

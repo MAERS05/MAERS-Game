@@ -629,6 +629,7 @@
       max-width: 620px;
       line-height: 1.65;
       pointer-events: none;
+      z-index: 460;
     }
 
     .battle-log-close {
@@ -712,6 +713,21 @@
 
     .mode-overlay.show {
       opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* 阶段遮罩：结算/过渡/结束期间拦截底层所有点击 */
+    .phase-overlay {
+      position: fixed;
+      inset: 0;
+      background: transparent;
+      pointer-events: none;
+      z-index: 450;
+      /* 高于所有交互元素（action-config 200, equip 300），
+         低于 mode-overlay(490) / restart(500) 等结算层 UI */
+    }
+
+    .phase-overlay.active {
       pointer-events: auto;
     }
 
@@ -1976,6 +1992,9 @@
       <div class="log-detail" id="logDetail"></div>
       <div class="log-hint" id="battleLogHint">点击关闭，开始下一回合</div>
     </div>
+
+    <!-- 阶段遮罩：在非交互阶段（结算、回合过渡、游戏结束）阻止一切点击穿透 -->
+    <div id="phaseOverlay" class="phase-overlay"></div>
 
     <!-- 重新开始按钮 -->
     <button id="restartBtn" class="game-btn" onclick="location.reload()">重新开始</button>

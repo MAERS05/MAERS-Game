@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file constants.js
  * @description 博弈战斗系统 — 核心常量与枚举定义
  * 
@@ -382,6 +382,8 @@ export const EffectId = Object.freeze({
   STEADY: 'steady',
   INVIGORATE: 'invigorate',
   TREMOR: 'tremor',
+  // ── 通用功能效果 ──
+  PURIFY: 'purify',
   // ── AI 闪避技能（skill/ai-dodge/）──
   DISARM: 'disarm',
   EQUITY: 'equity',
@@ -419,13 +421,13 @@ export const EffectDefs = Object.freeze({
     playerOnly: true,
   },
   [EffectId.FATIGUE]: {
-    id: EffectId.FATIGUE, name: '疲兵',
+    id: EffectId.FATIGUE, name: '定身',
     applicableTo: [Action.ATTACK],
     playerOnly: true,
   },
   // ── 共享攻击技能（skill/attack/）──
   [EffectId.PARALYZE]: {
-    id: EffectId.PARALYZE, name: '麻痹',
+    id: EffectId.PARALYZE, name: '封脉',
     applicableTo: [Action.ATTACK],
   },
   [EffectId.CHARGE]: {
@@ -478,7 +480,7 @@ export const EffectDefs = Object.freeze({
     playerOnly: true,
   },
   [EffectId.PILFER]: {
-    id: EffectId.PILFER, name: '窃取',
+    id: EffectId.PILFER, name: '振势',
     applicableTo: [Action.DODGE],
     playerOnly: true,
   },
@@ -517,7 +519,7 @@ export const EffectDefs = Object.freeze({
     aiOnly: true,
   },
   [EffectId.INVIGORATE]: {
-    id: EffectId.INVIGORATE, name: '振神',
+    id: EffectId.INVIGORATE, name: '洁净',
     applicableTo: [Action.GUARD],
     aiOnly: true,
   },

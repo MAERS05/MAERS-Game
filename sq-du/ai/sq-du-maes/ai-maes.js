@@ -43,7 +43,7 @@ export { AIEnhanceLayer } from '../ai-enhance.js';
 
 /** MAES AI 攻击技能池 */
 const MAES_ATTACK_EFFECTS = [
-  EffectId.PARALYZE,      // 麻痹
+  EffectId.PARALYZE,      // 封脉
   EffectId.CHARGE,        // 蓄力（共享）
   EffectId.SHATTER_POINT, // 崩穴（共享）
   EffectId.BLOOD_DRINK,   // 饮血（AI 专属）
@@ -57,7 +57,7 @@ const MAES_GUARD_EFFECTS = [
   EffectId.SHOCKWAVE,     // 崩震
   EffectId.MUSTER,        // 整备（共享）
   EffectId.STEADY,        // 稳重（AI 专属）
-  EffectId.INVIGORATE,    // 振神（AI 专属）
+  EffectId.INVIGORATE,    // 洁净（AI 专属）
   EffectId.TREMOR,        // 强震（AI 专属）
 ];
 
@@ -119,17 +119,17 @@ export const MaesProfile = {
 
   // ── MAES 行为调优（注入 AI 状态，被 ai-base / ai-scheduler 读取） ──
   tuning: {
-    attackBias: 0.8,   // 攻击权重偏移（正=更好斗）
-    guardBias: 0.4,   // 守备权重偏移
-    dodgeBias: 0.2,   // 闪避权重偏移
-    standbyBias: -0.3,  // 蓄势权重偏移
-    healBias: -0.3,    // 疗愈权重偏移（负=更少疗愈）
+    attackBias: 2.3,    // 攻击 33%
+    guardBias: 1.5,     // 守备 25%
+    dodgeBias: 0.8,     // 闪避 18%
+    standbyBias: 0.3,   // 蓄势 13%
+    healBias: 0.1,      // 疗愈 11%
     insightThreshold: 0.8,   // 洞察评分阈值（低=更积极洞察；默认 1.8）
     insightMaxProb: 0.90,  // 洞察最大概率（默认 0.65）
     redecideBias: 0.20,  // 重决策概率偏移（加到各情境概率上）
     speedBoostBias: 0.1,  // 先手概率偏移（正=更爱先手）
     passiveExploitBias: 1.5,   // 对手被动行为时攻击加成（蓄势/疗愈=白给）
-    effectSkipChance: 0.1,    // 10% 概率不携带效果（轻出手）
+    effectSkipChance: 0.05,    // 5% 概率不携带效果（轻出手）
   },
 };
 

@@ -428,6 +428,10 @@ export class AIBaseLogic {
     if (blocked.includes(Action.STANDBY)) w.standby = -Infinity;
     if (blocked.includes(Action.HEAL)) w.heal = -Infinity;
 
+    // ── 独立封锁字段（截脉 standbyBlocked / 禁愈 healBlocked）──
+    if (ai.standbyBlocked) w.standby = -Infinity;
+    if (ai.healBlocked) w.heal = -Infinity;
+
     const weightMap = {
       [Action.ATTACK]: w.attack,
       [Action.GUARD]: w.guard,

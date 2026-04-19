@@ -28,7 +28,7 @@ export const WeakEffect = createStatusEffect({
 export const BrokenBladeEffect = createStatusEffect({
   id: 'broken_blade',
   name: '碎刃',
-  desc: '本回合无法攻击',
+  desc: '无法攻击',
   applicableTo: [Action.ATTACK],
   timingDisplay: 'phase',
   apply(state) {

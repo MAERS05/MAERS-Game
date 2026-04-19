@@ -202,6 +202,7 @@ const ui = {
   turnEndNotice: $('turnEndNotice'),
   turnEndCountdownHint: $('turnEndCountdownHint'),
   restartBtn: $('restartBtn'),
+  phaseOverlay: $('phaseOverlay'),
 };
 
 // ─── 本地 UI 状态 ─────────────────────────────────────
@@ -616,21 +617,8 @@ ui.insightBtn.addEventListener('click', () => {
 
 ui.battleLog.addEventListener('click', () => {
   if (!ui.battleLog.classList.contains('show')) return;
-  // 仅在游戏结束时，才允许点击强制重置
-  if (!isGameOver) return;
-
-  ui.battleLog.classList.remove('show');
-  document.body.classList.remove('resolving');
-  // 重新开局
-  isGameOver = false;
-  matchHistory = [];
-  updateHistoryUI();
-  ui.turnIndicator.textContent = "TURN 1";
-  ui.battleLog.querySelector('.log-hint').textContent = "";
-
-  engine.restartGame();
-  initUI();
-  resetForNewTurn();
+  // 游戏结束时点击战报不做任何操作，只能通过重新开始按钮重开
+  if (isGameOver) return;
 });
 
 ui.historyBtn.addEventListener('click', () => ui.historyModal.classList.add('show'));
@@ -662,6 +650,11 @@ engine.on(EngineEvent.TIMER_TICK, payload => {
   const p1Data = payload[PlayerId.P1];
   const p2Data = payload[PlayerId.P2];
   const snap = engine.getSnapshot();
+
+  // 只在决策期（TICKING）才解除阶段遮罩，装配期 tick 不影响
+  if (snap.state === EngineState.TICKING) {
+    ui.phaseOverlay.classList.remove('active');
+  }
 
   updateRing(
     ui.p1Arc, ui.p1RingWrap, ui.p1Sec, ui.p1Phase,
@@ -868,6 +861,8 @@ engine.on(EngineEvent.ACTIVE_INSIGHT, ({ casterId, revealedAction, revealed }) =
 
 engine.on(EngineEvent.ACTION_PHASE_START, () => {
   ui.phaseIndicator.textContent = '行动期';
+  // 行动期：激活阶段遮罩，阻止玩家在结算过程中操作
+  ui.phaseOverlay.classList.add('active');
 
   // 双方已就绪，立即清除洞察提示
   ui.insightNotice.classList.remove('show');
@@ -998,6 +993,8 @@ engine.on(EngineEvent.TURN_RESOLVED, result => {
 
 engine.on(EngineEvent.GAME_OVER, ({ reason }) => {
   isGameOver = true;
+  // 游戏结束：激活阶段遮罩，只允许点击重新开始按钮
+  ui.phaseOverlay.classList.add('active');
   ui.logDetail.innerHTML += `<br><br><strong style="color:var(--color-atk)">${reason}</strong>`;
   ui.standbyBtn.disabled = true;
   ui.readyBtn.disabled = true;
@@ -1109,6 +1106,7 @@ const EFFECT_ICON_META = {
   [EffectId.MERIDIAN_BLOCK]: { icon: 'close-saving.svg', name: '截脉', resource: '禁止蓄势', binary: true },
   [EffectId.HEAL_BLOCK]: { icon: 'close-treat.svg', name: '禁愈', resource: '禁止疗愈', binary: true },
   [EffectId.ATTACK_ENHANCE]: { icon: 'strong.svg', name: '攻击强化', resource: '攻击点数和槽位', sign: +1 },
+  [EffectId.PURIFY]: { icon: 'clear-body.svg', name: '净化', resource: '清除负面效果', binary: true },
 };
 
 /** 生成效果文本（动态 n 值） */
@@ -1190,7 +1188,7 @@ function updateStatusIcons(playerId, state) {
     const duration = entry.duration ?? null;
     const interval = entry.interval ?? null;
     const key = `${eid}|${phase}|${turn}|${duration}|${interval}`;
-    
+
     if (groups.has(key)) {
       groups.get(key).n += 1;
     } else {
@@ -1581,6 +1579,7 @@ let gameMode = 'timed'; // 'timed' | 'instant'
 
 // 监听回合结束期（1s）
 engine.on(EngineEvent.TURN_END_PHASE, () => {
+  ui.phaseOverlay.classList.add('active');
   if (gameMode === 'instant') return; // 即时模式跳过提示
   ui.phaseIndicator.textContent = '回合结束期';
 
@@ -1603,6 +1602,7 @@ engine.on(EngineEvent.TURN_END_PHASE, () => {
 
 // 监听回合开始期（1s）
 engine.on(EngineEvent.TURN_START_PHASE, () => {
+  ui.phaseOverlay.classList.add('active');
   if (gameMode !== 'instant') {
     ui.phaseIndicator.textContent = '回合开始期';
   }
@@ -1640,6 +1640,8 @@ engine.on(EngineEvent.TURN_START_PHASE, () => {
 
 // 监听装备期开始事件 → 显示覆盖面板并倒计时
 engine.on(EngineEvent.EQUIP_PHASE_START, ({ secondsLeft }) => {
+  // 装配期由自身覆盖面板控制交互，关闭阶段遮罩
+  ui.phaseOverlay.classList.remove('active');
   const equipCloseBtn = document.getElementById('equipCloseBtn');
   if (gameMode === 'instant') {
     // 即时模式：隐藏倒计时，显示关闭按钮
@@ -1664,6 +1666,7 @@ engine.on(EngineEvent.EQUIP_PHASE_START, ({ secondsLeft }) => {
 
 // 监听装备期结束事件 → 隐藏覆盖面板，启用主操作区
 engine.on(EngineEvent.EQUIP_PHASE_END, () => {
+  // 装备期结束，但还未进入决策期，保持遮罩直到 TIMER_TICK
   ui.phaseIndicator.textContent = '决策期';
   ui.equipOverlay.classList.remove('active');
   closePicker();
@@ -1796,7 +1799,7 @@ if (ui.globalPauseBtn) {
     // 同步暂停/恢复背景音乐
     if (bgmEl) {
       if (isPaused) bgmEl.pause();
-      else bgmEl.play().catch(() => {});
+      else bgmEl.play().catch(() => { });
     }
   });
 }

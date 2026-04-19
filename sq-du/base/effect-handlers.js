@@ -18,15 +18,15 @@ import { FortifiedEffect, WoundedEffect } from '../effect/function/combat-identi
 import { PowerEffect, WeakEffect, BrokenBladeEffect } from '../effect/function/attack-status.js';
 import { SolidEffect, CrackedArmorEffect, BrokenArmorEffect } from '../effect/function/defense-status.js';
 import { SideStepEffect, ClumsyEffect, ShackledDodgeEffect } from '../effect/function/dodge-status.js';
-import { MeridianBlockEffect, HealBlockEffect, AttackEnhanceEffect, AttackSlot0BlockEffect, GuardSlot0BlockEffect, DodgeSlot0BlockEffect, GuardEnhanceEffect, DodgeEnhanceEffect } from '../effect/function/utility-status.js';
+import { MeridianBlockEffect, HealBlockEffect, AttackEnhanceEffect, AttackSlot0BlockEffect, GuardSlot0BlockEffect, DodgeSlot0BlockEffect, GuardEnhanceEffect, DodgeEnhanceEffect, PurifyEffect } from '../effect/function/utility-status.js';
 
 // ── 玩家攻击技能（skill/player-attack/）──
 import { BreakQiEffect } from '../skill/player-attack/break_qi.js';
 import { HamstringEffect } from '../skill/player-attack/hamstring.js';
-import { FatigueEffect } from '../skill/player-attack/fatigue.js';
+import { FatigueEffect } from '../skill/player-attack/immobilize.js';
 
 // ── 共享攻击技能（skill/attack/）──
-import { ParalyzeEffect } from '../skill/attack/paralyze.js';
+import { ParalyzeEffect } from '../skill/attack/seal_vein.js';
 import { ChargeEffect } from '../skill/attack/charge.js';
 import { ShatterPointEffect } from '../skill/attack/shatter_point.js';
 
@@ -43,7 +43,7 @@ import { MusterEffect } from '../skill/guard/muster.js';
 // ── 玩家闪避技能（skill/player-dodge/）──
 import { Hide } from '../skill/player-dodge/hide.js';
 import { DeferredEffect } from '../skill/player-dodge/deferred.js';
-import { PilferEffect } from '../skill/player-dodge/pilfer.js';
+import { PilferEffect } from '../skill/player-dodge/rally.js';
 
 // ── 共享闪避技能（skill/dodge/）──
 import { Lure } from '../skill/dodge/lure.js';
@@ -62,7 +62,7 @@ import { PursuitEffect } from '../skill/ai-attack/pursuit.js';
 
 // ── AI 守备技能（skill/ai-guard/）──
 import { SteadyEffect } from '../skill/ai-guard/steady.js';
-import { InvigorateEffect } from '../skill/ai-guard/invigorate.js';
+import { InvigorateEffect } from '../skill/ai-guard/cleanse.js';
 import { TremorEffect } from '../skill/ai-guard/tremor.js';
 
 /**
@@ -140,6 +140,7 @@ const RawEffectHandlers = {
   dodge_slot0_block: DodgeSlot0BlockEffect,
   guard_enhance: GuardEnhanceEffect,
   dodge_enhance: DodgeEnhanceEffect,
+  purify: PurifyEffect,
 };
 
 /**

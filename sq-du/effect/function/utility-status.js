@@ -6,7 +6,7 @@ import { createStatusEffect } from './status-factory.js';
 export const MeridianBlockEffect = createStatusEffect({
   id: 'meridian_block',
   name: '截脉',
-  desc: '本回合无法蓄势',
+  desc: '无法蓄势',
   applicableTo: [Action.STANDBY],
   timingDisplay: 'phase',
   apply(state) {
@@ -17,7 +17,7 @@ export const MeridianBlockEffect = createStatusEffect({
 export const HealBlockEffect = createStatusEffect({
   id: 'heal_block',
   name: '禁愈',
-  desc: '本回合无法疗愈',
+  desc: '无法疗愈',
   applicableTo: [Action.HEAL],
   timingDisplay: 'phase',
   apply(state) {
@@ -44,7 +44,7 @@ export const AttackEnhanceEffect = createStatusEffect({
 export const AttackSlot0BlockEffect = createStatusEffect({
   id: 'attack_slot0_block',
   name: '封锁',
-  desc: '攻击一号槽位禁用',
+  desc: '攻击一号槽位封锁',
   applicableTo: [Action.ATTACK],
   timingDisplay: 'phase',
   apply(state) {
@@ -62,7 +62,7 @@ export const AttackSlot0BlockEffect = createStatusEffect({
 export const GuardSlot0BlockEffect = createStatusEffect({
   id: 'guard_slot0_block',
   name: '封锁',
-  desc: '守备一号槽位禁用',
+  desc: '守备一号槽位封锁',
   applicableTo: [Action.GUARD],
   timingDisplay: 'phase',
   apply(state) {
@@ -80,7 +80,7 @@ export const GuardSlot0BlockEffect = createStatusEffect({
 export const DodgeSlot0BlockEffect = createStatusEffect({
   id: 'dodge_slot0_block',
   name: '封锁',
-  desc: '闪避一号槽位禁用',
+  desc: '闪避一号槽位封锁',
   applicableTo: [Action.DODGE],
   timingDisplay: 'phase',
   apply(state) {
@@ -126,3 +126,54 @@ export const DodgeEnhanceEffect = createStatusEffect({
     }
   },
 });
+
+/**
+ * 净化：清除自身部分负面效果。
+ * 清除范围：虚弱、碎甲、僵硬、沉重、疲惫、愚钝、创伤、禁锢、蒙蔽、
+ *           碎刃、废甲、锁链、截脉、禁愈、萎靡、封锁。
+ */
+export const PurifyEffect = createStatusEffect({
+  id: 'purify',
+  name: '净化',
+  desc: '清除自身部分负面效果',
+  applicableTo: [Action.GUARD],
+  timingDisplay: 'phase',
+  apply(state) {
+    // ── 数值型负面字段清零 ──
+    const negativeFields = [
+      'ptsDebuff',           // 虚弱
+      'guardDebuff',         // 碎甲
+      'dodgeDebuff',         // 僵硬
+      'agilityDebuff',       // 沉重
+      'staminaPenalty',      // 疲惫
+      'insightDebuff',       // 愚钝
+      'hpDrain',             // 创伤
+      'restRecoverPenalty',  // 蓄势恢复惩罚
+      'healRecoverPenalty',  // 疗愈恢复惩罚
+    ];
+    for (const field of negativeFields) {
+      if ((state[field] || 0) > 0) state[field] = 0;
+    }
+
+    // ── 二元型负面状态清除 ──
+    state.speedAdjustBlocked = false;  // 禁锢
+    state.insightBlocked = false;      // 蒙蔽
+    state.standbyBlocked = false;      // 截脉
+    state.healBlocked = false;         // 禁愈
+
+    // ── 行动禁用清除 ──
+    if (Array.isArray(state.actionBlocked)) {
+      state.actionBlocked = [];
+    }
+
+    // ── 槽位封锁清除 ──
+    if (state.slotBlocked) {
+      for (const act of [Action.ATTACK, Action.GUARD, Action.DODGE]) {
+        if (state.slotBlocked[act]) {
+          state.slotBlocked[act] = [false, false, false];
+        }
+      }
+    }
+  },
+});
+

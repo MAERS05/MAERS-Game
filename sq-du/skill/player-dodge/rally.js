@@ -5,22 +5,22 @@ import { createSkillEffect } from '../../effect/function/skill-factory.js';
 import { EffectLayer } from '../../main/effect.js';
 
 /**
- * 窃取（玩家专属闪避技能）
- * 若闪避成功（未受伤），下回合开始后、回合结束前禁用对方守备一号槽位。
+ * 振势（玩家专属闪避技能）
+ * 若闪避成功，为自身附加1级[兴奋]并在下回合开始后，回合结束前生效。
  */
 export const PilferEffect = createSkillEffect({
   id: EffectId.PILFER,
-  name: '窃取',
-  desc: '若闪避成功，下回合开始后，回合结束前禁用对方守备一号槽位',
+  name: '振势',
+  desc: '若闪避成功，为自身附加1级[兴奋]并在下回合开始后，回合结束前生效',
   applicableTo: [Action.DODGE],
 
   onPost(ctx, owner, opponent, selfDmg, oppDmg) {
-    if (!opponent) return;
+    if (!owner) return;
     if ((selfDmg || 0) > 0) return; // 闪避必须成功（未受伤）
-    EffectLayer.queueEffect(opponent, EffectId.GUARD_SLOT0_BLOCK, {
+    EffectLayer.queueEffect(owner, EffectId.EXCITED, {
       phaseEvent: 'TURN_START',
-      source: 'skill:pilfer',
+      source: 'skill:rally',
     });
-    EffectLayer.markFlashEffect(opponent, EffectId.GUARD_SLOT0_BLOCK);
+    EffectLayer.markFlashEffect(owner, EffectId.EXCITED);
   },
 });
