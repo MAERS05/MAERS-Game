@@ -338,9 +338,18 @@ export class AIBaseLogic {
         w.attack -= 1.5;
         w.dodge -= 0.5;
       }
-      // 疗愈消耗 1 精力——危机期只有精力=1且血量危急时才考虑
+      // 疗愈消耗 1 精力——危机期只有精力=1且先手值高时才考虑
+      // 但绝对不能在自己 1 血且对手有精力能攻击时疗愈，那等于找死（疗愈无法拦截伤害）
       if (!ai.healBlocked && ai.hp <= 1 && aiEffectiveStamina >= 1) {
-        w.heal += 2.0;
+        const pStamina = snap.playerEffectiveStamina ?? snap.playerStamina ?? 0;
+        const aiSpeed = 1 + (snap.aiAgilityBoost || 0) + (snap.aiPermAgilityBoost || 0) - (snap.aiAgilityDebuff || 0) - (snap.aiPermAgilityDebuff || 0);
+        const pSpeedMax = 1 + (snap.playerAgilityBoost || 0) + (snap.playerPermAgilityBoost || 0) - (snap.playerAgilityDebuff || 0) - (snap.playerPermAgilityDebuff || 0) + Math.max(0, pStamina - 1);
+
+        if (aiSpeed > pSpeedMax) {
+          w.heal += 1.5; // AI先手碾压玩家倾家荡产买到的极速，必定触发"先愈后伤"，可以赌疗愈
+        } else {
+          w.heal -= 5.0; // 速度可能被追平和超车（先伤后愈暴毙），或者对手 0 精力此时系统已有处决判定，坚决不准按疗愈！
+        }
       }
     }
     // ── 阶段2：保守（精力 = 2）─ 可行动一次但不留余量 ──
@@ -452,11 +461,11 @@ export class AIBaseLogic {
     // ── 连续攻击受挫（最近2次进攻均未造成伤害）→ 调整策略 ──
     if (snap.aiConsecAttackFailed) {
       const cfb = (ai.aiTuning || {}).consecFailBias || {};
-      w.attack  += cfb.attack  ?? -1.0;
-      w.guard   += cfb.guard   ?? +1.0;
-      w.dodge   += cfb.dodge   ?? +1.0;
+      w.attack += cfb.attack ?? -1.0;
+      w.guard += cfb.guard ?? +1.0;
+      w.dodge += cfb.dodge ?? +1.0;
       w.standby += cfb.standby ?? +1.5;
-      w.heal    += cfb.heal    ?? +0;
+      w.heal += cfb.heal ?? +0;
     }
 
     // ── 行动禁用：被效果封禁的行动权重归零 ──────────
