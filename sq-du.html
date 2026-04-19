@@ -1301,7 +1301,7 @@
       display: none;
       align-items: center;
       justify-content: center;
-      z-index: 200;
+      z-index: 1600; /* 必须高于 .hud-top(1500) 才能在装配期正确覆盖 */
     }
 
     .equip-overlay.active {
