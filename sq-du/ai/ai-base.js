@@ -471,6 +471,7 @@ export class AIBaseLogic {
 
   static pickSpeed(snap, action, ai) {
     const BASE = DefaultStats.BASE_SPEED;
+    if (ai.speedAdjustBlocked) return BASE;
     // 被动行为无先手收益（先手恢复时序为玩家策略，AI不做此判断）
     if (action === Action.STANDBY || action === Action.HEAL ||
       action === Action.READY || action === Action.PREPARE) return BASE;

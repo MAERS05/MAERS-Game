@@ -448,7 +448,7 @@ export class BattleEngine {
     if (p.actionCtx.action === Action.PREPARE) {
       p.actionCtx.speed = DefaultStats.BASE_SPEED;
       p.speed = DefaultStats.BASE_SPEED;
-    } else if (patch.speed != null) {
+    } else if (patch.speed != null && patch.speed !== p.speed && EffectLayer.canAdjustSpeed(p, patch.speed - p.speed)) {
       const targetSpeed = patch.speed;
       const currentSpeed = p.speed; // 当前先手（回合初始为 BASE_SPEED）
       const delta = targetSpeed - currentSpeed;
