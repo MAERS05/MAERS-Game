@@ -421,7 +421,7 @@ export const EffectDefs = Object.freeze({
     playerOnly: true,
   },
   [EffectId.FATIGUE]: {
-    id: EffectId.FATIGUE, name: '撕裂',
+    id: EffectId.FATIGUE, name: '破刃',
     applicableTo: [Action.ATTACK],
     playerOnly: true,
   },
@@ -477,7 +477,7 @@ export const EffectDefs = Object.freeze({
   [EffectId.DEFERRED]: {
     id: EffectId.DEFERRED, name: '延付',
     applicableTo: [Action.DODGE],
-    playerOnly: true,
+    aiOnly: true,
   },
   [EffectId.PILFER]: {
     id: EffectId.PILFER, name: '振势',
@@ -514,7 +514,7 @@ export const EffectDefs = Object.freeze({
   },
   // ── AI 守备技能（skill/ai-guard/）──
   [EffectId.STEADY]: {
-    id: EffectId.STEADY, name: '稳重',
+    id: EffectId.STEADY, name: '反冲',
     applicableTo: [Action.GUARD],
     aiOnly: true,
   },
@@ -537,7 +537,7 @@ export const EffectDefs = Object.freeze({
   [EffectId.EQUITY]: {
     id: EffectId.EQUITY, name: '公平',
     applicableTo: [Action.DODGE],
-    aiOnly: true,
+    playerOnly: true,
   },
   [EffectId.FURY]: {
     id: EffectId.FURY, name: '愤怒',

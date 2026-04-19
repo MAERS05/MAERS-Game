@@ -42,7 +42,7 @@ import { MusterEffect } from '../skill/guard/muster.js';
 
 // ── 玩家闪避技能（skill/player-dodge/）──
 import { Hide } from '../skill/player-dodge/hide.js';
-import { DeferredEffect } from '../skill/player-dodge/deferred.js';
+import { DeferredEffect } from '../skill/ai-dodge/deferred.js';
 import { PilferEffect } from '../skill/player-dodge/rally.js';
 
 // ── 共享闪避技能（skill/dodge/）──
@@ -52,7 +52,7 @@ import { NimbleEffect } from '../skill/dodge/nimble.js';
 
 // ── AI 闪避技能（skill/ai-dodge/）──
 import { DisarmEffect } from '../skill/ai-dodge/disarm.js';
-import { EquityEffect } from '../skill/ai-dodge/equity.js';
+import { EquityEffect } from '../skill/player-dodge/equity.js';
 import { FuryEffect } from '../skill/ai-dodge/fury.js';
 
 // ── AI 攻击技能（skill/ai-attack/）──

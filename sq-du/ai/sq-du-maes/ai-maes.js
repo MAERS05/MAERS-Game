@@ -56,7 +56,7 @@ const MAES_GUARD_EFFECTS = [
   EffectId.RESTORE,       // 震颤
   EffectId.SHOCKWAVE,     // 崩震
   EffectId.MUSTER,        // 整备（共享）
-  EffectId.STEADY,        // 稳重（AI 专属）
+  EffectId.STEADY,        // 反冲（AI 专属）
   EffectId.INVIGORATE,    // 洁净（AI 专属）
   EffectId.TREMOR,        // 强震（AI 专属）
 ];
@@ -67,7 +67,7 @@ const MAES_DODGE_EFFECTS = [
   EffectId.SEE_THROUGH,   // 看破
   EffectId.NIMBLE,        // 轻身（共享）
   EffectId.DISARM,        // 解甲（AI 专属）
-  EffectId.EQUITY,        // 公平（AI 专属）
+  EffectId.DEFERRED,      // 延付（AI 专属）
   EffectId.FURY,          // 愤怒（AI 专属）
 ];
 
@@ -124,7 +124,7 @@ export const MaesProfile = {
     dodgeBias: 0.8,     // 闪避 18%
     standbyBias: 0.3,   // 蓄势 13%
     healBias: 0.1,      // 疗愈 11%    insightThreshold: 0.8,   // 洞察评分阈值（低=更积极洞察；默认 1.8）
-    insightMaxProb: 0.90,  // 洞察最大概率（默认 0.65）
+    insightMaxProb: 0.65,  // 洞察最大概率（默认 0.65）
     redecideBias: 0.20,  // 重决策概率偏移（加到各情境概率上）
     speedBoostBias: 0.1,  // 先手概率偏移（正=更爱先手）
     passiveExploitBias: 1.5,   // 对手被动行为时攻击加成（蓄势/疗愈=白给）

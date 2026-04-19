@@ -169,6 +169,29 @@ export class EffectLayer {
       + (p2State.permAgilityBoost || 0) - (p2State.agilityDebuff || 0) - (p2State.permAgilityDebuff || 0);
     cp2.speed = clampPts(p2SpeedRaw, 'speedOverflow', 'speedUnderflow', p2State);
 
+    // ── 蓄备类行动：强制先手归零，退还提速消耗的精力 ──
+    // 技能 onPre 可能将任意行动转为 PREPARE（如蓄力、洁净、延付），
+    // 此时玩家选择的先手提升无意义，需要退款。
+    const refundSpeedStamina = (ctx, state) => {
+      if (ctx.action !== Action.PREPARE) return;
+      const spent = (ctx.speed || DefaultStats.BASE_SPEED) - DefaultStats.BASE_SPEED;
+      if (spent > 0) {
+        // 优先退 speedDiscountSpent，再退 stamina
+        for (let i = 0; i < spent; i++) {
+          if ((state.speedDiscountSpent || 0) > 0) {
+            state.speedDiscountSpent--;
+            state.staminaDiscount = (state.staminaDiscount || 0) + 1;
+          } else {
+            state.stamina = Math.min(DefaultStats.MAX_STAMINA, (state.stamina || 0) + 1);
+          }
+        }
+      }
+      ctx.speed = DefaultStats.BASE_SPEED;
+    };
+    refundSpeedStamina(cp1, p1State);
+    refundSpeedStamina(cp2, p2State);
+
+
     // ── 消费本回合一次性 boost/debuff（已应用到 pts/speed，清零等待衰减填充下回合） ──
     p1State.chargeBoost = 0;
     p1State.guardBoost = 0;

@@ -41,10 +41,11 @@ export const AttackEnhanceEffect = createStatusEffect({
   },
 });
 
+/** 封锁对方【攻击一号槽位】 */
 export const AttackSlot0BlockEffect = createStatusEffect({
   id: 'attack_slot0_block',
   name: '封锁',
-  desc: '攻击一号槽位封锁',
+  desc: '部分槽位封锁',
   applicableTo: [Action.ATTACK],
   timingDisplay: 'phase',
   apply(state) {
@@ -59,10 +60,11 @@ export const AttackSlot0BlockEffect = createStatusEffect({
   },
 });
 
+/** 封锁对方【守备一号槽位】 */
 export const GuardSlot0BlockEffect = createStatusEffect({
   id: 'guard_slot0_block',
   name: '封锁',
-  desc: '守备一号槽位封锁',
+  desc: '部分槽位封锁',
   applicableTo: [Action.GUARD],
   timingDisplay: 'phase',
   apply(state) {
@@ -77,10 +79,11 @@ export const GuardSlot0BlockEffect = createStatusEffect({
   },
 });
 
+/** 封锁对方【闪避一号槽位】 */
 export const DodgeSlot0BlockEffect = createStatusEffect({
   id: 'dodge_slot0_block',
   name: '封锁',
-  desc: '闪避一号槽位封锁',
+  desc: '部分槽位封锁',
   applicableTo: [Action.DODGE],
   timingDisplay: 'phase',
   apply(state) {

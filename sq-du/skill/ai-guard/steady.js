@@ -6,16 +6,16 @@ import { EffectLayer } from '../../main/effect.js';
 
 export const SteadyEffect = createSkillEffect({
   id: EffectId.STEADY,
-  name: '稳重',
-  desc: '本回合不执行守备，为自身附加1级[坚固]并在接下来2回合内的行动期开始后触发',
+  name: '反冲',
+  desc: '若守备成功，[封锁]对方守备一号槽位并在下回合开始后，回合结束前生效',
   applicableTo: [Action.GUARD],
-  onPre(ctx, state) {
-    EffectLayer.queueEffect(state, EffectId.SOLID, {
-      phaseEvent: 'ACTION_START',
-      duration: 2,
+  onPost(ctx, owner, opponent, selfDmg, oppDmg) {
+    if (!opponent) return;
+    if ((selfDmg || 0) > 0) return; // 必须守备成功（未受伤）
+    EffectLayer.queueEffect(opponent, EffectId.GUARD_SLOT0_BLOCK, {
+      phaseEvent: 'TURN_START',
       source: 'skill:steady',
     });
-    // 转为蓄备：保留守备的精力消耗，但本回合不执行守备
-    return { ...ctx, action: Action.PREPARE };
+    EffectLayer.markFlashEffect(opponent, EffectId.GUARD_SLOT0_BLOCK);
   },
 });

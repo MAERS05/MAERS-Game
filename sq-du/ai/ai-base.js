@@ -145,6 +145,7 @@ export class AIBaseLogic {
       aiPtsDebuff: ai.ptsDebuff || 0,  // 攻击点数被削
       aiGuardDebuff: ai.guardDebuff || 0,  // 守备点数被削
       aiDodgeDebuff: ai.dodgeDebuff || 0,  // 闪避点数被削
+      aiAgilityDebuff: ai.agilityDebuff || 0, // 沉重（降低先手）
       aiGuardBoost: ai.guardBoost || 0,  // 守备增益
       aiDodgeBoost: ai.dodgeBoost || 0,  // 闪避增益
       aiChargeBoost: ai.chargeBoost || 0,  // 蓄力增益
@@ -247,6 +248,11 @@ export class AIBaseLogic {
     if (snap.aiDodgeDebuff > 0) {
       w.dodge -= snap.aiDodgeDebuff * 1.0;
       w.guard += 0.5;
+    }
+    // 被挂沉重（先手下降） → 缺乏速度主动权时，守备和闪避更容易被压制，权重下降
+    if (snap.aiAgilityDebuff > 0) {
+      w.guard -= snap.aiAgilityDebuff * 0.7;
+      w.dodge -= snap.aiAgilityDebuff * 0.7;
     }
     // 蓄力增益在身 → 优先攻击释放蓄力伤害
     if (snap.aiChargeBoost > 0) {
