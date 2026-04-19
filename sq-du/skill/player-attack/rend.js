@@ -11,14 +11,14 @@ import { EffectLayer } from '../../main/effect.js';
 export const FatigueEffect = createSkillEffect({
   id: EffectId.FATIGUE,
   name: '撕裂',
-  desc: '若攻击成功，为对方附加1级[创伤]并在下回合开始后触发',
+  desc: '若攻击成功，为对方附加1级[创伤]并在下回合的行动期开始后触发',
   applicableTo: [Action.ATTACK],
 
   onPost(ctx, owner, opponent, selfDmg, oppDmg) {
     if (!opponent) return;
     if ((oppDmg || 0) <= 0) return; // 必须命中
     EffectLayer.queueEffect(opponent, EffectId.WOUNDED, {
-      phaseEvent: 'TURN_START',
+      phaseEvent: 'ACTION_START',
       source: 'skill:immobilize',
     });
     EffectLayer.markFlashEffect(opponent, EffectId.WOUNDED);
