@@ -108,12 +108,21 @@ export class AIExtraLayer {
     // ── 基础权重（B）：所有技能拉平至 1.3~1.5 ──
     // ── 调优权重（T）：基于场景条件的额外加成 ──
     const B = 1.4; // 基准线
+    const hasToCleanse = (
+      (ai.ptsDebuff || 0) > 0 || (ai.guardDebuff || 0) > 0 || (ai.dodgeDebuff || 0) > 0 ||
+      (ai.agilityDebuff || 0) > 0 || (ai.staminaPenalty || 0) > 0 || (ai.insightDebuff || 0) > 0 ||
+      (ai.hpDrain || 0) > 0 || (ai.restRecoverPenalty || 0) > 0 || (ai.healRecoverPenalty || 0) > 0 ||
+      ai.speedAdjustBlocked || ai.insightBlocked || ai.standbyBlocked || ai.healBlocked ||
+      (Array.isArray(ai.actionBlocked) && ai.actionBlocked.length > 0) ||
+      (ai.slotBlocked && (ai.slotBlocked[Action.ATTACK]?.some(x=>x) || ai.slotBlocked[Action.GUARD]?.some(x=>x) || ai.slotBlocked[Action.DODGE]?.some(x=>x)))
+    );
+
     const byId = {
       // ── 共享攻击技能 ──                       基础    调优
       [EffectId.PARALYZE]: action === Action.ATTACK ? B - 0.1 : -5,
       // ── AI 攻击技能 ──
       [EffectId.BLOOD_DRINK]: action === Action.ATTACK ? B + 0.1 + (aiLowHp ? 1.0 : 0) : -5,
-      [EffectId.CHARGE]: action === Action.ATTACK ? B + ((ai.chargeBoost || 0) > 0 ? -0.6 : 0) + (ai.stamina >= 3 ? 0.2 : 0) + (playerLowHp ? -0.4 : 0) + (isEarlyGame ? -0.2 : 0) : -5,
+      [EffectId.CHARGE]: action === Action.ATTACK ? B - 0.1 + ((ai.chargeBoost || 0) > 0 ? -0.6 : 0) + (ai.stamina >= 3 ? 0.2 : 0) + (playerLowHp ? -0.4 : 0) : -5,
       [EffectId.SHATTER_POINT]: action === Action.ATTACK ? B + 0.1 + (player?.healBlocked ? -0.6 : 0) + (playerLowHp ? 0.3 : 0) : -5,
       [EffectId.FRENZY]: action === Action.ATTACK ? B + 0.1 : -5,
       [EffectId.PURSUIT]: action === Action.ATTACK ? B + 0.1 + ((ai.agilityBoost || 0) > 0 ? 0.3 : 0) + ((ai.agilityDebuff || 0) > 0 ? 0.3 : 0) : -5,
@@ -123,8 +132,8 @@ export class AIExtraLayer {
       [EffectId.SHOCKWAVE]: action === Action.GUARD ? B + ((player?.ptsDebuff || 0) > 0 ? -0.4 : 0) : -5,
       [EffectId.MUSTER]: action === Action.GUARD ? B - 0.1 : -5,
       // ── AI 守备技能 ──
-      [EffectId.STEADY]: action === Action.GUARD ? B + 0.1 + ((ai.guardBoost || 0) > 0 ? -0.6 : 0) + (isEarlyGame ? -0.2 : 0) : -5,
-      [EffectId.INVIGORATE]: action === Action.GUARD ? B + (((ai.ptsDebuff || 0) + (ai.guardDebuff || 0) + (ai.dodgeDebuff || 0) + (ai.agilityDebuff || 0) + (ai.staminaPenalty || 0)) > 0 ? 0.4 : 0) + (isEarlyGame ? -0.3 : 0) : -5,
+      [EffectId.STEADY]: action === Action.GUARD ? B - 0.1 + ((ai.guardBoost || 0) > 0 ? -0.6 : 0) : -5,
+      [EffectId.INVIGORATE]: action === Action.GUARD ? B + (hasToCleanse ? 0.3 : 0) : -5,
       [EffectId.TREMOR]: action === Action.GUARD ? B + 0.1 : -5,
 
       // ── 共享闪避技能 ──

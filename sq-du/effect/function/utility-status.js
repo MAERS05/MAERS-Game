@@ -137,7 +137,7 @@ export const PurifyEffect = createStatusEffect({
   name: '净化',
   desc: '清除自身部分负面效果',
   applicableTo: [Action.GUARD],
-  timingDisplay: 'phase',
+  timingDisplay: 'trigger',
   apply(state) {
     // ── 数值型负面字段清零 ──
     const negativeFields = [
