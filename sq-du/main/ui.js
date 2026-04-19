@@ -1815,6 +1815,7 @@ const modeTimedBtn = document.getElementById('modeTimedBtn');
 function closeModeSelect() {
   modeSelectBox.classList.remove('show');
   modeOverlay.classList.remove('show');
+  document.body.classList.add('game-started');
 }
 
 // 页面加载后直接展示模式选择

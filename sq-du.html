@@ -89,9 +89,14 @@
       justify-content: space-between;
       align-items: flex-start;
       padding: 24px 48px;
-      z-index: 1500;
       position: relative;
+      z-index: 1500; /* 默认游戏内高层级，悬浮在各种遮罩上 */
       gap: 16px;
+      pointer-events: none; /* 让空白区域穿透点击 */
+    }
+
+    body:not(.game-started) .hud-top {
+      z-index: 10; /* 开局防遮挡模式选择菜单 */
     }
 
     /* ─── 状态卡 ─────────────────────────────────── */
@@ -107,6 +112,8 @@
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.05);
       flex-shrink: 0;
       position: relative;
+      z-index: 10;
+      pointer-events: auto; /* 恢复实体卡片的点击 */
     }
 
     .status-enemy {
@@ -538,7 +545,10 @@
       color: #f59e0b;
       cursor: pointer;
     }
-    .term-link:active { opacity: 0.7; }
+
+    .term-link:active {
+      opacity: 0.7;
+    }
 
     /* ─── 回合/中间区 ──────────────────────────────── */
     .hud-center {
@@ -562,7 +572,6 @@
       border: 1px solid rgba(255, 255, 255, 0.15);
       color: var(--text-muted);
       position: relative;
-      z-index: 9999;
       border-radius: 8px;
       width: 32px;
       height: 32px;
@@ -572,6 +581,11 @@
       cursor: pointer;
       transition: all 0.2s;
       font-size: 1rem;
+    }
+
+    body.game-started .history-btn {
+      z-index: 9999;
+      pointer-events: auto !important; /* 任何时候都可以点击，即使顶层被挂了 none */
     }
 
     .history-btn:hover {
@@ -1173,98 +1187,6 @@
       opacity: 0.6;
     }
 
-    /* ─── 响应式 ──────────────────────────────────── */
-    @media (max-width: 640px) {
-      body {
-        height: auto;
-        min-height: 100svh;
-        overflow-y: auto;
-        overflow-x: hidden;
-      }
-
-      .hud-top {
-        flex-direction: column;
-        padding: 10px 12px;
-        gap: 8px;
-      }
-
-      .status-card {
-        padding: 8px 12px 28px 12px;
-        gap: 10px;
-      }
-
-      .status-icon-tray {
-        left: 12px;
-        right: 12px;
-      }
-
-      .status-enemy .status-icon-tray {
-        right: 28px;
-      }
-
-      .avatar-frame {
-        width: 60px;
-        height: 60px;
-      }
-
-      .timer-ring-wrap {
-        width: 32px;
-        height: 32px;
-        top: 4px;
-        left: 4px;
-      }
-
-      .timer-ring-svg {
-        width: 32px;
-        height: 32px;
-      }
-
-      .timer-sec {
-        font-size: 0.6rem;
-      }
-
-      .stat-label {
-        width: 44px;
-        font-size: 0.6rem;
-      }
-
-      .hp-pip {
-        width: 10px;
-        height: 10px;
-      }
-
-      .stamina-pip {
-        width: 10px;
-        height: 5px;
-      }
-
-      .bottom-actions {
-        padding: 12px 8px 28px;
-        gap: 16px;
-      }
-
-      .act-btn {
-        width: 74px;
-        height: 74px;
-        font-size: 0.88rem;
-      }
-
-      .act-btn.guard {
-        width: 68px;
-        height: 68px;
-      }
-
-      .act-pt {
-        font-size: 1.5rem;
-      }
-
-      .commit-area {
-        position: static;
-        transform: none;
-        padding: 12px 16px 0;
-      }
-    }
-
     /* ── 敌方情报框 ─────────────────────────────────── */
     .intel-box {
       position: fixed;
@@ -1387,9 +1309,9 @@
     }
 
     .equip-overlay-inner {
-      background: rgba(24, 24, 27, 0.9);
-      /* 暗灰实心 */
-      backdrop-filter: blur(12px);
+      background: rgba(24, 24, 27, 0.1);
+      /* 半透明底 */
+      backdrop-filter: blur(2px);
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-left: 4px solid #f59e0b;
       /* 炽黄强调线 */
@@ -1506,7 +1428,7 @@
 
     .equip-slot:hover {
       border-color: #f59e0b;
-      background: rgba(245, 158, 11, 0.1);
+      background: rgb(60, 51, 39);
     }
 
     .equip-slot .slot-add {
@@ -1523,7 +1445,7 @@
     .equip-slot.filled {
       border-color: rgba(245, 158, 11, 0.8);
       border-style: solid;
-      background: rgba(245, 158, 11, 0.15);
+      background: rgb(70, 57, 37);
     }
 
     .equip-slot .slot-name {
@@ -1830,6 +1752,7 @@
       }
     }
   </style>
+  <link href="mobile-sq-du.css" rel="stylesheet">
 </head>
 
 <body>
@@ -2011,7 +1934,8 @@
         <button id="modeTimedBtn" class="game-btn">计时</button>
         <button id="modeInstantBtn" class="game-btn">即时</button>
       </div>
-      <div class="mode-select-divider" style="margin:16px 0 8px; border-top:1px solid rgba(255,255,255,0.1); padding-top:16px; text-align:center;">
+      <div class="mode-select-divider"
+        style="margin:16px 0 8px; border-top:1px solid rgba(255,255,255,0.1); padding-top:16px; text-align:center;">
         <div class="mode-select-title">普通模式</div>
       </div>
       <div class="mode-select-btns">

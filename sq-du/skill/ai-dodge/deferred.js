@@ -11,8 +11,8 @@ import { EffectLayer } from '../../main/effect.js';
 export const DeferredEffect = createSkillEffect({
   id: EffectId.DEFERRED,
   name: '延付',
-  desc: '本回合不执行闪避，为自身附加1级[侧身]并在接下来2回合内的回合开始后，回合结束前生效',
-  applicableTo: [Action.DODGE],
+  desc: '本回合闪避不执行，为自身附加1级[侧身]并在接下来2回合内的回合开始后，回合结束前生效',
+  applicableTo: [Action.DODGE, Action.PREPARE],
   onPre(ctx, state) {
     EffectLayer.queueEffect(state, EffectId.SIDE_STEP, {
       phaseEvent: 'TURN_START',

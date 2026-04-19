@@ -1,0 +1,124 @@
+/* 移动端专属样式 (max-width: 640px) */
+
+@media (max-width: 640px) {
+  body {
+    height: auto;
+    min-height: 100svh;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .hud-top {
+    flex-direction: column;
+    align-items: center;
+    /* 解决移动端不居中的问题 */
+    padding: 8px 10px;
+    /* 进一步压缩内边距 */
+    gap: 6px;
+  }
+
+  .status-card {
+    padding: 6px 10px 22px 10px;
+    gap: 8px;
+    width: 175px;
+    /* 固定卡片宽度，保证两者视觉对齐统一 */
+  }
+
+  .status-icon-tray {
+    left: 8px;
+    right: 8px;
+    bottom: 4px;
+  }
+
+  .status-enemy .status-icon-tray {
+    right: 22px;
+  }
+
+  .avatar-frame {
+    width: 48px;
+    /* 头像缩小 */
+    height: 48px;
+  }
+
+  .timer-ring-wrap {
+    width: 26px;
+    height: 26px;
+    top: 3px;
+    left: 3px;
+  }
+
+  .timer-ring-svg {
+    width: 26px;
+    height: 26px;
+  }
+
+  .timer-sec {
+    font-size: 0.55rem;
+  }
+
+  .stat-label {
+    width: 36px;
+    font-size: 0.55rem;
+  }
+
+  .hp-pip {
+    width: 8px;
+    height: 8px;
+  }
+
+  .stamina-pip {
+    width: 8px;
+    height: 4px;
+  }
+
+  /* 行动区稍微缩小 */
+  .bottom-actions {
+    padding: 8px 6px 20px;
+    gap: 12px;
+  }
+
+  .act-btn {
+    width: 64px;
+    height: 64px;
+    font-size: 0.8rem;
+  }
+
+  .act-btn.guard {
+    width: 58px;
+    height: 58px;
+  }
+
+  .act-pt {
+    font-size: 1.2rem;
+  }
+
+  .commit-area {
+    position: static;
+    transform: none;
+    padding: 8px 12px 0;
+  }
+
+  /* 调整中心信息区展示 */
+  .phase-indicator {
+    font-size: 0.7rem;
+  }
+
+  .turn-indicator {
+    font-size: 1.1rem;
+    letter-spacing: 1px;
+  }
+
+  .history-btn {
+    width: 28px;
+    height: 28px;
+  }
+
+  /* 修复情报框由于布局变长被压到底下的问题 */
+  .intel-box {
+    top: 310px;
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1550;
+  }
+}

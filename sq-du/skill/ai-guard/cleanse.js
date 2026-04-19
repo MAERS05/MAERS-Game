@@ -11,8 +11,8 @@ import { EffectLayer } from '../../main/effect.js';
 export const InvigorateEffect = createSkillEffect({
   id: EffectId.INVIGORATE,
   name: '洁净',
-  desc: '本回合不执行守备，为自身附加[净化]并在下回合开始后触发',
-  applicableTo: [Action.GUARD],
+  desc: '本回合守备不执行，为自身附加[净化]并在下回合开始后触发',
+  applicableTo: [Action.GUARD, Action.PREPARE],
 
   onPre(ctx, state) {
     // 净化（下回合开始触发）：清除自身部分负面效果
