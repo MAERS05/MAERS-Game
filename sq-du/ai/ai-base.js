@@ -118,6 +118,21 @@ export class AIBaseLogic {
       return streak;
     })();
 
+    // AI 自身连招计数
+    const aiLastAction = history.length ? history[history.length - 1].aiAction : null;
+    const aiSameStreak = (() => {
+      if (!aiLastAction) return 0;
+      let streak = 0;
+      for (let i = history.length - 1; i >= 0; i--) {
+        if (history[i].aiAction !== aiLastAction) break;
+        streak++;
+      }
+      return streak;
+    })();
+
+    // 僵局检测：双方连续出同一招 ≥ 2 回合
+    const isStalemate = aiSameStreak >= 2 && sameActionStreak >= 2;
+
     return {
       aiHpRatio: this.clamp01(ai.hp / MAX_HP),
       playerHpRatio: this.clamp01(player.hp / MAX_HP),
@@ -163,6 +178,9 @@ export class AIBaseLogic {
       oppAggression,
       oppLastAction: lastAction,
       oppActionStreak: sameActionStreak,
+      aiLastAction,
+      aiSameStreak,
+      isStalemate,
       predictNext: this._buildTransitionModel(history, lastAction),
     };
   }
@@ -431,6 +449,25 @@ export class AIBaseLogic {
     // ── 独立封锁字段（截脉 standbyBlocked / 禁愈 healBlocked）──
     if (ai.standbyBlocked) w.standby = -Infinity;
     if (ai.healBlocked) w.heal = -Infinity;
+
+    // ── 反僵局机制：AI 连续出同一招时逐步惩罚，避免死循环 ──
+    if (snap.aiSameStreak >= 2 && snap.aiLastAction) {
+      const penaltyKey = snap.aiLastAction === Action.ATTACK ? 'attack'
+        : snap.aiLastAction === Action.GUARD ? 'guard'
+        : snap.aiLastAction === Action.DODGE ? 'dodge'
+        : snap.aiLastAction === Action.STANDBY ? 'standby'
+        : snap.aiLastAction === Action.HEAL ? 'heal' : null;
+      if (penaltyKey && w[penaltyKey] > -Infinity) {
+        // 连续2次-1.0，3次-2.0，4次-3.5...
+        w[penaltyKey] -= (snap.aiSameStreak - 1) * 1.2;
+      }
+    }
+    // 双方僵局时强制随机化：给所有可用行动加大随机扰动
+    if (snap.isStalemate) {
+      for (const key of ['attack', 'guard', 'dodge', 'standby', 'heal']) {
+        if (w[key] > -Infinity) w[key] += Math.random() * 3.0;
+      }
+    }
 
     const weightMap = {
       [Action.ATTACK]: w.attack,

@@ -1284,6 +1284,7 @@ export class BattleEngine {
         opponentSpeed: result.p1Action.speed ?? DefaultStats.BASE_SPEED,
         opponentEnhance: result.p1Action.enhance ?? 0,
         opponentStamina: result.newState.p1.stamina,
+        aiAction: result.p2Action?.action ?? null,
       });
       if (this._aiHistory.length > 5) this._aiHistory.shift();
     }
