@@ -295,6 +295,10 @@ export class AIBaseLogic {
     // ── 对手血量压力（有精力时主动进攻）──────────
     if (aiEffectiveStamina >= 2) {
       w.attack += (1 - snap.playerHpRatio) * 3.0;
+    } else if (snap.playerHpRatio <= this.TUNING.executeHpLine + 0.15 && !snap.aiConsecAttackFailed) {
+      // 即使1精力，对手已命悬一线且未连续攻击受挫时加进攻加成
+      // 若攻击就已连续受挫，对手很可能一直在守备，不应被血量讪惑挪接负隅攻击
+      w.attack += (1 - snap.playerHpRatio) * 1.5;
     }
 
     // ── 对手攻击倾向（对应防守）───────────────────
@@ -317,9 +321,17 @@ export class AIBaseLogic {
 
     // ── 阶段1：危机（精力 ≤ 1）─ 几乎只能蓄势回气 ──
     if (aiEffectiveStamina <= 1) {
-      w.standby += 4.0;
-      w.attack -= 1.5;
-      w.dodge -= 0.5;
+      // 例外：对手命悬一线且未连续攻击受挫时，进攻可一击制胜，蓄势加成大幅降低
+      // 但若攻击已连续受挫，对手很可能一直在守备，血量讪惑让位于受挫信号
+      const playerAtDeathsDoor = snap.playerHpRatio <= this.TUNING.executeHpLine + 0.15;
+      if (playerAtDeathsDoor && !snap.aiConsecAttackFailed) {
+        w.standby += 1.0;  // 原 4.0 大幅减少
+        w.attack -= 0.3;   // 原 -1.5 大幅减少
+      } else {
+        w.standby += 4.0;
+        w.attack -= 1.5;
+        w.dodge -= 0.5;
+      }
       // 疗愈消耗 1 精力——危机期只有精力=1且血量危急时才考虑
       if (!ai.healBlocked && ai.hp <= 1 && aiEffectiveStamina >= 1) {
         w.heal += 2.0;
@@ -423,10 +435,11 @@ export class AIBaseLogic {
       if (snap.playerStaminaRatio <= 0.3) w.heal += 1.0;
       // 绝杀窗口时不疗愈
       if (indicators.killWindow > 0 || indicators.executeWindow > 0) w.heal = -Infinity;
-      // 精力=1时疗愈会清空精力，极其危险——除非有兴奋/振奋等特殊效果抵消消耗
+      // 精力=1时疗愈会清空精力，下回合无法行动等于送死
+      // 无论对手当前精力几何，对手下回合必然能行动（蓄势回复），无减免时大幅惩罚
       if (aiEffectiveStamina <= 1) {
         const hasRecoverMitigation = (ai.staminaDiscount || 0) > 0 || (ai.restRecoverBonus || 0) > 0;
-        w.heal += hasRecoverMitigation ? -0.5 : -2.0;
+        w.heal += hasRecoverMitigation ? -0.5 : -3.5;
       }
     }
 
@@ -490,14 +503,25 @@ export class AIBaseLogic {
       return BASE + 1;
     }
 
-    // 动态博弈：预期对手闪避，我方攻击 -> 必须先手以咬住并超越闪避先手
+    // 动态博弈：预期对手闪避，我方攻击 → 必须先手以咬住并超越闪避先手
+    // 但若提速会耗尽精力（下回合必须蓄势），改为低概率而非确定提速
     if (action === Action.ATTACK && pDodge > 0.40 && availableForBoost >= 1) {
-      return BASE + 1;
+      const willDrainEmpty = availableForBoost === 1;
+      const tuning0 = ai.aiTuning || {};
+      const speedBias0 = tuning0.speedBoostBias || 0;
+      const prob = willDrainEmpty ? Math.max(0.15, 0.10 + speedBias0) : 1.0;
+      if (Math.random() < prob) return BASE + 1;
     }
 
-    // 动态博弈：预期对手攻击，且对手有先手习惯，我方防御/闪避 -> 抢先部署防线
+    // 动态博弈：预期对手攻击，且对手有先手习惯，我方防御/闪避 → 抢先部署防线
     if ((action === Action.GUARD || action === Action.DODGE) && pAtk > 0.45 && snap.oppSpeedTrend > DefaultStats.BASE_SPEED + 0.3) {
-      if (availableForBoost >= 1) return BASE + 1;
+      if (availableForBoost >= 1) {
+        const willDrainEmpty2 = availableForBoost === 1;
+        const tuning1 = ai.aiTuning || {};
+        const speedBias1 = tuning1.speedBoostBias || 0;
+        const prob2 = willDrainEmpty2 ? Math.max(0.15, 0.10 + speedBias1) : 1.0;
+        if (Math.random() < prob2) return BASE + 1;
+      }
     }
 
     // 血线告急时的特殊本能反应保命先手
