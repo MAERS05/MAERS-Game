@@ -23,7 +23,7 @@ import { MeridianBlockEffect, HealBlockEffect, AttackEnhanceEffect, AttackSlot0B
 // ── 玩家攻击技能（skill/player-attack/）──
 import { BreakQiEffect } from '../skill/player-attack/break_qi.js';
 import { HamstringEffect } from '../skill/player-attack/hamstring.js';
-import { FatigueEffect } from '../skill/player-attack/immobilize.js';
+import { FatigueEffect } from '../skill/player-attack/rend.js';
 
 // ── 共享攻击技能（skill/attack/）──
 import { ParalyzeEffect } from '../skill/attack/seal_vein.js';
@@ -36,7 +36,7 @@ import { BacklashEffect } from '../skill/player-guard/backlash.js';
 import { BlindingEffect } from '../skill/player-guard/blinding.js';
 
 // ── 共享守备技能（skill/guard/）──
-import { Restore } from '../skill/guard/restore.js';
+import { Restore } from '../skill/guard/shackle.js';
 import { ShockwaveEffect } from '../skill/guard/shockwave.js';
 import { MusterEffect } from '../skill/guard/muster.js';
 

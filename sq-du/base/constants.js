@@ -353,13 +353,13 @@ export const EffectId = Object.freeze({
   // ── 玩家攻击技能（skill/player-attack/）──
   BREAK_QI: 'break_qi',
   HAMSTRING: 'hamstring',
-  FATIGUE: 'fatigue',
+  FATIGUE: 'rend',
   // ── 共享攻击技能（skill/attack/）──
   PARALYZE: 'paralyze',
   CHARGE: 'charge',
   SHATTER_POINT: 'shatter_point',
   // ── 共享守备技能（skill/guard/）──
-  RESTORE: 'restore',
+  RESTORE: 'shackle_guard',
   REDIRECT: 'redirect',
   BACKLASH: 'backlash',
   BLINDING: 'blinding',
@@ -421,7 +421,7 @@ export const EffectDefs = Object.freeze({
     playerOnly: true,
   },
   [EffectId.FATIGUE]: {
-    id: EffectId.FATIGUE, name: '定身',
+    id: EffectId.FATIGUE, name: '撕裂',
     applicableTo: [Action.ATTACK],
     playerOnly: true,
   },
@@ -440,7 +440,7 @@ export const EffectDefs = Object.freeze({
   },
   // ── 共享守备技能（skill/guard/）──
   [EffectId.RESTORE]: {
-    id: EffectId.RESTORE, name: '恢复',
+    id: EffectId.RESTORE, name: '震颤',
     applicableTo: [Action.GUARD],
   },
   [EffectId.SHOCKWAVE]: {

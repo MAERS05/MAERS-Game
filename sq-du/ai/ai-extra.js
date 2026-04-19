@@ -119,7 +119,7 @@ export class AIExtraLayer {
       [EffectId.PURSUIT]: action === Action.ATTACK ? B + 0.1 + ((ai.agilityBoost || 0) > 0 ? 0.3 : 0) + ((ai.agilityDebuff || 0) > 0 ? 0.3 : 0) : -5,
 
       // ── 共享守备技能 ──
-      [EffectId.RESTORE]: action === Action.GUARD ? B + (aiLowHp ? 0.8 : 0) : -5,
+      [EffectId.RESTORE]: action === Action.GUARD ? B + (!player?.speedAdjustBlocked ? 0.4 : -0.6) : -5,
       [EffectId.SHOCKWAVE]: action === Action.GUARD ? B + ((player?.ptsDebuff || 0) > 0 ? -0.4 : 0) : -5,
       [EffectId.MUSTER]: action === Action.GUARD ? B - 0.1 : -5,
       // ── AI 守备技能 ──

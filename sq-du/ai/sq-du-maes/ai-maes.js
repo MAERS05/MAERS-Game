@@ -53,7 +53,7 @@ const MAES_ATTACK_EFFECTS = [
 
 /** MAES AI 守备技能池 */
 const MAES_GUARD_EFFECTS = [
-  EffectId.RESTORE,       // 恢复
+  EffectId.RESTORE,       // 震颤
   EffectId.SHOCKWAVE,     // 崩震
   EffectId.MUSTER,        // 整备（共享）
   EffectId.STEADY,        // 稳重（AI 专属）
