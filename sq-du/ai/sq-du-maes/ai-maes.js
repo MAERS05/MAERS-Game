@@ -128,7 +128,7 @@ export const MaesProfile = {
     redecideBias: 0.20,  // 重决策概率偏移（加到各情境概率上）
     speedBoostBias: 0.1,  // 先手概率偏移（正=更爱先手）
     passiveExploitBias: 1.5,   // 对手被动行为时攻击加成（蓄势/疗愈=白给）
-    effectSkipChance: 0.05,    // 5% 概率不携带效果（轻出手）
+    effectSkipChance: 0.0,     // 0% 概率不携带效果（确保每次出手必定带技能）
     // ── 连续攻击受挫时的权重调整（最近2次攻击均未造成伤害） ──
     // 蓄势25%，疗愈18%，攻击19%，守备19%，闪避19% (总权重 10.0)
     consecFailBias: {

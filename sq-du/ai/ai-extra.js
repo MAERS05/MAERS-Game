@@ -133,7 +133,7 @@ export class AIExtraLayer {
       [EffectId.MUSTER]: action === Action.GUARD ? B - 0.1 : -5,
       // ── AI 守备技能 ──
       [EffectId.STEADY]: action === Action.GUARD ? B : -5,
-      [EffectId.INVIGORATE]: action === Action.GUARD ? B + (hasToCleanse ? 0.3 : 0) : -5,
+      [EffectId.INVIGORATE]: action === Action.GUARD ? B : -5,
       [EffectId.TREMOR]: action === Action.GUARD ? B : -5,
 
       // ── 共享闪避技能 ──
@@ -143,7 +143,7 @@ export class AIExtraLayer {
       // ── AI 闪避技能 ──
       [EffectId.DISARM]: action === Action.DODGE ? B : -5,
       [EffectId.DEFERRED]: action === Action.DODGE ? B + 0.1 + ((ai.dodgeBoost || 0) > 0 ? -0.6 : 0) : -5,
-      [EffectId.FURY]: action === Action.DODGE ? B + ((ai.dodgeBoost || 0) <= 0 ? 0.3 : 0) + (aiLowHp ? -0.8 : 0) : -5,
+      [EffectId.FURY]: action === Action.DODGE ? B - 0.1 + ((ai.dodgeBoost || 0) <= 0 ? 0.3 : 0) + (aiLowHp ? -0.8 : 0) : -5,
     };
 
     let total = score + (byId[id] ?? 0);

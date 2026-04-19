@@ -367,9 +367,9 @@ function refreshPoints() {
   // 取消行为按钮：只要有行动被选中就显示
   ui.cancelActionBtn.classList.toggle('visible', !!selectedAction);
 
-  // 只要还有有效精力即可先手；是否透支行动由玩家自行选择
-  ui.p1SpeedUp.disabled = effectiveStamina <= 0;
-  ui.p1SpeedDown.disabled = p1.speed <= DefaultStats.BASE_SPEED;
+  // 只要还有有效精力即可先手；若被禁锢，则强制不可调速
+  ui.p1SpeedUp.disabled = effectiveStamina <= 0 || p1.speedAdjustBlocked;
+  ui.p1SpeedDown.disabled = p1.speed <= DefaultStats.BASE_SPEED || p1.speedAdjustBlocked;
 }
 
 // ═══════════════════════════════════════════════════════
