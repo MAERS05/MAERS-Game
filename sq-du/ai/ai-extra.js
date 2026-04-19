@@ -113,7 +113,7 @@ export class AIExtraLayer {
       [EffectId.PARALYZE]: action === Action.ATTACK ? B - 0.1 : -5,
       // ── AI 攻击技能 ──
       [EffectId.BLOOD_DRINK]: action === Action.ATTACK ? B + 0.1 + (aiLowHp ? 1.0 : 0) : -5,
-      [EffectId.CHARGE]: action === Action.ATTACK ? B + ((ai.chargeBoost || 0) > 0 ? -0.6 : 0) + (ai.stamina >= 3 ? 0.2 : 0) + (playerLowHp ? -0.4 : 0) : -5,
+      [EffectId.CHARGE]: action === Action.ATTACK ? B + ((ai.chargeBoost || 0) > 0 ? -0.6 : 0) + (ai.stamina >= 3 ? 0.2 : 0) + (playerLowHp ? -0.4 : 0) + (isEarlyGame ? -0.2 : 0) : -5,
       [EffectId.SHATTER_POINT]: action === Action.ATTACK ? B + 0.1 + (player?.healBlocked ? -0.6 : 0) + (playerLowHp ? 0.3 : 0) : -5,
       [EffectId.FRENZY]: action === Action.ATTACK ? B + 0.1 : -5,
       [EffectId.PURSUIT]: action === Action.ATTACK ? B + 0.1 + ((ai.agilityBoost || 0) > 0 ? 0.3 : 0) + ((ai.agilityDebuff || 0) > 0 ? 0.3 : 0) : -5,
@@ -124,7 +124,7 @@ export class AIExtraLayer {
       [EffectId.MUSTER]: action === Action.GUARD ? B - 0.1 : -5,
       // ── AI 守备技能 ──
       [EffectId.STEADY]: action === Action.GUARD ? B + 0.1 + ((ai.guardBoost || 0) > 0 ? -0.6 : 0) + (isEarlyGame ? -0.2 : 0) : -5,
-      [EffectId.INVIGORATE]: action === Action.GUARD ? B + (((ai.ptsDebuff || 0) + (ai.guardDebuff || 0) + (ai.dodgeDebuff || 0) + (ai.agilityDebuff || 0) + (ai.staminaPenalty || 0)) > 0 ? 0.4 : 0) : -5,
+      [EffectId.INVIGORATE]: action === Action.GUARD ? B + (((ai.ptsDebuff || 0) + (ai.guardDebuff || 0) + (ai.dodgeDebuff || 0) + (ai.agilityDebuff || 0) + (ai.staminaPenalty || 0)) > 0 ? 0.4 : 0) + (isEarlyGame ? -0.3 : 0) : -5,
       [EffectId.TREMOR]: action === Action.GUARD ? B + 0.1 : -5,
 
       // ── 共享闪避技能 ──

@@ -444,7 +444,11 @@ export class BattleEngine {
     // ── AI 先手消耗同步 ──────────────────────────────────
     // AI 绕过了 adjustSpeed()，直接在 patch 中提交 speed 值。
     // 此处将 speed 差值转化为精力扣除，与 adjustSpeed 行为一致。
-    if (patch.speed != null) {
+    // 蓄备类行动不允许提速，强制重置为基础先手
+    if (p.actionCtx.action === Action.PREPARE) {
+      p.actionCtx.speed = DefaultStats.BASE_SPEED;
+      p.speed = DefaultStats.BASE_SPEED;
+    } else if (patch.speed != null) {
       const targetSpeed = patch.speed;
       const currentSpeed = p.speed; // 当前先手（回合初始为 BASE_SPEED）
       const delta = targetSpeed - currentSpeed;
@@ -503,6 +507,8 @@ export class BattleEngine {
    */
   adjustSpeed(playerId, delta) {
     const p = this._players[playerId];
+    // 蓄备类行动不允许调速
+    if (p.actionCtx?.action === Action.PREPARE) return;
     if (!EffectLayer.canAdjustSpeed(p, delta)) return;
 
     if (delta > 0) {

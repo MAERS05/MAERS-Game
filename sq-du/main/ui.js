@@ -1089,7 +1089,7 @@ const EFFECT_ICON_META = {
   'side_step_state': { icon: 'avoid.svg', name: '侧身', resource: '闪避点数', sign: +1 },
   [EffectId.CLUMSY]: { icon: 'heavy.svg', name: '僵硬', resource: '闪避点数', sign: -1 },
   [EffectId.LIGHT]: { icon: 'fast.svg', name: '轻盈', resource: '先手', sign: +1 },
-  [EffectId.HEAVY]: { icon: 'fast.svg', name: '沉重', resource: '先手', sign: -1 },
+  [EffectId.HEAVY]: { icon: 'heavy.svg', name: '沉重', resource: '先手', sign: -1 },
   [EffectId.WOUNDED]: { icon: 'wound.svg', name: '创伤', resource: '命数', sign: -1 },
   [EffectId.FORTIFIED]: { icon: 'treat.svg', name: '治愈', resource: '命数', sign: +1 },
   [EffectId.REJUVENATED]: { icon: 'uplifting.svg', name: '振奋', resource: '精力', sign: +1 },
@@ -1248,7 +1248,7 @@ function updateStatusIcons(playerId, state) {
     { field: 'dodgeBoost', eid: EffectId.SIDE_STEP, sign: +1, resource: '闪避点数', name: '侧身', icon: 'avoid.svg' },
     { field: 'dodgeDebuff', eid: EffectId.CLUMSY, sign: -1, resource: '闪避点数', name: '僵硬', icon: 'heavy.svg' },
     { field: 'agilityBoost', eid: EffectId.LIGHT, sign: +1, resource: '先手', name: '轻盈', icon: 'fast.svg' },
-    { field: 'agilityDebuff', eid: EffectId.HEAVY, sign: -1, resource: '先手', name: '沉重', icon: 'fast.svg' },
+    { field: 'agilityDebuff', eid: EffectId.HEAVY, sign: -1, resource: '先手', name: '沉重', icon: 'heavy.svg' },
     { field: 'staminaPenalty', eid: EffectId.EXHAUSTED, sign: +1, resource: '精力消耗', name: '疲惫', icon: 'tired.svg' },
     { field: 'staminaDiscount', eid: EffectId.EXCITED, sign: -1, resource: '精力消耗', name: '兴奋', icon: 'excited.svg' },
     { field: 'hpDrain', eid: EffectId.WOUNDED, sign: -1, resource: '命数', name: '创伤', icon: 'wound.svg' },
@@ -1293,7 +1293,7 @@ function updateStatusIcons(playerId, state) {
   if (!rendered.has(EffectId.BLINDED) && state.insightBlocked)
     addIcon('close-eye.svg', `蒙蔽：禁止洞察`, state._effectMeta?.[EffectId.BLINDED] || 'TURN_PHASE', '本回合');
   if (!rendered.has(EffectId.SHACKLED) && state.speedAdjustBlocked)
-    addIcon('fast.svg', `禁锢：禁止调速`, state._effectMeta?.[EffectId.SHACKLED] || 'TURN_PHASE', '本回合');
+    addIcon('close-fast.svg', `禁锢：禁止调速`, state._effectMeta?.[EffectId.SHACKLED] || 'TURN_PHASE', '本回合');
 
   // 行动禁止
   if (state.actionBlocked) {
