@@ -123,13 +123,20 @@ export const MaesProfile = {
     guardBias: 1.5,     // 守备 25%
     dodgeBias: 0.8,     // 闪避 18%
     standbyBias: 0.3,   // 蓄势 13%
-    healBias: 0.1,      // 疗愈 11%
-    insightThreshold: 0.8,   // 洞察评分阈值（低=更积极洞察；默认 1.8）
+    healBias: 0.1,      // 疗愈 11%    insightThreshold: 0.8,   // 洞察评分阈值（低=更积极洞察；默认 1.8）
     insightMaxProb: 0.90,  // 洞察最大概率（默认 0.65）
     redecideBias: 0.20,  // 重决策概率偏移（加到各情境概率上）
     speedBoostBias: 0.1,  // 先手概率偏移（正=更爱先手）
     passiveExploitBias: 1.5,   // 对手被动行为时攻击加成（蓄势/疗愈=白给）
     effectSkipChance: 0.05,    // 5% 概率不携带效果（轻出手）
+    // ── 连续攻击受挫时的权重调整（最近2次攻击均未造成伤害） ──
+    consecFailBias: {
+      attack: -1.8,  // 攻击 3.3 → 1.5
+      guard: +1.0,  // 守备 2.5 → 3.5
+      dodge: +0.7,  // 闪避 1.8 → 2.5
+      standby: +2.7,  // 蓄势 1.3 → 4.0
+      heal: +0.9,  // 疗愈 1.1 → 2.0
+    },
   },
 };
 
@@ -202,7 +209,17 @@ export function maesConstrainDecision(decision, scene) {
 
   // ── 场景0（好斗本能）：基础层在精力≤1时强制待命，但 MAES 更激进 ──
   // 对手上回合被动行为（蓄势/疗愈）或对手精力低时，MAES 在保留1点精力余量的前提下攻击
-  if (d.action === Action.STANDBY && effectiveStamina >= 2) {
+  // 但连续攻击均未奏效时，尊重基础层的受挫调整，不再强行进攻
+  const consecFailed = (() => {
+    const attacks = [];
+    for (let i = (history?.length ?? 0) - 1; i >= 0 && attacks.length < 2; i--) {
+      const h = history[i];
+      if (h.aiAction === Action.ATTACK) attacks.push(h.aiDealtDamage === true);
+    }
+    return attacks.length >= 2 && attacks.every(s => !s);
+  })();
+
+  if (d.action === Action.STANDBY && effectiveStamina >= 2 && !consecFailed) {
     const recentOpp = history?.length ? history[history.length - 1]?.opponentAction : null;
     const oppPassive = recentOpp === Action.STANDBY || recentOpp === Action.HEAL;
     const oppWeak = player.stamina <= 1 || player.hp <= 2;

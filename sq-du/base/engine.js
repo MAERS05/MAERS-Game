@@ -1284,7 +1284,9 @@ export class BattleEngine {
         opponentSpeed: result.p1Action.speed ?? DefaultStats.BASE_SPEED,
         opponentEnhance: result.p1Action.enhance ?? 0,
         opponentStamina: result.newState.p1.stamina,
+        // AI 自身本回合记录
         aiAction: result.p2Action?.action ?? null,
+        aiDealtDamage: (result.damageToP1 ?? 0) > 0,
       });
       if (this._aiHistory.length > 5) this._aiHistory.shift();
     }
