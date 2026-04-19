@@ -432,7 +432,7 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.CHARGE]: {
     id: EffectId.CHARGE, name: '蓄力',
-    applicableTo: [Action.ATTACK],
+    applicableTo: [Action.ATTACK, Action.PREPARE],
   },
   [EffectId.SHATTER_POINT]: {
     id: EffectId.SHATTER_POINT, name: '崩穴',
@@ -476,7 +476,7 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.DEFERRED]: {
     id: EffectId.DEFERRED, name: '延付',
-    applicableTo: [Action.DODGE],
+    applicableTo: [Action.DODGE, Action.PREPARE],
     aiOnly: true,
   },
   [EffectId.PILFER]: {
@@ -520,7 +520,7 @@ export const EffectDefs = Object.freeze({
   },
   [EffectId.INVIGORATE]: {
     id: EffectId.INVIGORATE, name: '洁净',
-    applicableTo: [Action.GUARD],
+    applicableTo: [Action.GUARD, Action.PREPARE],
     aiOnly: true,
   },
   [EffectId.TREMOR]: {
