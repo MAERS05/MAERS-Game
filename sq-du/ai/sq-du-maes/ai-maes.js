@@ -129,7 +129,8 @@ export const MaesProfile = {
     speedBoostBias: 0.1,  // 先手概率偏移（正=更爱先手）
     passiveExploitBias: 0.6,    // 对手被动行为时攻击加成（原1.5太高导致锁死攻击）
     effectSkipChance: 0.0,     // 0% 概率不携带效果（确保每次出手必定带技能）
-    effectDesireBias: 0.55,   // 55% 概率主动强化以获取额外技能效果（精力≥3时触发）
+    effectDesireBias: 0.42,   // 强化+不提速≈38%，不强化+不提速≈33%，不强化+提速≈25%
+    defaultSpeedBias: 0.43,   // 不提速基础提速概率（无特定触发时兜底）
     // ── 连续攻击受挫时的权重调整（最近2次攻击均未造成伤害） ──
     // 目标概率：蓄势30% > 疗愈25% > 攻击22% > 守备13% > 闪避10% (总权重 10.0)
     consecFailBias: {
@@ -338,6 +339,14 @@ export function maesConstrainDecision(decision, scene) {
           const prob = Math.min(0.60, 0.05 + speedBias) * speedPenalty;
           if (Math.random() < prob) d.speed = BASE + 1;
         }
+      }
+
+      // ── 默认先手倾向（无历史/无特定触发时的兜底概率）──────────
+      // 确保第一回合等无历史情况下提速也有实际概率触发。
+      // 由 tuning.defaultSpeedBias 控制（0~1），不叠加任何情境放大。
+      if (d.speed === BASE && canAffordBoost) {
+        const defaultProb = (tuning.defaultSpeedBias || 0) * speedPenalty;
+        if (defaultProb > 0 && Math.random() < defaultProb) d.speed = BASE + 1;
       }
     }
   }
