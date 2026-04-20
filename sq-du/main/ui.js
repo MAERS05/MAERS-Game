@@ -1271,9 +1271,9 @@ function updateStatusIcons(playerId, state) {
   // ── 3. bonus 字段图标（支持临时 { value, turns } 和永久 perm* 两类） ──
   const bonusChecks = [
     { field: 'attackPtsBonus', permField: 'permAttackPtsBonus', icon: 'strong.svg', name: '攻击强化', resource: '攻击点数和槽位' },
-    { field: 'guardPtsBonus',  permField: 'permGuardPtsBonus',  icon: 'shield.svg', name: '守备强化', resource: '守备点数和槽位' },
-    { field: 'dodgePtsBonus',  permField: 'permDodgePtsBonus',  icon: 'avoid.svg',  name: '闪避强化', resource: '闪避点数和槽位' },
-    { field: 'speedBonus',     permField: null,                  icon: 'fast.svg',   name: '先手强化', resource: '先手' },
+    { field: 'guardPtsBonus', permField: 'permGuardPtsBonus', icon: 'shield.svg', name: '守备强化', resource: '守备点数和槽位' },
+    { field: 'dodgePtsBonus', permField: 'permDodgePtsBonus', icon: 'avoid.svg', name: '闪避强化', resource: '闪避点数和槽位' },
+    { field: 'speedBonus', permField: null, icon: 'fast.svg', name: '先手强化', resource: '先手' },
   ];
   for (const { field, permField, icon, name, resource } of bonusChecks) {
     const raw = state[field];
