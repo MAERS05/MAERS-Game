@@ -142,11 +142,11 @@ export class AIExtraLayer {
       // ── 共享闪避技能 ──
       [EffectId.LURE]: action === Action.DODGE ? B : -5,
       [EffectId.SEE_THROUGH]: action === Action.DODGE ? B - 0.1 : -5,
-      [EffectId.NIMBLE]: action === Action.DODGE ? B - 0.1 + ((ai.dodgeBoost || 0) > 0 ? 0.3 : 0) : -5,
+      [EffectId.NIMBLE]: action === Action.DODGE ? B + 0.1 : -5,
       // ── AI 闪避技能 ──
-      [EffectId.DISARM]: action === Action.DODGE ? B + 0.1 + ((ai.dodgeBoost || 0) > 0 ? -0.6 : 0) : -5,
-      [EffectId.DEFERRED]: action === Action.DODGE ? B + 0.1 : -5,
-      [EffectId.FURY]: action === Action.DODGE ? B + (aiLowHp ? -0.8 : 0) : -5,
+      [EffectId.DISARM]: action === Action.DODGE ? B + ((ai.dodgeBoost || 0) > 0 ? -0.6 : 0) : -5,
+      [EffectId.DEFERRED]: action === Action.DODGE ? B - 0.1 : -5,
+      [EffectId.FURY]: action === Action.DODGE ? B + (aiLowHp ? -0.8 : 0) + ((ai.agilityBoost || 0) > 0 ? -0.5 : 0) + ((ai.dodgeBoost || 0) > 0 ? -0.4 : 0) : -5,
     };
 
     let total = score + (byId[id] ?? 0);
