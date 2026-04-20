@@ -23,8 +23,8 @@ export class AIBaseLogic {
     maxProcProb: 0.78,
     lowHpLine: 0.30,
     executeHpLine: 0.20,
-    decisiveLead: 1.20,
-    decisiveCriticalLead: 0.80,
+    decisiveLead: 2.50,
+    decisiveCriticalLead: 1.80,
   };
 
   static clamp01(v) { return Math.max(0, Math.min(1, v)); }

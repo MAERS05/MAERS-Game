@@ -127,7 +127,7 @@ export const MaesProfile = {
     insightMaxProb: 0.65,  // 洞察最大概率（默认 0.65）
     redecideBias: 0.20,  // 重决策概率偏移（加到各情境概率上）
     speedBoostBias: 0.1,  // 先手概率偏移（正=更爱先手）
-    passiveExploitBias: 1.5,   // 对手被动行为时攻击加成（蓄势/疗愈=白给）
+    passiveExploitBias: 0.6,    // 对手被动行为时攻击加成（原1.5太高导致锁死攻击）
     effectSkipChance: 0.0,     // 0% 概率不携带效果（确保每次出手必定带技能）
     // ── 连续攻击受挫时的权重调整（最近2次攻击均未造成伤害） ──
     // 目标概率：蓄势30% > 疗愈25% > 攻击22% > 守备13% > 闪避10% (总权重 10.0)
@@ -228,7 +228,8 @@ export function maesConstrainDecision(decision, scene) {
   if (d.action === Action.STANDBY && effectiveStamina >= 2 && !consecFailed && !(ai.ptsDebuff > 0)) {
     const recentOpp = history?.length ? history[history.length - 1]?.opponentAction : null;
     const oppPassive = recentOpp === Action.STANDBY || recentOpp === Action.HEAL;
-    const oppWeak = player.stamina <= 1 || player.hp <= 2;
+    // oppWeak：仅在对手精力彻底耗尽时才视为弱点（原 hp<=2 || stamina<=1 范围太宽，开局即触发）
+    const oppWeak = player.stamina <= 0;
     if (oppPassive || oppWeak || executeWindow) {
       d.action = Action.ATTACK;
       d.effects = AIExtraLayer.pickEffects(Action.ATTACK, d.enhance || 0, ai, { player, isRedecide: false });
