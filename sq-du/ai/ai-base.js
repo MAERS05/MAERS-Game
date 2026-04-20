@@ -366,11 +366,11 @@ export class AIBaseLogic {
         w.attack += 0.8;
         w.guard += 0.5;
       }
-      // 对手高精力：我方处于劣势，适度收缩
+      // 对手高精力：我方处于劣势，适度收缩，拉平攻击/守备/蓄势各22%，疗愈19%，闪避15%
       else {
-        w.standby += 0.6;
-        w.guard += 0.2;
-        w.heal += 0.2;
+        w.standby += 0.5;
+        w.heal += 0.6;
+        w.dodge += 0.55;
       }
       // 对手被动行为（蓄势/疗愈）：无防御，可施压（具体力度由 tuning 决定）
       const passiveBias = tuning.passiveExploitBias || 0;

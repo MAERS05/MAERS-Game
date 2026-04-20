@@ -325,10 +325,10 @@ export function maesConstrainDecision(decision, scene) {
       const canAffordComfort = effectiveStamina - actionCost >= 2;
       if (canAffordComfort && d.speed === BASE) {
         if (d.action === Action.ATTACK) {
-          const prob = Math.min(0.75, 0.20 + speedBias);
+          const prob = Math.min(0.75, 0.15 + speedBias);
           if (Math.random() < prob) d.speed = BASE + 1;
         } else if (d.action === Action.GUARD || d.action === Action.DODGE) {
-          const prob = Math.min(0.60, 0.10 + speedBias);
+          const prob = Math.min(0.60, 0.05 + speedBias);
           if (Math.random() < prob) d.speed = BASE + 1;
         }
       }
