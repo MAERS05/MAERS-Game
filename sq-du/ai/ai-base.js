@@ -557,13 +557,13 @@ export class AIBaseLogic {
 
     // 攻击时精力 ≥ 3：有余量先手施压
     if (action === Action.ATTACK && availableForBoost >= 2) {
-      const prob = Math.min(0.75, 0.30 + speedBias);
+      const prob = Math.min(0.75, 0.20 + speedBias);
       if (Math.random() < prob) return BASE + 1;
     }
 
     // 守备/闪避时精力 ≥ 3：适度抢先部署
     if ((action === Action.GUARD || action === Action.DODGE) && availableForBoost >= 2) {
-      const prob = Math.min(0.60, 0.20 + speedBias);
+      const prob = Math.min(0.60, 0.10 + speedBias);
       if (Math.random() < prob) return BASE + 1;
     }
 
