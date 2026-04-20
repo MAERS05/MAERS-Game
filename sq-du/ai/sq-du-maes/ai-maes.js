@@ -329,7 +329,7 @@ export function maesConstrainDecision(decision, scene) {
       }
 
       // 精力充裕时（提速后至少留2精力）→ 主动先手施压
-      const canAffordComfort = effectiveStamina - actionCost >= 2;
+      const canAffordComfort = effectiveStamina - totalCostWithBoost >= 2;
       if (canAffordComfort && d.speed === BASE) {
         if (d.action === Action.ATTACK) {
           const prob = Math.min(0.75, 0.15 + speedBias) * speedPenalty;
