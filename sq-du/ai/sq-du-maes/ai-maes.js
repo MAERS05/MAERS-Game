@@ -227,8 +227,9 @@ export function maesConstrainDecision(decision, scene) {
 
   if (d.action === Action.STANDBY && effectiveStamina >= 2 && !consecFailed && !(ai.ptsDebuff > 0)) {
     const recentOpp = history?.length ? history[history.length - 1]?.opponentAction : null;
-    const oppPassive = recentOpp === Action.STANDBY || recentOpp === Action.HEAL;
-    // oppWeak：仅在对手精力彻底耗尽时才视为弱点（原 hp<=2 || stamina<=1 范围太宽，开局即触发）
+    // oppPassive：对手蓄势/疗愈时才视为破绽，但须对手精力同时吃紧才值得进攻；
+    // 对手精力充足时蓄势只是常规运营，不构成漏洞
+    const oppPassive = (recentOpp === Action.STANDBY || recentOpp === Action.HEAL) && player.stamina <= 1;
     const oppWeak = player.stamina <= 0;
     if (oppPassive || oppWeak || executeWindow) {
       d.action = Action.ATTACK;

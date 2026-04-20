@@ -372,9 +372,10 @@ export class AIBaseLogic {
         w.heal += 0.6;
         w.dodge += 0.55;
       }
-      // 对手被动行为（蓄势/疗愈）：无防御，可施压（具体力度由 tuning 决定）
+      // 对手被动行为（蓄势/疗愈）：仅在对手精力同样吃紧时才视为施压机会
+      // 对手精力充足时蓄势/疗愈只是常规运营，不应触发进攻奖励
       const passiveBias = tuning.passiveExploitBias || 0;
-      if (passiveBias > 0 && (snap.oppLastAction === Action.STANDBY || snap.oppLastAction === Action.HEAL)) {
+      if (passiveBias > 0 && snap.playerStamina <= 1 && (snap.oppLastAction === Action.STANDBY || snap.oppLastAction === Action.HEAL)) {
         w.attack += passiveBias;
       }
       // 自身低血时更优先蓄势保命
@@ -403,13 +404,13 @@ export class AIBaseLogic {
       }
     }
 
-    // ── 对手换气窗口（对手低精力）─ 抓住机会 ──
+    // ── 对手换气窗口（对手低精力）─ 适度施压 ──
     if (snap.lastOppStamina <= 1 && aiEffectiveStamina >= 2) {
-      w.attack += 1.5;
-      w.standby -= 1.0;
-    } else if (snap.oppStaminaTrend <= 1.5 && aiEffectiveStamina >= 2) {
       w.attack += 0.8;
       w.standby -= 0.4;
+    } else if (snap.oppStaminaTrend <= 1.5 && aiEffectiveStamina >= 2) {
+      w.attack += 0.4;
+      w.standby -= 0.2;
     }
 
     // ── 对手濒危时不允许保守 ─────────────────────
