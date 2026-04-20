@@ -282,10 +282,11 @@ export function maesConstrainDecision(decision, scene) {
     d.action !== Action.STANDBY && d.action !== Action.HEAL &&
     d.action !== Action.READY && d.action !== Action.PREPARE
   ) {
-    // 计算提速后的精力余量
-    const actionCost = 1 + (d.enhance || 0) + Math.max(0, d.speed - BASE);
-    const canAffordBoost = effectiveStamina - actionCost >= 1; // 提速后至少留1精力
-    const canAffordDesperate = effectiveStamina - actionCost >= 0; // 提速后精力可以归零（孤注一掷）
+    // 计算提速所需的总精力（行动基础 + 强化 + 提速各1）
+    const baseCost = 1 + (d.enhance || 0);        // 不含提速的行动开销
+    const totalCostWithBoost = baseCost + 1;       // 含提速的总开销
+    const canAffordBoost = effectiveStamina - totalCostWithBoost >= 1; // 提速后至少留1精力
+    const canAffordDesperate = effectiveStamina - totalCostWithBoost >= 0; // 提速后精力可归零（孤注一掷）
 
     if (canAffordDesperate) {
       // 从历史中提取马尔可夫预测
