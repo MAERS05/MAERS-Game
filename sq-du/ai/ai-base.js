@@ -516,8 +516,6 @@ export class AIBaseLogic {
 
     if (availableForBoost <= 0) return BASE; // 精力不足以先手
 
-    const { attack: pAtk, guard: pGrd, dodge: pDodge } = snap.predictNext;
-
     // 绝杀窗口无条件先手确保先手致命一击
     const killWindow = (snap.playerHpRatio <= this.TUNING.executeHpLine && snap.playerStaminaRatio <= 0.34 && aiEffectiveStamina >= 2) ? 1 : 0;
     const executeWindow = snap.playerStamina <= 0 ? 1 : 0;
@@ -525,49 +523,7 @@ export class AIBaseLogic {
       return BASE + 1;
     }
 
-    // 动态博弈：预期对手闪避，我方攻击 → 必须先手以咬住并超越闪避先手
-    // 但若提速会耗尽精力（下回合必须蓄势），改为低概率而非确定提速
-    if (action === Action.ATTACK && pDodge > 0.40 && availableForBoost >= 1) {
-      const willDrainEmpty = availableForBoost === 1;
-      const tuning0 = ai.aiTuning || {};
-      const speedBias0 = tuning0.speedBoostBias || 0;
-      const prob = willDrainEmpty ? Math.max(0.15, 0.10 + speedBias0) : 1.0;
-      if (Math.random() < prob) return BASE + 1;
-    }
-
-    // 动态博弈：预期对手攻击，且对手有先手习惯，我方防御/闪避 → 抢先部署防线
-    if ((action === Action.GUARD || action === Action.DODGE) && pAtk > 0.45 && snap.oppSpeedTrend > DefaultStats.BASE_SPEED + 0.3) {
-      if (availableForBoost >= 1) {
-        const willDrainEmpty2 = availableForBoost === 1;
-        const tuning1 = ai.aiTuning || {};
-        const speedBias1 = tuning1.speedBoostBias || 0;
-        const prob2 = willDrainEmpty2 ? Math.max(0.15, 0.10 + speedBias1) : 1.0;
-        if (Math.random() < prob2) return BASE + 1;
-      }
-    }
-
-    // 血线告急时的特殊本能反应保命先手
-    if (snap.aiHpRatio <= 0.3 && action !== Action.ATTACK && pAtk > 0.35 && availableForBoost >= 1) {
-      return BASE + 1;
-    }
-
-    // ── 精力充裕时主动先手（tuning 驱动）──
-    const tuning = ai.aiTuning || {};
-    const speedBias = tuning.speedBoostBias || 0;
-
-    // 攻击时精力 ≥ 3：有余量先手施压
-    if (action === Action.ATTACK && availableForBoost >= 2) {
-      const prob = Math.min(0.75, 0.20 + speedBias);
-      if (Math.random() < prob) return BASE + 1;
-    }
-
-    // 守备/闪避时精力 ≥ 3：适度抢先部署
-    if ((action === Action.GUARD || action === Action.DODGE) && availableForBoost >= 2) {
-      const prob = Math.min(0.60, 0.10 + speedBias);
-      if (Math.random() < prob) return BASE + 1;
-    }
-
-    // 若无关键的竞速必要，保守留存精力
+    // 人格驱动的先手策略由各 AI 定制层（如 ai-maes.js）在约束阶段处理
     return BASE;
   }
 

@@ -271,5 +271,69 @@ export function maesConstrainDecision(decision, scene) {
     });
   }
 
+  // ── 场景4（MAES 先手本能）：根据对手行为预测决定是否提速 ──
+  // 此逻辑从基础层剥离至 MAES 定制层，属于人格特征非通用行为
+  const BASE = DefaultStats.BASE_SPEED;
+  if (
+    d.speed === BASE &&
+    !ai.speedAdjustBlocked &&
+    d.action !== Action.STANDBY && d.action !== Action.HEAL &&
+    d.action !== Action.READY && d.action !== Action.PREPARE
+  ) {
+    // 计算提速后的精力余量
+    const actionCost = 1 + (d.enhance || 0) + Math.max(0, d.speed - BASE);
+    const canAffordBoost = effectiveStamina - actionCost >= 1; // 提速后至少留1精力
+    const canAffordDesperate = effectiveStamina - actionCost >= 0; // 提速后精力可以归零（孤注一掷）
+
+    if (canAffordDesperate) {
+      // 从历史中提取马尔可夫预测
+      const recent = (history || []).slice(-4);
+      const total = recent.length;
+      let dodgeCount = 0, atkCount = 0, oppSpeedSum = 0;
+      for (const h of recent) {
+        if (h.opponentAction === Action.DODGE) dodgeCount++;
+        if (h.opponentAction === Action.ATTACK) atkCount++;
+        oppSpeedSum += h.opponentSpeed ?? BASE;
+      }
+      const pDodge = total ? dodgeCount / total : 0;
+      const pAtk = total ? atkCount / total : 0;
+      const oppSpeedTrend = total ? oppSpeedSum / total : BASE;
+
+      const tuning = ai.aiTuning || {};
+      const speedBias = tuning.speedBoostBias || 0;
+
+      // 攻击 vs 预测对手闪避 → 提速追击
+      if (d.action === Action.ATTACK && pDodge > 0.40) {
+        const prob = canAffordBoost ? 0.70 : Math.max(0.15, 0.10 + speedBias);
+        if (Math.random() < prob) d.speed = BASE + 1;
+      }
+
+      // 守备/闪避 vs 预测对手攻击 + 对手有提速习惯 → 抢先部署防线
+      if ((d.action === Action.GUARD || d.action === Action.DODGE) && pAtk > 0.45 && oppSpeedTrend > BASE + 0.3) {
+        const prob = canAffordBoost ? 0.55 : Math.max(0.15, 0.10 + speedBias);
+        if (Math.random() < prob) d.speed = BASE + 1;
+      }
+
+      // 血线告急 + 预测对手攻击 + 对手有余力提速 → 保命先手
+      const aiHpRatio = ai.hp / DefaultStats.MAX_HP;
+      const playerCanBoostSpeed = player.stamina >= 2; // 对手至少需要2精力才能提速（1行动+1先手）
+      if (aiHpRatio <= 0.3 && d.action !== Action.ATTACK && pAtk > 0.35 && canAffordDesperate && playerCanBoostSpeed) {
+        d.speed = BASE + 1;
+      }
+
+      // 精力充裕时（提速后至少留2精力）→ 主动先手施压
+      const canAffordComfort = effectiveStamina - actionCost >= 2;
+      if (canAffordComfort && d.speed === BASE) {
+        if (d.action === Action.ATTACK) {
+          const prob = Math.min(0.75, 0.20 + speedBias);
+          if (Math.random() < prob) d.speed = BASE + 1;
+        } else if (d.action === Action.GUARD || d.action === Action.DODGE) {
+          const prob = Math.min(0.60, 0.10 + speedBias);
+          if (Math.random() < prob) d.speed = BASE + 1;
+        }
+      }
+    }
+  }
+
   return d;
 }
