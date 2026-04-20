@@ -141,11 +141,13 @@ export const MaesProfile = {
     // ── 攻击点数被削（ptsDebuff > 0）时的额外权重偏移 ──
     // 基础层已处理：attack -1.0/级, guard +0.5, standby +0.5
     // 本表在其基础上叠加，使最终权重精确落到目标值（以 1 级 debuff 为基准）：
-    //   攻击 3.3-1.0-0.3=2.0 | 守备 2.5+0.5-0.4=2.6 | 蓄势 1.3+0.5+0.5=2.3
+    //   守备 2.6 | 蓄势 2.4 | 攻击 2.2 | 闪避 1.6 | 疗愈 1.2
     ptsDebuffBias: {
       attack:  -0.3,
-      guard:   -0.4,
-      standby: +0.5,
+      guard:   -0.5,
+      standby: +0.3,
+      dodge:   +0.6,
+      heal:    -0.1,
     },
   },
 };

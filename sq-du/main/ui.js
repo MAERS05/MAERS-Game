@@ -1268,21 +1268,30 @@ function updateStatusIcons(playerId, state) {
     rendered.add(eid);
   }
 
-  // ── 3. bonus 字段图标（支持 { value, turns } 对象格式） ──
+  // ── 3. bonus 字段图标（支持临时 { value, turns } 和永久 perm* 两类） ──
   const bonusChecks = [
-    { field: 'attackPtsBonus', icon: 'strong.svg', name: '攻击强化', resource: '攻击点数和槽位' },
-    { field: 'guardPtsBonus', icon: 'shield.svg', name: '守备强化', resource: '守备点数和槽位' },
-    { field: 'dodgePtsBonus', icon: 'avoid.svg', name: '闪避强化', resource: '闪避点数和槽位' },
-    { field: 'speedBonus', icon: 'fast.svg', name: '先手强化', resource: '先手' },
+    { field: 'attackPtsBonus', permField: 'permAttackPtsBonus', icon: 'strong.svg', name: '攻击强化', resource: '攻击点数和槽位' },
+    { field: 'guardPtsBonus',  permField: 'permGuardPtsBonus',  icon: 'shield.svg', name: '守备强化', resource: '守备点数和槽位' },
+    { field: 'dodgePtsBonus',  permField: 'permDodgePtsBonus',  icon: 'avoid.svg',  name: '闪避强化', resource: '闪避点数和槽位' },
+    { field: 'speedBonus',     permField: null,                  icon: 'fast.svg',   name: '先手强化', resource: '先手' },
   ];
-  for (const { field, icon, name, resource } of bonusChecks) {
+  for (const { field, permField, icon, name, resource } of bonusChecks) {
     const raw = state[field];
-    const val = readBonus(raw);
-    if (val <= 0) continue;
-    // 回合标签：对象模式读 turns，纯数字模式用值本身
-    const turns = (raw && typeof raw === 'object') ? raw.turns : raw;
-    const turnLabel = !isFinite(turns) ? '永久' : decayTurnLabel(turns);
-    addIcon(icon, `${name}：${resource} +${val}`, 'TURN_PHASE', turnLabel);
+    const tempVal = readBonus(raw);
+    const permVal = permField ? (state[permField] || 0) : 0;
+    const totalVal = tempVal + permVal;
+    if (totalVal <= 0) continue;
+    // 回合标签：永久加成优先显示"永久"，否则按临时衰减计
+    let turnLabel;
+    if (permVal > 0 && tempVal <= 0) {
+      turnLabel = '永久';
+    } else if (permVal > 0) {
+      turnLabel = '永久 + 临时';
+    } else {
+      const turns = (raw && typeof raw === 'object') ? raw.turns : raw;
+      turnLabel = !isFinite(turns) ? '永久' : decayTurnLabel(turns);
+    }
+    addIcon(icon, `${name}：${resource} +${totalVal}`, 'TURN_PHASE', turnLabel);
   }
 
   // 洞察相关
