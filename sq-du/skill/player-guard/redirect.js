@@ -12,7 +12,7 @@ import { EffectLayer } from '../../main/effect.js';
 export const RedirectEffect = createSkillEffect({
   id: EffectId.REDIRECT,
   name: '化劲',
-  desc: '在行动期开始后为自身附加1级[坚固]并触发，随后为自身附加1级[僵硬]并在下一回合的行动期开始后触发。若守备成功，为对方附加1级[虚弱]并在下一回合的行动期开始后触发',
+  desc: '在行动期开始后为自身附加1级[坚固]并触发，随后为自身附加1级[僵硬]并在下一回合的行动期开始后触发。若守备成功，为对方附加1级[虚弱]并在下一回合的行动期开始后触发。',
   applicableTo: [Action.GUARD],
 
   onPre(ctx, state) {

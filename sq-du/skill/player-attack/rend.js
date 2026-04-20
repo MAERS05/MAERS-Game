@@ -11,7 +11,7 @@ import { EffectLayer } from '../../main/effect.js';
 export const FatigueEffect = createSkillEffect({
   id: EffectId.FATIGUE,
   name: '破刃',
-  desc: '若攻击成功，[封锁]对方攻击一号槽位并在下回合开始后，回合结束前生效',
+  desc: '若攻击成功，[封锁]对方攻击一号槽位并在下回合开始后，回合结束前生效。',
   applicableTo: [Action.ATTACK],
 
   onPost(ctx, owner, opponent, selfDmg, oppDmg) {

@@ -11,7 +11,7 @@ import { EffectLayer } from '../../main/effect.js';
 export const TremorEffect = createSkillEffect({
   id: EffectId.TREMOR,
   name: '强震',
-  desc: '若守备成功，[封锁]对方闪避一号槽位并在下回合开始后，回合结束前生效',
+  desc: '若守备成功，[封锁]对方闪避一号槽位并在下回合开始后，回合结束前生效。',
   applicableTo: [Action.GUARD],
 
   onPost(ctx, owner, opponent, selfDmg, oppDmg) {

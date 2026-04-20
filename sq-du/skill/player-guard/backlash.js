@@ -11,7 +11,7 @@ import { EffectLayer } from '../../main/effect.js';
 export const BacklashEffect = createSkillEffect({
   id: EffectId.BACKLASH,
   name: '反噬',
-  desc: '若守备成功，为对方附加1级[疲惫]并在下回合开始后，回合结束前生效',
+  desc: '若守备成功，为对方附加1级[疲惫]并在下回合开始后，回合结束前生效，为自身附加1级[振奋]并在下回合开始后触发。',
   applicableTo: [Action.GUARD],
 
   onPost(ctx, owner, opponent, selfDmg, oppDmg) {
@@ -22,5 +22,12 @@ export const BacklashEffect = createSkillEffect({
       source: 'skill:backlash',
     });
     EffectLayer.markFlashEffect(opponent, EffectId.EXHAUSTED);
+
+    // 为自身附加振奋
+    EffectLayer.queueEffect(owner, EffectId.REJUVENATED, {
+      phaseEvent: 'TURN_START',
+      source: 'skill:backlash',
+    });
+    EffectLayer.markFlashEffect(owner, EffectId.REJUVENATED);
   },
 });

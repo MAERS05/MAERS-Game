@@ -11,7 +11,7 @@ import { EffectLayer } from '../../main/effect.js';
 export const ParalyzeEffect = createSkillEffect({
   id: EffectId.PARALYZE,
   name: '封脉',
-  desc: '若攻击成功，为对方附加[截脉]并在下回合开始后，回合结束前生效',
+  desc: '若攻击成功，为对方附加[截脉]并在下回合开始后，回合结束前生效。',
   applicableTo: [Action.ATTACK],
 
   onPost(ctx, owner, opponent, selfDmg, oppDmg) {

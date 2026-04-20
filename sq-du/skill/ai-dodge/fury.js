@@ -11,7 +11,7 @@ import { EffectLayer } from '../../main/effect.js';
 export const FuryEffect = createSkillEffect({
   id: EffectId.FURY,
   name: '愤怒',
-  desc: '若闪避失败，为自身附加1级[力量]和1级[僵硬]并在下回合的行动期开始后触发',
+  desc: '若闪避失败，为自身附加1级[力量]和1级[僵硬]并在下回合的行动期开始后触发。',
   applicableTo: [Action.DODGE],
   triggerOnFail: true,
 

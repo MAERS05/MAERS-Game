@@ -11,7 +11,7 @@ import { EffectLayer } from '../../main/effect.js';
 export const BlindingEffect = createSkillEffect({
   id: EffectId.BLINDING,
   name: '预备',
-  desc: '若守备成功，为自身附加1级[侧身]并在下回合的行动期开始后触发',
+  desc: '若守备成功，为自身附加1级[侧身]并在下回合的行动期开始后触发。',
   applicableTo: [Action.GUARD],
 
   onPost(ctx, owner, opponent, selfDmg, oppDmg) {

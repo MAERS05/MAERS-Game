@@ -11,7 +11,7 @@ import { EffectLayer } from '../../main/effect.js';
 export const BloodDrinkEffect = createSkillEffect({
   id: EffectId.BLOOD_DRINK,
   name: '饮血',
-  desc: '若攻击成功，为自身附加1级[治愈]并在下回合开始后触发',
+  desc: '若攻击成功，为自身附加1级[治愈]并在下回合开始后触发。',
   applicableTo: [Action.ATTACK],
 
   onPost(ctx, owner, opponent, selfDmg, oppDmg) {

@@ -11,7 +11,7 @@ import { EffectLayer } from '../../main/effect.js';
 export const ShatterPointEffect = createSkillEffect({
   id: EffectId.SHATTER_POINT,
   name: '崩穴',
-  desc: '若攻击成功，为对方附加1级[禁愈]并在下回合开始后，回合结束前生效',
+  desc: '若攻击成功，为对方附加1级[禁愈]并在下回合开始后，回合结束前生效。',
   applicableTo: [Action.ATTACK],
 
   onPost(ctx, owner, opponent, selfDmg, oppDmg) {

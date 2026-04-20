@@ -12,7 +12,7 @@ import { EffectLayer } from '../../main/effect.js';
 export const EquityEffect = createSkillEffect({
   id: EffectId.EQUITY,
   name: '公平',
-  desc: '若触发侥幸，为自身附加1级[守备强化]并在下回合开始后，回合结束前生效。为对方附加1级[闪避强化]并在下回合开始后，回合结束前生效',
+  desc: '若触发侥幸，为自身附加1级[守备强化]并在下回合开始后，回合结束前生效。为对方附加1级[闪避强化]并在下回合开始后，回合结束前生效。',
   applicableTo: [Action.DODGE],
   triggerOnMutualHit: true,
 

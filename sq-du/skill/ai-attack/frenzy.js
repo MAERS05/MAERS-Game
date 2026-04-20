@@ -11,7 +11,7 @@ import { EffectLayer } from '../../main/effect.js';
 export const FrenzyEffect = createSkillEffect({
   id: EffectId.FRENZY,
   name: '狂热',
-  desc: '若攻击成功，为自身附加1级[兴奋]并在下回合开始后，回合结束前生效',
+  desc: '若攻击成功，为自身附加1级[兴奋]并在下回合开始后，回合结束前生效。',
   applicableTo: [Action.ATTACK],
 
   onPost(ctx, owner, opponent, selfDmg, oppDmg) {
