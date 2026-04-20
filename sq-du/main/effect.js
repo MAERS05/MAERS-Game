@@ -97,9 +97,9 @@ export class EffectLayer {
     const calcSlotPts = (ctx, state) => {
       if (!ctx || ctx.action === Action.STANDBY || ctx.action === Action.READY) return 0;
       let base = ctx.pts || 0;
-      if (ctx.action === Action.ATTACK) base += readBonus(state.attackPtsBonus);
-      else if (ctx.action === Action.GUARD) base += readBonus(state.guardPtsBonus);
-      else if (ctx.action === Action.DODGE) base += readBonus(state.dodgePtsBonus);
+      if (ctx.action === Action.ATTACK) base += readBonus(state.attackPtsBonus) + (state.permAttackPtsBonus || 0);
+      else if (ctx.action === Action.GUARD) base += readBonus(state.guardPtsBonus) + (state.permGuardPtsBonus || 0);
+      else if (ctx.action === Action.DODGE) base += readBonus(state.dodgePtsBonus) + (state.permDodgePtsBonus || 0);
       return Math.max(0, base);
     };
     cp1._slotPts = calcSlotPts(cp1, p1State);

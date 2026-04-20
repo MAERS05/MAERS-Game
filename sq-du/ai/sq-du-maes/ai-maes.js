@@ -98,11 +98,11 @@ export const MaesProfile = {
   name: 'MAES',
   desc: '定制化 AI：攻击 +1，禁止闪避，技能优先',
 
-  // ── 数值修正（{ value, turns } 格式：turns=Infinity 永久，turns=N 持续N回合） ──
-  attackPtsBonus: { value: 1, turns: Infinity },  // 攻击点数 +1（永久）
-  guardPtsBonus: { value: 1, turns: Infinity },  // 守备点数 +1（永久）
-  dodgePtsBonus: 0,                              // 闪避点数加值
-  speedBonus: 0,                              // 先手加值
+  // ── 永久数值修正（写入 perm* 字段，不与临时效果冲突） ──
+  permAttackPtsBonus: 1,  // 攻击点数 +1（永久）
+  permGuardPtsBonus: 1,   // 守备点数 +1（永久）
+  permDodgePtsBonus: 0,   // 闪避点数加值（永久）
+  permSpeedBonus: 0,      // 先手加值（永久）
 
   // ── 永久禁用（true = 整局禁用，不受回合衰减影响） ──
   permInsightBlocked: false,      // 永久禁洞察
@@ -159,17 +159,11 @@ export const MaesProfile = {
 export function applyCustomization(state) {
   if (!state) return;
 
-  // ── 数值修正（对象 { value, turns } 直接覆写，纯数字叠加） ──
-  const addBonus = (field, val) => {
-    if (val === 0) return;                                    // 0 = 无修正
-    if (val && typeof val === 'object') { state[field] = { ...val }; return; }  // 对象 = 直接赋值
-    if (!isFinite(val)) { state[field] = val; return; }       // Infinity = 永久（纯数字模式）
-    state[field] = (state[field] || 0) + val;                 // 有限数字 = 叠加
-  };
-  addBonus('attackPtsBonus', MaesProfile.attackPtsBonus);
-  addBonus('guardPtsBonus', MaesProfile.guardPtsBonus);
-  addBonus('dodgePtsBonus', MaesProfile.dodgePtsBonus);
-  addBonus('speedBonus', MaesProfile.speedBonus);
+  // ── 永久数值修正（写入 perm* 字段，与临时 bonus 字段隔离） ──
+  state.permAttackPtsBonus = (state.permAttackPtsBonus || 0) + (MaesProfile.permAttackPtsBonus || 0);
+  state.permGuardPtsBonus = (state.permGuardPtsBonus || 0) + (MaesProfile.permGuardPtsBonus || 0);
+  state.permDodgePtsBonus = (state.permDodgePtsBonus || 0) + (MaesProfile.permDodgePtsBonus || 0);
+  state.permSpeedBonus = (state.permSpeedBonus || 0) + (MaesProfile.permSpeedBonus || 0);
 
   // ── 永久禁用 ──
   state.permInsightBlocked = state.permInsightBlocked || MaesProfile.permInsightBlocked;

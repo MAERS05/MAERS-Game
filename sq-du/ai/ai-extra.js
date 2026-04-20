@@ -32,11 +32,14 @@ export class AIExtraLayer {
    */
   static pickEffects(action, enhance, ai, scene = {}) {
     const EFFECT_SLOTS = 3;
-    // 可用槽位 = 1 + 强化 + bonus 加值（attackPtsBonus/guardPtsBonus/dodgePtsBonus）
+    // 可用槽位 = 1 + 强化 + bonus 加值（临时 + 永久）
     const bonusField = action === Action.ATTACK ? 'attackPtsBonus'
       : action === Action.GUARD ? 'guardPtsBonus'
         : 'dodgePtsBonus';
-    const slots = Math.min(Math.floor(1 + enhance + readBonus(ai[bonusField])), EFFECT_SLOTS);
+    const permBonusField = action === Action.ATTACK ? 'permAttackPtsBonus'
+      : action === Action.GUARD ? 'permGuardPtsBonus'
+        : 'permDodgePtsBonus';
+    const slots = Math.min(Math.floor(1 + enhance + readBonus(ai[bonusField]) + (ai[permBonusField] || 0)), EFFECT_SLOTS);
 
     // tuning 控制：有概率不携带效果（模拟"轻出手"）
     const skipChance = ai.aiTuning?.effectSkipChance || 0;

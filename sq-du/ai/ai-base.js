@@ -152,10 +152,10 @@ export class AIBaseLogic {
       aiStaminaPenalty: ai.staminaPenalty || 0,  // 精力消耗增加
       aiHealBlocked: !!ai.healBlocked,         // 被禁疗愈
       aiSpeedBlocked: !!ai.speedAdjustBlocked,  // 被禁先手
-      // AI bonus 加值（用于点数判断和强化决策）
-      aiAttackBonus: readBonus(ai.attackPtsBonus),
-      aiGuardBonus: readBonus(ai.guardPtsBonus),
-      aiDodgeBonus: readBonus(ai.dodgePtsBonus),
+      // AI bonus 加值（临时 + 永久，用于点数判断和强化决策）
+      aiAttackBonus: readBonus(ai.attackPtsBonus) + (ai.permAttackPtsBonus || 0),
+      aiGuardBonus: readBonus(ai.guardPtsBonus) + (ai.permGuardPtsBonus || 0),
+      aiDodgeBonus: readBonus(ai.dodgePtsBonus) + (ai.permDodgePtsBonus || 0),
 
       oppSpeedTrend,
       oppEnhanceTrend,
