@@ -129,5 +129,12 @@
     left: 50%;
     transform: translateX(-50%);
     z-index: 1550;
+    width: 280px; /* 移动端放大一点便于阅读 */
+  }
+
+  .intel-list {
+    max-height: 50vh;
+    overflow-y: auto;
+    padding-right: 4px; /* 防止滚动条遮挡文字 */
   }
 }

@@ -129,6 +129,7 @@ export const MaesProfile = {
     speedBoostBias: 0.1,  // 先手概率偏移（正=更爱先手）
     passiveExploitBias: 0.6,    // 对手被动行为时攻击加成（原1.5太高导致锁死攻击）
     effectSkipChance: 0.0,     // 0% 概率不携带效果（确保每次出手必定带技能）
+    effectDesireBias: 0.55,   // 55% 概率主动强化以获取额外技能效果（精力≥3时触发）
     // ── 连续攻击受挫时的权重调整（最近2次攻击均未造成伤害） ──
     // 目标概率：蓄势30% > 疗愈25% > 攻击22% > 守备13% > 闪避10% (总权重 10.0)
     consecFailBias: {
@@ -303,21 +304,25 @@ export function maesConstrainDecision(decision, scene) {
       const tuning = ai.aiTuning || {};
       const speedBias = tuning.speedBoostBias || 0;
 
+      // 提升点数已经花了额外精力且附带技能触发 → 提速价值低于强化，概率大幅降低
+      const hasEnhanced = (d.enhance || 0) >= 1;
+      const speedPenalty = hasEnhanced ? 0.3 : 1.0; // 已强化时所有提速概率乘以0.3
+
       // 攻击 vs 预测对手闪避 → 提速追击
       if (d.action === Action.ATTACK && pDodge > 0.40) {
-        const prob = canAffordBoost ? 0.70 : Math.max(0.15, 0.10 + speedBias);
+        const prob = (canAffordBoost ? 0.70 : Math.max(0.15, 0.10 + speedBias)) * speedPenalty;
         if (Math.random() < prob) d.speed = BASE + 1;
       }
 
       // 守备/闪避 vs 预测对手攻击 + 对手有提速习惯 → 抢先部署防线
       if ((d.action === Action.GUARD || d.action === Action.DODGE) && pAtk > 0.45 && oppSpeedTrend > BASE + 0.3) {
-        const prob = canAffordBoost ? 0.55 : Math.max(0.15, 0.10 + speedBias);
+        const prob = (canAffordBoost ? 0.55 : Math.max(0.15, 0.10 + speedBias)) * speedPenalty;
         if (Math.random() < prob) d.speed = BASE + 1;
       }
 
-      // 血线告急 + 预测对手攻击 + 对手有余力提速 → 保命先手
+      // 血线告急 + 预测对手攻击 + 对手有余力提速 → 保命先手（急迫情况不受强化惩罚）
       const aiHpRatio = ai.hp / DefaultStats.MAX_HP;
-      const playerCanBoostSpeed = player.stamina >= 2; // 对手至少需要2精力才能提速（1行动+1先手）
+      const playerCanBoostSpeed = player.stamina >= 2;
       if (aiHpRatio <= 0.3 && d.action !== Action.ATTACK && pAtk > 0.35 && canAffordDesperate && playerCanBoostSpeed) {
         d.speed = BASE + 1;
       }
@@ -326,10 +331,10 @@ export function maesConstrainDecision(decision, scene) {
       const canAffordComfort = effectiveStamina - actionCost >= 2;
       if (canAffordComfort && d.speed === BASE) {
         if (d.action === Action.ATTACK) {
-          const prob = Math.min(0.75, 0.15 + speedBias);
+          const prob = Math.min(0.75, 0.15 + speedBias) * speedPenalty;
           if (Math.random() < prob) d.speed = BASE + 1;
         } else if (d.action === Action.GUARD || d.action === Action.DODGE) {
-          const prob = Math.min(0.60, 0.05 + speedBias);
+          const prob = Math.min(0.60, 0.05 + speedBias) * speedPenalty;
           if (Math.random() < prob) d.speed = BASE + 1;
         }
       }

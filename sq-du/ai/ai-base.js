@@ -476,6 +476,16 @@ export class AIBaseLogic {
       w.heal += cfb.heal ?? +0;
     }
 
+    // ── 博弈收益矩阵调整（期望收益 → 权重微调）────────
+    // 基于马尔可夫预测的玩家行动概率，计算每个AI行动的期望收益，
+    // 将结果叠加回权重，使AI能感知pts/debuff/先手对实际对碰结果的影响。
+    const payoffAdj = this.computePayoffAdjustments(snap, ai, aiEffectiveStamina);
+    w.attack  += payoffAdj.attack;
+    w.guard   += payoffAdj.guard;
+    w.dodge   += payoffAdj.dodge;
+    w.standby += payoffAdj.standby;
+    w.heal    += payoffAdj.heal;
+
     // ── 行动禁用：被效果封禁的行动权重归零 ──────────
     const blocked = [
       ...(Array.isArray(ai.actionBlocked) ? ai.actionBlocked : []),
@@ -568,6 +578,20 @@ export class AIBaseLogic {
       return 1;
     }
 
+    // ── 技能效果欲望（effectDesireBias）────────────────────
+    // 强化不只是 +pts，还额外触发一个技能效果。
+    // 即使基础点数已足够，也有概率主动强化以获取技能收益。
+    // 由定制层 tuning.effectDesireBias 控制（0~1），0=从不主动强化，1=总是强化。
+    // 条件：精力充裕（强化后至少留1精力余量）且未连续受挫。
+    const effectBias = (ai.aiTuning || {}).effectDesireBias || 0;
+    if (effectBias > 0 && aiEffectiveStamina >= 3 && !snap.aiConsecAttackFailed) {
+      // 攻击时欲望最高（技能效果最有价值），守备/闪避次之
+      const desire = action === Action.ATTACK ? effectBias
+        : (action === Action.GUARD || action === Action.DODGE) ? effectBias * 0.5
+          : 0;
+      if (desire > 0 && Math.random() < desire) return 1;
+    }
+
     return 0; // 无明显差值获胜收益，保留精力
   }
 
@@ -605,5 +629,180 @@ export class AIBaseLogic {
       if (rand <= 0) return key;
     }
     return entries[entries.length - 1][0];
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 博弈收益矩阵（Game-Theory Payoff Matrix）
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * 对每个AI行动计算基于玩家预测概率的「期望收益」，
+   * 返回各行动应叠加到权重的调整量。
+   *
+   * 算法：
+   *  for aiAction in [attack, guard, dodge, standby, heal]:
+   *    payoff = Σ P(playerAction) × evaluateClash(aiAction, playerAction)
+   *  return payoff × SCALE
+   *
+   * @param {object} snap              - AIBaseLogic.snapshot 快照
+   * @param {object} ai                - AI 玩家状态
+   * @param {number} aiEffectiveStamina
+   * @returns {{ attack, guard, dodge, standby, heal }}
+   */
+  static computePayoffAdjustments(snap, ai, aiEffectiveStamina) {
+    const SCALE = 1.0; // 收益期望对权重总影响强度
+
+    // ── AI 各行动有效点数（含 bonus + debuff）──
+    const aiAtkPts = Math.max(0, 1 + snap.aiAttackBonus - (snap.aiPtsDebuff || 0));
+    const aiGrdPts = Math.max(0, 1 + snap.aiGuardBonus  - (snap.aiGuardDebuff || 0));
+    const aiDdgPts = Math.max(0, 1 + snap.aiDodgeBonus  - (snap.aiDodgeDebuff || 0));
+    const aiSpdBase = DefaultStats.BASE_SPEED - (snap.aiAgilityDebuff || 0);
+
+    // ── 玩家各行动有效点数（含 bonus + debuff）──
+    const pAtkPts  = Math.max(0, 1 + snap.playerAttackBonus - (snap.playerPtsDebuff  || 0));
+    const pGrdPts  = Math.max(0, 1 + snap.playerGuardBonus  - (snap.playerGuardDebuff || 0));
+    const pDdgPts  = Math.max(0, 1 + snap.playerDodgeBonus  - (snap.playerDodgeDebuff || 0));
+    const pSpdEst  = snap.oppSpeedTrend ?? DefaultStats.BASE_SPEED;
+
+    // ── 玩家行动预测概率（马尔可夫） ──
+    const pred = snap.predictNext || {};
+    const pActions = [
+      { act: Action.ATTACK,  pts: pAtkPts, spd: pSpdEst, prob: pred.attack  ?? 0.20 },
+      { act: Action.GUARD,   pts: pGrdPts, spd: pSpdEst, prob: pred.guard   ?? 0.20 },
+      { act: Action.DODGE,   pts: pDdgPts, spd: pSpdEst, prob: pred.dodge   ?? 0.20 },
+      { act: Action.STANDBY, pts: 0,       spd: 0,       prob: pred.standby ?? 0.20 },
+      { act: Action.HEAL,    pts: 0,       spd: 0,       prob: pred.heal    ?? 0.20 },
+    ];
+    const totalProb = pActions.reduce((s, p) => s + p.prob, 0);
+    if (totalProb > 0) pActions.forEach(p => p.prob /= totalProb);
+
+    // ── AI 行动列表 ──
+    const aiActions = [
+      { act: Action.ATTACK,  pts: aiAtkPts, spd: aiSpdBase  },
+      { act: Action.GUARD,   pts: aiGrdPts, spd: aiSpdBase  },
+      { act: Action.DODGE,   pts: aiDdgPts, spd: aiSpdBase  },
+      { act: Action.STANDBY, pts: 0,        spd: 0          },
+      { act: Action.HEAL,    pts: 0,        spd: 0          },
+    ];
+
+    // ── 急迫系数：我方血量越低，输赢结果越重要 ──
+    const urgency = 1.0 + (1.0 - snap.aiHpRatio) * 0.4;
+
+    const keyMap = {
+      [Action.ATTACK]: 'attack', [Action.GUARD]: 'guard',
+      [Action.DODGE]: 'dodge', [Action.STANDBY]: 'standby', [Action.HEAL]: 'heal',
+    };
+    const adj = { attack: 0, guard: 0, dodge: 0, standby: 0, heal: 0 };
+
+    for (const aiA of aiActions) {
+      let expected = 0;
+      for (const pA of pActions) {
+        expected += pA.prob * this._evaluateClash(
+          aiA.act, aiA.pts, aiA.spd,
+          pA.act,  pA.pts,  pA.spd,
+          snap
+        );
+      }
+      adj[keyMap[aiA.act]] = expected * SCALE * urgency;
+    }
+
+    return adj;
+  }
+
+  /**
+   * 单次对碰收益评估（AI 视角）。
+   *
+   * 收益值范围约 [-2, +2]：
+   *  +1.5 ~ +2.0  = AI 命中无防御目标（最优）
+   *  +0.5 ~ +1.0  = AI 有净优势
+   *   0           = 无交互 / 平局
+   *  -0.3 ~ -0.5  = 机会成本（白费精力）
+   *  -0.8 ~ -1.5  = AI 受损
+   *
+   * @param {string} aiAct   - AI 行动
+   * @param {number} aiPts   - AI 有效点数
+   * @param {number} aiSpd   - AI 有效先手值
+   * @param {string} pAct    - 玩家行动
+   * @param {number} pPts    - 玩家有效点数
+   * @param {number} pSpd    - 玩家估计先手值
+   * @param {object} snap    - 快照（用于附加状态判断）
+   * @returns {number} 收益值
+   */
+  static _evaluateClash(aiAct, aiPts, aiSpd, pAct, pPts, pSpd, snap) {
+    // ── AI 攻击 ──────────────────────────────────────────
+    if (aiAct === Action.ATTACK) {
+      if (pAct === Action.STANDBY || pAct === Action.HEAL) {
+        return 1.5;  // 命中无防御：强优势
+      }
+      if (pAct === Action.GUARD) {
+        // 打穿：胜（区分高pt暴击感）；被挡：负（浪费精力）
+        if (aiPts > pPts)  return 1.0;
+        if (aiPts === pPts) return -0.2; // 同分=守备胜
+        return -0.8;
+      }
+      if (pAct === Action.DODGE) {
+        return aiSpd > pSpd ? 0.8 : -0.4; // 先手追击才能打中
+      }
+      if (pAct === Action.ATTACK) {
+        // 双方互打：pts高者赢，同pts平局
+        if (aiPts > pPts)  return 0.8;
+        if (aiPts < pPts)  return -1.0;
+        return 0;
+      }
+    }
+
+    // ── AI 守备 ──────────────────────────────────────────
+    if (aiAct === Action.GUARD) {
+      if (pAct === Action.ATTACK) {
+        // 守住有反震收益；被打穿受损
+        if (aiPts >= pPts) return 0.8;
+        return -0.8 - (pPts - aiPts) * 0.3; // 差值越大损失越惨
+      }
+      if (pAct === Action.STANDBY || pAct === Action.HEAL) {
+        return -0.3; // 玩家被动，AI 守备属于机会成本
+      }
+      return 0; // 守备 vs 非攻击：无交互
+    }
+
+    // ── AI 闪避 ──────────────────────────────────────────
+    if (aiAct === Action.DODGE) {
+      if (pAct === Action.ATTACK) {
+        return aiSpd > pSpd ? 0.8 : -0.8;
+      }
+      if (pAct === Action.STANDBY || pAct === Action.HEAL) {
+        return -0.3; // 机会成本
+      }
+      return 0;
+    }
+
+    // ── AI 蓄势 ──────────────────────────────────────────
+    if (aiAct === Action.STANDBY) {
+      if (pAct === Action.ATTACK) {
+        return -1.5; // 被打
+      }
+      if (pAct === Action.STANDBY) {
+        // 双方都蓄势：精力差等同，看谁基础值高
+        return 0.1;
+      }
+      if (pAct === Action.HEAL) {
+        return 0.0; // 双方休整
+      }
+      if (pAct === Action.GUARD || pAct === Action.DODGE) {
+        return 0.2; // 玩家浪费防御，AI 积累精力
+      }
+    }
+
+    // ── AI 疗愈 ──────────────────────────────────────────
+    if (aiAct === Action.HEAL) {
+      if (pAct === Action.ATTACK) {
+        return -1.5; // 被打
+      }
+      if (pAct === Action.GUARD || pAct === Action.DODGE) {
+        return 0.3; // 玩家浪费行动
+      }
+      return 0.1;
+    }
+
+    return 0;
   }
 }
