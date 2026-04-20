@@ -129,8 +129,9 @@ export const MaesProfile = {
     speedBoostBias: 0.1,  // 先手概率偏移（正=更爱先手）
     passiveExploitBias: 0.6,    // 对手被动行为时攻击加成（原1.5太高导致锁死攻击）
     effectSkipChance: 0.0,     // 0% 概率不携带效果（确保每次出手必定带技能）
-    effectDesireBias: 0.42,   // 强化+不提速≈38%，不强化+不提速≈33%，不强化+提速≈25%
-    defaultSpeedBias: 0.43,   // 不提速基础提速概率（无特定触发时兜底）
+    // 目标分布：不强化+不提速≈33% > 强化+不提速≈32% > 不强化+提速≈30% > 强化+提速≈5%
+    effectDesireBias: 0.37,   // P(强化) ← 控制强化概率
+    defaultSpeedBias: 0.48,   // P(提速|不强化) ← 控制基础提速概率
     // ── 连续攻击受挫时的权重调整（最近2次攻击均未造成伤害） ──
     // 目标概率：蓄势30% > 疗愈25% > 攻击22% > 守备13% > 闪避10% (总权重 10.0)
     consecFailBias: {
