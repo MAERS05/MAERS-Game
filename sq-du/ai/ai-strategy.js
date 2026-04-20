@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file ai-strategy.js
  * @description 博弈战斗系统 — AI 完美信息策略层
  *
@@ -35,14 +35,14 @@ export class AIStrategyLayer {
     // 对手的有效点数（含 bonus）
     const revealedBasePts = 1 + (revealed?.enhance ?? 0);
     const revealedBonus = revealedAct === Action.ATTACK ? snap.playerAttackBonus
-                        : revealedAct === Action.GUARD  ? snap.playerGuardBonus
-                        : revealedAct === Action.DODGE  ? snap.playerDodgeBonus
-                        : 0;
+      : revealedAct === Action.GUARD ? snap.playerGuardBonus
+        : revealedAct === Action.DODGE ? snap.playerDodgeBonus
+          : 0;
     const revealedPts = revealedBasePts + revealedBonus;
     const revealedSpd = revealed?.speed ?? DefaultStats.BASE_SPEED;
 
-    const action     = this._pickAction(revealedAct, revealedPts, revealedSpd, snap, ai, effectiveStamina, indicators);
-    const speedRaw   = this._pickSpeed(revealedAct, revealedSpd, snap, action, effectiveStamina);
+    const action = this._pickAction(revealedAct, revealedPts, revealedSpd, snap, ai, effectiveStamina, indicators);
+    const speedRaw = this._pickSpeed(revealedAct, revealedSpd, snap, action, effectiveStamina);
     const enhanceRaw = this._pickEnhance(revealedAct, revealedPts, snap, action, ai, effectiveStamina, indicators);
 
     return { action, speedRaw, enhanceRaw };
@@ -207,8 +207,8 @@ export class AIStrategyLayer {
 
     // AI 当前行动的有效基础点数（含 bonus）
     const aiBasePts = 1 + (action === Action.ATTACK ? snap.aiAttackBonus
-                        :  action === Action.GUARD  ? snap.aiGuardBonus
-                        :                             snap.aiDodgeBonus);
+      : action === Action.GUARD ? snap.aiGuardBonus
+        : snap.aiDodgeBonus);
 
     // 攻击 vs 守备：只有基础点数不足以打穿时才强化
     if (action === Action.ATTACK && revealedAct === Action.GUARD) {

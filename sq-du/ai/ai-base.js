@@ -240,11 +240,11 @@ export class AIBaseLogic {
       w.standby += 0.5;
       // 各 AI 定制化微调：ptsDebuffBias 可在 aiTuning 中声明
       const pdb = (ai.aiTuning || {}).ptsDebuffBias || {};
-      w.attack  += pdb.attack  ?? 0;
-      w.guard   += pdb.guard   ?? 0;
+      w.attack += pdb.attack ?? 0;
+      w.guard += pdb.guard ?? 0;
       w.standby += pdb.standby ?? 0;
-      w.dodge   += pdb.dodge   ?? 0;
-      w.heal    += pdb.heal    ?? 0;
+      w.dodge += pdb.dodge ?? 0;
+      w.heal += pdb.heal ?? 0;
     }
     // 守备被削 → 守备不可靠，转闪避
     if (snap.aiGuardDebuff > 0) {

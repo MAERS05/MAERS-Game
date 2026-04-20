@@ -119,35 +119,35 @@ export const MaesProfile = {
 
   // ── MAES 行为调优（注入 AI 状态，被 ai-base / ai-scheduler 读取） ──
   tuning: {
-    attackBias: 2.5,    // 攻击 35%
-    guardBias: 1.6,     // 守备 26%
-    dodgeBias: 0.0,     // 闪避 10%
-    standbyBias: 0.6,   // 蓄势 16%
-    healBias: 0.3,      // 疗愈 13%
+    attackBias: 2.0,
+    guardBias: 2.0,
+    dodgeBias: 0.5,
+    standbyBias: 1.5,
+    healBias: 1.0,
     insightMaxProb: 0.65,  // 洞察最大概率（默认 0.65）
     redecideBias: 0.20,  // 重决策概率偏移（加到各情境概率上）
     speedBoostBias: 0.1,  // 先手概率偏移（正=更爱先手）
     passiveExploitBias: 1.5,   // 对手被动行为时攻击加成（蓄势/疗愈=白给）
     effectSkipChance: 0.0,     // 0% 概率不携带效果（确保每次出手必定带技能）
     // ── 连续攻击受挫时的权重调整（最近2次攻击均未造成伤害） ──
-    // 蓄势25%，疗愈18%，攻击19%，守备19%，闪避19% (总权重 10.0)
+    // 目标概率：蓄势30% > 疗愈25% > 攻击22% > 守备13% > 闪避10% (总权重 10.0)
     consecFailBias: {
-      attack:  -1.4,  // 攻击 3.3 → 1.9 (19%)
-      guard:   -0.6,  // 守备 2.5 → 1.9 (19%)
-      dodge:   +0.1,  // 闪避 1.8 → 1.9 (19%)
-      standby: +1.2,  // 蓄势 1.3 → 2.5 (25%)
-      heal:    +0.7,  // 疗愈 1.1 → 1.8 (18%)
+      attack: -0.8,   // 攻击 3.0 -> 2.2 (22%)
+      guard: -1.7,    // 守备 3.0 -> 1.3 (13%)
+      dodge: -0.5,    // 闪避 1.5 -> 1.0 (10%)
+      standby: +0.5,  // 蓄势 2.5 -> 3.0 (30%)
+      heal: +0.5,     // 疗愈 2.0 -> 2.5 (25%)
     },
     // ── 攻击点数被削（ptsDebuff > 0）时的额外权重偏移 ──
     // 基础层已处理：attack -1.0/级, guard +0.5, standby +0.5
     // 本表在其基础上叠加，使最终权重精确落到目标值（以 1 级 debuff 为基准）：
     //   守备 2.6 | 蓄势 2.4 | 攻击 2.2 | 闪避 1.6 | 疗愈 1.2
     ptsDebuffBias: {
-      attack:  -0.3,
-      guard:   -0.5,
+      attack: -0.3,
+      guard: -0.5,
       standby: +0.3,
-      dodge:   +0.6,
-      heal:    -0.1,
+      dodge: +0.6,
+      heal: -0.1,
     },
   },
 };
