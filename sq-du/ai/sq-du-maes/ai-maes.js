@@ -138,6 +138,15 @@ export const MaesProfile = {
       standby: +1.2,  // 蓄势 1.3 → 2.5 (25%)
       heal:    +0.7,  // 疗愈 1.1 → 1.8 (18%)
     },
+    // ── 攻击点数被削（ptsDebuff > 0）时的额外权重偏移 ──
+    // 基础层已处理：attack -1.0/级, guard +0.5, standby +0.5
+    // 本表在其基础上叠加，使最终权重精确落到目标值（以 1 级 debuff 为基准）：
+    //   攻击 3.3-1.0-0.3=2.0 | 守备 2.5+0.5-0.4=2.6 | 蓄势 1.3+0.5+0.5=2.3
+    ptsDebuffBias: {
+      attack:  -0.3,
+      guard:   -0.4,
+      standby: +0.5,
+    },
   },
 };
 
@@ -220,7 +229,7 @@ export function maesConstrainDecision(decision, scene) {
     return attacks.length >= 2 && attacks.every(s => !s);
   })();
 
-  if (d.action === Action.STANDBY && effectiveStamina >= 2 && !consecFailed) {
+  if (d.action === Action.STANDBY && effectiveStamina >= 2 && !consecFailed && !(ai.ptsDebuff > 0)) {
     const recentOpp = history?.length ? history[history.length - 1]?.opponentAction : null;
     const oppPassive = recentOpp === Action.STANDBY || recentOpp === Action.HEAL;
     const oppWeak = player.stamina <= 1 || player.hp <= 2;
@@ -231,11 +240,14 @@ export function maesConstrainDecision(decision, scene) {
   }
 
   // ── 场景1（血线保命）：HP=1 + 对手有精力 → 强制守备 ──
+  // 例外：AI 有 2+ 精力且对手精力 ≤ 1 时，攻击（如饮血）收益严格优于守备/疗愈，
+  //       允许攻击通过；同时不再豁免疗愈，迫使 AI 选择攻击而非原地疗愈。
+  const aiCanPressAtLowHp = effectiveStamina >= 2 && player.stamina <= 1;
   if (
     ai.hp <= 1 &&
     player.stamina > 0 &&
     d.action !== Action.GUARD &&
-    d.action !== Action.HEAL &&
+    !(d.action === Action.ATTACK && aiCanPressAtLowHp) &&
     !killWindow && !executeWindow
   ) {
     d.action = Action.GUARD;

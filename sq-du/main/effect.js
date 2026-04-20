@@ -567,6 +567,7 @@ export class EffectLayer {
     owner.pendingEffects.push({
       effectId,
       source: options.source || 'skill',
+      priority: options.priority ?? 0,
       readyAt: {
         phaseEvent: options.phaseEvent || null,
         turn: options.turn ?? null,

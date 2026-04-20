@@ -235,9 +235,16 @@ export class AIBaseLogic {
     // ── AI 自身效果感知（被挂 debuff 时调整决策）────
     // 攻击被削 → 攻击效率低，转守/蓄势
     if (snap.aiPtsDebuff > 0) {
-      w.attack -= snap.aiPtsDebuff * 0.8;
-      w.guard += 0.4;
+      w.attack -= snap.aiPtsDebuff * 1.0;
+      w.guard += 0.5;
       w.standby += 0.5;
+      // 各 AI 定制化微调：ptsDebuffBias 可在 aiTuning 中声明
+      const pdb = (ai.aiTuning || {}).ptsDebuffBias || {};
+      w.attack  += pdb.attack  ?? 0;
+      w.guard   += pdb.guard   ?? 0;
+      w.standby += pdb.standby ?? 0;
+      w.dodge   += pdb.dodge   ?? 0;
+      w.heal    += pdb.heal    ?? 0;
     }
     // 守备被削 → 守备不可靠，转闪避
     if (snap.aiGuardDebuff > 0) {

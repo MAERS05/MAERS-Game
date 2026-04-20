@@ -13,6 +13,7 @@ export class EffectTimingLayer {
       const opponent = player.id === PlayerId.P1 ? p2 : p1;
       const queue = Array.isArray(player.pendingEffects) ? player.pendingEffects : [];
       const remain = [];
+      const ready = [];
 
       for (const entry of queue) {
         const readyAt = entry.readyAt || {};
@@ -32,6 +33,13 @@ export class EffectTimingLayer {
           continue;
         }
 
+        ready.push(entry);
+      }
+
+      // 按 priority 升序排列：数值越大越晚触发（净化 priority=100 排最后）
+      ready.sort((a, b) => (a.priority || 0) - (b.priority || 0));
+
+      for (const entry of ready) {
         const handler = EffectHandlers[entry.effectId];
         if (handler?.onPhase) {
           handler.onPhase({
@@ -74,7 +82,7 @@ export class EffectTimingLayer {
         if (shouldKeep) {
           remain.push(entry);
         }
-      } // <--- restore missing closing brace here
+      }
 
       player.pendingEffects = remain;
     }

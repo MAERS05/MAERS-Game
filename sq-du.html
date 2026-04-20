@@ -1535,7 +1535,7 @@
       border-radius: 12px;
       padding: 16px;
       display: none;
-      z-index: 300;
+      z-index: 1700; /* 高于 equip-overlay 的 1600 */
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
     }
 
@@ -1550,7 +1550,7 @@
       position: fixed;
       inset: 0;
       background: rgba(0, 0, 0, 0.5);
-      z-index: 299;
+      z-index: 1699; /* 高于 equip-overlay 的 1600 */
       cursor: default;
     }
 

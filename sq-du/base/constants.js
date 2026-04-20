@@ -463,7 +463,7 @@ export const EffectDefs = Object.freeze({
     playerOnly: true,
   },
   [EffectId.BLINDING]: {
-    id: EffectId.BLINDING, name: '盲目',
+    id: EffectId.BLINDING, name: '预备',
     applicableTo: [Action.GUARD],
     playerOnly: true,
   },

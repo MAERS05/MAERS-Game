@@ -15,9 +15,10 @@ export const InvigorateEffect = createSkillEffect({
   applicableTo: [Action.GUARD, Action.PREPARE],
 
   onPre(ctx, state) {
-    // 净化（下回合开始触发）：清除自身部分负面效果
+    // 净化（下回合开始触发，优先级最低确保在所有负面效果之后）：清除自身部分负面效果
     EffectLayer.queueEffect(state, EffectId.PURIFY, {
       phaseEvent: 'TURN_START',
+      priority: 100,
       source: 'skill:cleanse',
     });
     // 转为蓄备：保留守备的精力消耗，但本回合不执行守备
