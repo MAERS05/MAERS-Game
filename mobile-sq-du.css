@@ -61,6 +61,15 @@
     font-size: 0.55rem;
   }
 
+  .speed-val {
+    font-size: 1rem;
+    min-width: 12px;
+  }
+
+  .speed-row .stat-value-group {
+    gap: 3px;
+  }
+
   .hp-pip {
     width: 8px;
     height: 8px;

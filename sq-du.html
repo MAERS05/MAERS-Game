@@ -283,6 +283,14 @@
       align-items: center;
     }
 
+    .stat-value-group {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 66px;
+    }
+
     .stat-label {
       font-size: 0.72rem;
       color: var(--text-muted);
@@ -355,9 +363,9 @@
       border: 1px solid rgba(52, 211, 153, 0.3);
       color: var(--color-dod);
       border-radius: 50%;
-      width: 19px;
-      height: 19px;
-      font-size: 0.8rem;
+      width: 18px;
+      height: 18px;
+      font-size: 0.75rem;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -1788,21 +1796,27 @@
       <div class="stats-col">
         <div class="stat-row">
           <span class="stat-label">命数</span>
-          <div class="hp-pip" id="p1-hp-1"></div>
-          <div class="hp-pip" id="p1-hp-2"></div>
-          <div class="hp-pip" id="p1-hp-3"></div>
+          <div class="stat-value-group">
+            <div class="hp-pip" id="p1-hp-1"></div>
+            <div class="hp-pip" id="p1-hp-2"></div>
+            <div class="hp-pip" id="p1-hp-3"></div>
+          </div>
         </div>
         <div class="stat-row">
           <span class="stat-label">精力</span>
-          <div class="stamina-pip" id="p1-stam-1"></div>
-          <div class="stamina-pip" id="p1-stam-2"></div>
-          <div class="stamina-pip" id="p1-stam-3"></div>
+          <div class="stat-value-group">
+            <div class="stamina-pip" id="p1-stam-1"></div>
+            <div class="stamina-pip" id="p1-stam-2"></div>
+            <div class="stamina-pip" id="p1-stam-3"></div>
+          </div>
         </div>
         <div class="stat-row speed-row">
           <span class="stat-label">先手</span>
-          <button class="speed-btn" id="p1SpeedDown" title="降先手+1精力消耗">－</button>
-          <span class="speed-val" id="p1SpeedVal">1</span>
-          <button class="speed-btn" id="p1SpeedUp" title="提先手-1精力消耗">＋</button>
+          <div class="stat-value-group">
+            <button class="speed-btn" id="p1SpeedDown" title="降先手+1精力消耗">－</button>
+            <span class="speed-val" id="p1SpeedVal">1</span>
+            <button class="speed-btn" id="p1SpeedUp" title="提先手-1精力消耗">＋</button>
+          </div>
         </div>
       </div>
 
@@ -1834,19 +1848,25 @@
       <!-- 属性（方向翻转） -->
       <div class="stats-col">
         <div class="stat-row">
-          <div class="hp-pip" id="p2-hp-1"></div>
-          <div class="hp-pip" id="p2-hp-2"></div>
-          <div class="hp-pip" id="p2-hp-3"></div>
+          <div class="stat-value-group">
+            <div class="hp-pip" id="p2-hp-1"></div>
+            <div class="hp-pip" id="p2-hp-2"></div>
+            <div class="hp-pip" id="p2-hp-3"></div>
+          </div>
           <span class="stat-label" style="text-align:right">命数</span>
         </div>
         <div class="stat-row">
-          <div class="stamina-pip" id="p2-stam-1"></div>
-          <div class="stamina-pip" id="p2-stam-2"></div>
-          <div class="stamina-pip" id="p2-stam-3"></div>
+          <div class="stat-value-group">
+            <div class="stamina-pip" id="p2-stam-1"></div>
+            <div class="stamina-pip" id="p2-stam-2"></div>
+            <div class="stamina-pip" id="p2-stam-3"></div>
+          </div>
           <span class="stat-label" style="text-align:right">精力</span>
         </div>
         <div class="stat-row speed-row" style="justify-content:flex-end">
-          <span class="speed-val" id="p2SpeedVal">1</span>
+          <div class="stat-value-group">
+            <span class="speed-val" id="p2SpeedVal">1</span>
+          </div>
           <span class="stat-label" style="text-align:right">先手</span>
         </div>
       </div>
