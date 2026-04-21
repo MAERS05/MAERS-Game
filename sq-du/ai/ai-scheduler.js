@@ -195,51 +195,21 @@ function _evaluateRedecide(ai, player, revealedAction, effectiveStamina, getHist
   const tuning = ai.aiTuning || {};
   const bias = tuning.redecideBias || 0;
 
-  // ── 斜杀窗口：绝对不弃权 ────────────────────
-  if ((indicators.killWindow > 0 || indicators.executeWindow > 0) && effectiveStamina >= 1) {
+  // ── 既然已经是花金币买来的情报，就不再带有“放弃重决策”的 RNG 摆烂行为了。
+  // 一律利用完美信息打出克制解。
+
+  // ── 如果对手出攻击 ──
+  if (revealed?.action === Action.ATTACK) {
     return AIJudgeLayer.buildRedecideDecision(ai, player, revealed, getHistory());
   }
 
-  // ── 对手出攻击：威胁度驱动是否重决策 ──────────
-  if (revealed?.action === Action.ATTACK) {
-    const dangerFactor = Math.min(1, 0.50 + indicators.aiDanger * 0.40 + bias);
-    if (Math.random() < dangerFactor) {
-      return AIJudgeLayer.buildRedecideDecision(ai, player, revealed, getHistory());
-    }
-    return null;
+  // ── 如果对手出被动（待命/疗愈/守备/闪避） ──
+  // 只要能放得出一个动作，必根据克制调整
+  if (effectiveStamina >= 1 || revealed?.action === Action.STANDBY || revealed?.action === Action.HEAL) {
+    return AIJudgeLayer.buildRedecideDecision(ai, player, revealed, getHistory());
   }
 
-  // ── 对手出被动（待命/守备）：进攻机会评估 ─────
-  if (revealed?.action === Action.STANDBY && effectiveStamina >= 1) {
-    if (Math.random() < Math.min(1, 0.70 + bias)) {
-      return AIJudgeLayer.buildRedecideDecision(ai, player, revealed, getHistory());
-    }
-    return null;
-  }
-
-  // ── 对手疗愈：无防御，绝佳攻击机会 ─────────────
-  if (revealed?.action === Action.HEAL && effectiveStamina >= 1) {
-    if (Math.random() < Math.min(1, 0.85 + bias)) {
-      return AIJudgeLayer.buildRedecideDecision(ai, player, revealed, getHistory());
-    }
-    return null;
-  }
-
-  if (revealed?.action === Action.GUARD && effectiveStamina >= 2) {
-    if (Math.random() < Math.min(1, 0.45 + bias)) {
-      return AIJudgeLayer.buildRedecideDecision(ai, player, revealed, getHistory());
-    }
-    return null;
-  }
-
-  // ── 对手出闪避：攻击大概率被闪开，通常弃权 ────
-  if (revealed?.action === Action.DODGE) {
-    if (effectiveStamina >= 2 && Math.random() < Math.min(1, 0.30 + bias)) {
-      return AIJudgeLayer.buildRedecideDecision(ai, player, revealed, getHistory());
-    }
-    return null;
-  }
-
+  // 但如果真的一点力气没有，只能作罢
   return null;
 }
 

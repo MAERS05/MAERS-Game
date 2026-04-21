@@ -196,7 +196,7 @@ export function applyCustomization(state) {
   // ── 注入行为调优参数 ──
   state.aiTuning = { ...MaesProfile.tuning };
 
-  // ── 赋予 MAES 永久「振奋」效果：从第1回合挂载，每隔3回合（间隔3期）生效一次 ──
+  // ── 赋予 MAES 永久「振奋」效果：动态间隔 ──
   if (!Array.isArray(state.pendingEffects)) state.pendingEffects = [];
   state.pendingEffects.push({
     effectId: EffectId.REJUVENATED,
@@ -204,11 +204,12 @@ export function applyCustomization(state) {
     priority: 0,
     readyAt: {
       phaseEvent: 'TURN_START',
-      turn: 4,  // 1、2、3不触发，第4回合首触
+      turn: 3,  // 第一次：2回合后（第1、2回合跳过，第3回合首触）
       ownerId: state.id,
     },
     duration: null,    // 永久持续
-    interval: 3,       // 每3个间隔回合后触发（包含本身共跨4局）
+    interval: 2,       // 首次触发间隔为2（表现为每隔2回合）
+    intervalStep: 1,   // 每次触发完后，间隔数值 +1（2变3，3变4...）
     maxTriggers: null,
   });
 }
@@ -275,20 +276,38 @@ export function maesConstrainDecision(decision, scene) {
     d.effects = [];
   }
 
-  // ── 场景1（血线保命）：HP=1 + 对手有精力 → 强制守备 ──
+  // ── 场景1（血线保命）：HP=1 + 对手有精力 + 未知对手非攻击时 → 强制守备 ──
   // 例外：AI 有 2+ 精力且对手精力 ≤ 1 时，攻击（如饮血）收益严格优于守备/疗愈，
   //       允许攻击通过；同时不再豁免疗愈，迫使 AI 选择攻击而非原地疗愈。
   const aiCanPressAtLowHp = effectiveStamina >= 2 && player.stamina <= 1;
+  const knowsOpponentPassive = scene.revealedAction && scene.revealedAction.action !== Action.ATTACK;
   if (
     ai.hp <= 1 &&
     player.stamina > 0 &&
-    d.action !== Action.GUARD &&
+    !knowsOpponentPassive &&
+    (d.action !== Action.GUARD && d.action !== Action.STANDBY) &&
     !(d.action === Action.ATTACK && aiCanPressAtLowHp) &&
     !killWindow && !executeWindow
   ) {
-    d.action = Action.GUARD;
+    // 改成从守备和蓄势中 50% 随机挑选，建立不可预测的身法
+    d.action = Math.random() < 0.5 ? Action.GUARD : Action.STANDBY;
     d.speed = DefaultStats.BASE_SPEED;
     d.enhance = 0;
+    d.effects = AIExtraLayer.pickEffects(d.action, 0, ai, scene);
+  }
+
+  // ── 场景X（透视下的常识）：如果已经洞察发现对手没攻击，且自己选了防御动作，完全是白给 ──
+  if (knowsOpponentPassive && (d.action === Action.GUARD || d.action === Action.DODGE)) {
+    // 既然对面不打我，要么趁机干他，要么一起蓄势
+    if (effectiveStamina >= 1) {
+      d.action = Action.ATTACK;
+      d.effects = AIExtraLayer.pickEffects(Action.ATTACK, d.enhance || 0, ai, scene);
+    } else {
+      d.action = Action.STANDBY;
+      d.speed = DefaultStats.BASE_SPEED;
+      d.enhance = 0;
+      d.effects = [];
+    }
   }
 
   // ── 场景2（空精反守）：对手精力=0 + AI有精力 → 禁止待命/疗愈，迫使进攻 ──
@@ -298,7 +317,7 @@ export function maesConstrainDecision(decision, scene) {
     (d.action === Action.STANDBY || d.action === Action.HEAL)
   ) {
     d.action = Action.ATTACK;
-    d.effects = AIExtraLayer.pickEffects(Action.ATTACK, d.enhance || 0, ai, { player, isRedecide: false });
+    d.effects = AIExtraLayer.pickEffects(Action.ATTACK, d.enhance || 0, ai, { player, isRedecide: scene.isRedecide });
   }
 
   // ── 场景3（自残保护）：HP=1 → 移除所有带 hpCost 的技能 ──

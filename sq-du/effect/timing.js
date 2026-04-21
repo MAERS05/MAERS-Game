@@ -66,6 +66,12 @@ export class EffectTimingLayer {
             shouldKeep = true;
           }
           if (shouldKeep) {
+            // 支持动态递增间隔（如每次触发后间隔+1）
+            if (entry.intervalStep != null && entry.intervalStep !== 0) {
+              entry.interval += entry.intervalStep;
+              // 防止间隔无限缩小导致负数崩溃，最低为0
+              if (entry.interval < 0) entry.interval = 0;
+            }
             entry.readyAt.turn = (engine?.turn || 0) + entry.interval + 1;
           }
         }
