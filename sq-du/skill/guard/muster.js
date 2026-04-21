@@ -11,7 +11,7 @@ import { EffectLayer } from '../../main/effect.js';
  */
 export const MusterEffect = createSkillEffect({
   id: EffectId.MUSTER,
-  name: '整备',
+  name: '蓄积',
   desc: '若守备成功，为自身附加[攻击强化]并在下回合开始后，回合结束前生效。',
   applicableTo: [Action.GUARD],
 

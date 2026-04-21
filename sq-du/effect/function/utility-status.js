@@ -60,6 +60,21 @@ export const AttackSlot0BlockEffect = createStatusEffect({
   },
 });
 
+/** 封锁对方【攻击二号槽位】 */
+export const AttackSlot1BlockEffect = createStatusEffect({
+  id: 'attack_slot1_block',
+  name: '封锁',
+  desc: '部分槽位封锁',
+  applicableTo: [Action.ATTACK],
+  timingDisplay: 'phase',
+  apply(state) {
+    if (!state.slotBlocked) {
+      state.slotBlocked = { [Action.ATTACK]: [false, false, false], [Action.GUARD]: [false, false, false], [Action.DODGE]: [false, false, false] };
+    }
+    state.slotBlocked[Action.ATTACK][1] = true;
+  },
+});
+
 /** 封锁对方【守备一号槽位】 */
 export const GuardSlot0BlockEffect = createStatusEffect({
   id: 'guard_slot0_block',
@@ -76,6 +91,21 @@ export const GuardSlot0BlockEffect = createStatusEffect({
       };
     }
     state.slotBlocked[Action.GUARD][0] = true;
+  },
+});
+
+/** 封锁对方【守备三号槽位】 */
+export const GuardSlot2BlockEffect = createStatusEffect({
+  id: 'guard_slot2_block',
+  name: '封锁',
+  desc: '部分槽位封锁',
+  applicableTo: [Action.GUARD],
+  timingDisplay: 'phase',
+  apply(state) {
+    if (!state.slotBlocked) {
+      state.slotBlocked = { [Action.ATTACK]: [false, false, false], [Action.GUARD]: [false, false, false], [Action.DODGE]: [false, false, false] };
+    }
+    state.slotBlocked[Action.GUARD][2] = true;
   },
 });
 

@@ -18,7 +18,7 @@ import { FortifiedEffect, WoundedEffect } from '../effect/function/combat-identi
 import { PowerEffect, WeakEffect, BrokenBladeEffect } from '../effect/function/attack-status.js';
 import { SolidEffect, CrackedArmorEffect, BrokenArmorEffect } from '../effect/function/defense-status.js';
 import { SideStepEffect, ClumsyEffect, ShackledDodgeEffect } from '../effect/function/dodge-status.js';
-import { MeridianBlockEffect, HealBlockEffect, AttackEnhanceEffect, AttackSlot0BlockEffect, GuardSlot0BlockEffect, DodgeSlot0BlockEffect, GuardEnhanceEffect, DodgeEnhanceEffect, PurifyEffect } from '../effect/function/utility-status.js';
+import { MeridianBlockEffect, HealBlockEffect, AttackEnhanceEffect, AttackSlot0BlockEffect, AttackSlot1BlockEffect, GuardSlot0BlockEffect, GuardSlot2BlockEffect, DodgeSlot0BlockEffect, GuardEnhanceEffect, DodgeEnhanceEffect, PurifyEffect } from '../effect/function/utility-status.js';
 
 // ── 玩家攻击技能（skill/player-attack/）──
 import { BreakQiEffect } from '../skill/player-attack/break_qi.js';
@@ -136,7 +136,9 @@ const RawEffectHandlers = {
   heal_block: HealBlockEffect,
   attack_enhance: AttackEnhanceEffect,
   attack_slot0_block: AttackSlot0BlockEffect,
+  attack_slot1_block: AttackSlot1BlockEffect,
   guard_slot0_block: GuardSlot0BlockEffect,
+  guard_slot2_block: GuardSlot2BlockEffect,
   dodge_slot0_block: DodgeSlot0BlockEffect,
   guard_enhance: GuardEnhanceEffect,
   dodge_enhance: DodgeEnhanceEffect,

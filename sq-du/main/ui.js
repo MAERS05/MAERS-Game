@@ -1106,6 +1106,11 @@ const EFFECT_ICON_META = {
   [EffectId.MERIDIAN_BLOCK]: { icon: 'close-saving.svg', name: '截脉', resource: '禁止蓄势', binary: true },
   [EffectId.HEAL_BLOCK]: { icon: 'close-treat.svg', name: '禁愈', resource: '禁止疗愈', binary: true },
   [EffectId.ATTACK_ENHANCE]: { icon: 'strong.svg', name: '攻击强化', resource: '攻击点数和槽位', sign: +1 },
+  [EffectId.ATTACK_SLOT0_BLOCK]: { icon: 'prohibited-skill.svg', name: '封锁', resource: '攻击一号槽位', binary: true },
+  [EffectId.ATTACK_SLOT1_BLOCK]: { icon: 'prohibited-skill.svg', name: '封锁', resource: '攻击二号槽位', binary: true },
+  [EffectId.GUARD_SLOT0_BLOCK]: { icon: 'prohibited-skill.svg', name: '封锁', resource: '守备一号槽位', binary: true },
+  [EffectId.GUARD_SLOT2_BLOCK]: { icon: 'prohibited-skill.svg', name: '封锁', resource: '守备三号槽位', binary: true },
+  [EffectId.DODGE_SLOT0_BLOCK]: { icon: 'prohibited-skill.svg', name: '封锁', resource: '闪避一号槽位', binary: true },
   [EffectId.PURIFY]: { icon: 'clear-body.svg', name: '净化', resource: '清除负面效果', binary: true },
 };
 
@@ -1205,17 +1210,32 @@ function updateStatusIcons(playerId, state) {
    * @returns {string} ‘本回合’ | ‘N回合后’
    */
   const getTurnLabel = (group) => {
-    if (group.interval != null && group.interval > 0) {
-      const base = `每隔${group.interval}回合`;
-      if (group.maxTriggers != null && group.maxTriggers > 0) return `${base}（共${group.maxTriggers}次）`;
-      return `${base}（永久）`;
-    }
-    if (group.duration != null && group.duration > 0) return `剩余${group.duration}回合`;
+    let baseLabel = '';
     const targetTurn = group.minTurn;
-    if (targetTurn == null) return '本回合';
-    const delta = targetTurn - currentTurn;
-    if (delta <= 0) return '本回合';
-    return `${delta}回合后`;
+    const delta = targetTurn != null ? targetTurn - currentTurn : 0;
+
+    if (delta <= 0) {
+      baseLabel = '本回合';
+    } else {
+      baseLabel = `${delta}回合后`;
+    }
+
+    if (group.duration != null && group.duration > 0) {
+      baseLabel = `剩余${group.duration}回合`;
+    }
+
+    if (group.maxTriggers != null && group.maxTriggers > 0) {
+      // 本回合触发时消耗一次，显示触发后的剩余次数
+      const displayTriggers = delta <= 0 ? group.maxTriggers - 1 : group.maxTriggers;
+      if (displayTriggers > 0) return `${baseLabel}（剩${displayTriggers}次）`;
+    }
+
+    // 周期性但无次数限制 → 永久
+    if (group.interval != null && group.interval > 0) {
+      return `${baseLabel}（永久）`;
+    }
+
+    return baseLabel;
   };
 
   // 已渲染的 effectId 集合（跨 pending 和 flat 去重）

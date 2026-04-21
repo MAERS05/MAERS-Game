@@ -346,7 +346,9 @@ export const EffectId = Object.freeze({
   HEAL_BLOCK: 'heal_block',
   ATTACK_ENHANCE: 'attack_enhance',
   ATTACK_SLOT0_BLOCK: 'attack_slot0_block',
+  ATTACK_SLOT1_BLOCK: 'attack_slot1_block',
   GUARD_SLOT0_BLOCK: 'guard_slot0_block',
+  GUARD_SLOT2_BLOCK: 'guard_slot2_block',
   DODGE_SLOT0_BLOCK: 'dodge_slot0_block',
   GUARD_ENHANCE: 'guard_enhance',
   DODGE_ENHANCE: 'dodge_enhance',
@@ -420,7 +422,7 @@ export const EffectDefs = Object.freeze({
     playerOnly: true,
   },
   [EffectId.FATIGUE]: {
-    id: EffectId.FATIGUE, name: '破刃',
+    id: EffectId.FATIGUE, name: '汲取',
     applicableTo: [Action.ATTACK],
     playerOnly: true,
   },
