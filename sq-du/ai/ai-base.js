@@ -14,7 +14,7 @@
 
 'use strict';
 
-import { Action, DefaultStats, readBonus } from '../base/constants.js';
+import { Action, DefaultStats, EffectId, readBonus } from '../base/constants.js';
 
 export class AIBaseLogic {
   static TUNING = {
@@ -23,8 +23,8 @@ export class AIBaseLogic {
     maxProcProb: 0.78,
     lowHpLine: 0.30,
     executeHpLine: 0.20,
-    decisiveLead: 2.50,
-    decisiveCriticalLead: 1.80,
+    decisiveLead: 3.00,
+    decisiveCriticalLead: 2.20,
   };
 
   static clamp01(v) { return Math.max(0, Math.min(1, v)); }
@@ -136,6 +136,17 @@ export class AIBaseLogic {
       playerDodgeBoost: player.dodgeBoost || 0,  // 对手闪避增强 → 攻击难命中
       playerStaminaPenalty: player.staminaPenalty || 0, // 对手精力惩罚 → 对手变弱
       playerHealBlocked: !!player.healBlocked,     // 对手被禁疗愈
+      playerAttackBlocked: (() => {
+        // 对手攻击被封（actionBlocked 或 permActionBlocked 含 ATTACK，或槽位封锁导致所有攻击槽位卤)
+        const blocked = [
+          ...(Array.isArray(player.actionBlocked) ? player.actionBlocked : []),
+          ...(Array.isArray(player.permActionBlocked) ? player.permActionBlocked : []),
+        ];
+        if (blocked.includes(Action.ATTACK)) return true;
+        // 槽位封锁：所有攻击槽位均被封
+        const slots = (player.slotBlocked || {})[Action.ATTACK];
+        return Array.isArray(slots) && slots.length > 0 && slots.every(Boolean);
+      })(),
       // 对手 bonus 加值（用于点数对比）
       playerAttackBonus: readBonus(player.attackPtsBonus),
       playerGuardBonus: readBonus(player.guardPtsBonus),
@@ -178,6 +189,14 @@ export class AIBaseLogic {
         }
         return attacks.length >= 2 && attacks.every(success => !success);
       })(),
+
+      // 技能全知：直接读取双方装备槽，无需逐回合积累
+      // 玩家已装备的技能 ID 列表（AI 全知，开局即生效）
+      playerKnownEffects: Object.values(player.equippedEffects || {})
+        .flat().filter(Boolean),
+      // AI 自身可用技能 ID 列表（从 effectInventory 读取，equippedEffects 对 AI 无意义）
+      aiEquippedEffects: Object.values(ai.effectInventory || {})
+        .flat().filter(Boolean),
     };
   }
 
@@ -344,6 +363,10 @@ export class AIBaseLogic {
         w.standby += 4.0;
         w.attack -= 1.5;
         w.dodge -= 0.5;
+        // 1精力 + 无法一击制胜：攻击后归零精力，对手保有精力 → 自己等死
+        // 额外惩罚确保收益矩阵调整（±1~2）无法将 attack 推回正数
+        const canOneShot = snap.playerHpRatio <= (this.TUNING.executeHpLine + 0.15);
+        if (!canOneShot) w.attack -= 3.0;
       }
       // 疗愈消耗 1 精力——危机期只有精力=1且先手值高时才考虑
       // 但绝对不能在自己 1 血且对手有精力能攻击时疗愈，那等于找死（疗愈无法拦截伤害）
@@ -438,6 +461,90 @@ export class AIBaseLogic {
       w.standby += pDodge * 1.0;
       w.guard += pDodge * 0.5;
       w.attack -= pDodge * 0.8;
+    }
+
+    // ── 技能全知感知：直接读取玩家装备槽，开局即生效 ─────
+    const intel = snap.playerKnownEffects || [];
+    const aiSkills = snap.aiEquippedEffects || [];
+    if (intel.length > 0) {
+      // 玩家有反噬(BACKLASH)守备：攻击打中守备 → AI疲惫+对手振奋，进攻风险大增
+      if (intel.includes(EffectId.BACKLASH)) {
+        w.attack -= 0.6;  // 攻击撞守可能反噬
+        w.standby += 0.3; // 蓄势更安全
+      }
+      // 玩家有化劲(REDIRECT)守备：自带坚固(+1)，守备更难打穿
+      if (intel.includes(EffectId.REDIRECT)) {
+        w.attack -= 0.4;  // 打穿守备需要更多点数
+        w.guard += 0.3;   // 对守选择提升
+      }
+      // 玩家有断筋(HAMSTRING)攻击：被打 → AI沉重(先手-1)
+      if (intel.includes(EffectId.HAMSTRING)) {
+        w.guard += 0.4;   // 挡住才不会吃沉重
+        w.dodge += 0.3;   // 闪开也行
+      }
+      // 玩家有破刃(FATIGUE/REND)攻击：被打 → 攻击槽封锁
+      if (intel.includes(EffectId.FATIGUE)) {
+        w.guard += 0.5;   // 攻击槽被封很致命，必须防住
+        w.dodge += 0.3;
+      }
+      // 玩家有泣命(BREAK_QI)攻击：自残高伤型，守备挡住收益极大
+      if (intel.includes(EffectId.BREAK_QI)) {
+        w.guard += 0.6;   // 对手自残还没打中 = 血赚
+      }
+      // 玩家有隐匿(HIDE)闪避：闪避成功 → AI被蒙蔽，追击有风险
+      if (intel.includes(EffectId.HIDE)) {
+        // 降低对预测闪避时的追击欲望（已在 pDodge 分支处理，此处补偿）
+        if (pDodge > 0.3) w.attack -= 0.3;
+      }
+    }
+
+    // ── AI 自身技能意识：根据已装备技能调整行动倾向 ─────
+    if (aiSkills.length > 0) {
+      // 饮血(BLOOD_DRINK)攻击：攻击成功回血，低血时攻击附带自救价值
+      if (aiSkills.includes(EffectId.BLOOD_DRINK)) {
+        if (ai.hp <= 1) w.attack += 0.8;
+      }
+      // 狂乱(FRENZY)攻击：连击强化，保持进攻节奏以维持叠加层
+      if (aiSkills.includes(EffectId.FRENZY)) {
+        if (!snap.aiConsecAttackFailed) w.attack += 0.4;
+      }
+      // 追杀(PURSUIT)攻击：攻击成功获轻盈(先手+1)，先手优势在身时主动维持连击链
+      if (aiSkills.includes(EffectId.PURSUIT)) {
+        if ((snap.aiAgilityBoost || 0) > 0) w.attack += 0.5; // 已有轻盈时趁势攻击
+        else w.attack += 0.2; // 无先手时也稍微倾向打出第一次追杀
+      }
+      // 强震(TREMOR)守备：守备成功封对手闪避槽，守备价值提升
+      if (aiSkills.includes(EffectId.TREMOR)) {
+        w.guard += 0.4;
+      }
+      // 筹算(STEADY)守备：守备成功获侧身，守备价值提升
+      if (aiSkills.includes(EffectId.STEADY)) {
+        w.guard += 0.3;
+      }
+      // 洁净(INVIGORATE)守备：守备转蓄备 + 下回合净化负面效果
+      // 注意：本回合不执行守备！只有被挂了影响战斗的debuff时才值得用
+      if (aiSkills.includes(EffectId.INVIGORATE)) {
+        const hasDebuff = (snap.aiPtsDebuff > 0) || (snap.aiGuardDebuff > 0) ||
+                          (snap.aiDodgeDebuff > 0) || (snap.aiAgilityDebuff > 0);
+        if (hasDebuff) w.guard += 0.8; // 有负面时洁净价值极高
+        else w.guard -= 0.2;           // 无负面时洁净浪费守备回合，轻微惩罚
+      }
+      // 延付(DEFERRED)闪避：闪避成功获坚固(守备+1)，下回合防御更强
+      if (aiSkills.includes(EffectId.DEFERRED)) {
+        w.dodge += 0.3;
+      }
+      // 解甲(DISARM)闪避：onPre即时侧身(闪避+1)，下回合自身碎甲(守备减益)
+      // 闪避成功后对方附加愚钝(洞察消耗精力+1)——让对手每次使用洞察额外耗精
+      // 整体：主动进攻型对手使用洞察时代价更高，适合需要反制洞察的局面
+      if (aiSkills.includes(EffectId.DISARM)) {
+        w.dodge += 0.3; // 侧身+1使闪避更可靠，有稳定价值
+      }
+      // 愤怒(FURY)闪避：闪避失败也获力量+僵硬——失败有收益，降低闪避风险
+      // 僵硬(先手-1)是代价，但力量(攻击+1)是奖励，整体中性但降低了失败惩罚
+      if (aiSkills.includes(EffectId.FURY)) {
+        // 预测对手攻击且AI精力不足时，闪避+愤怒是稳健选择
+        if (snap.oppAggression > 0.5) w.dodge += 0.3;
+      }
     }
 
     // ── 濒危保命 ─────────────────────────────────

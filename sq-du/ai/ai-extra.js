@@ -125,7 +125,7 @@ export class AIExtraLayer {
       [EffectId.PARALYZE]: action === Action.ATTACK ? B : -5,
       // ── AI 攻击技能 ──
       [EffectId.BLOOD_DRINK]: action === Action.ATTACK ? B + 0.1 + (aiLowHp ? 1.5 : 0) : -5,
-      [EffectId.CHARGE]: action === Action.ATTACK ? B - 0.1 + ((ai.chargeBoost || 0) > 0 ? -0.6 : 0) + (playerLowHp ? -0.4 : 0) : -5,
+      [EffectId.CHARGE]: action === Action.ATTACK ? B + ((ai.chargeBoost || 0) > 0 ? -1.0 : 0) + (playerLowHp ? -0.6 : 0) : -5,
       [EffectId.SHATTER_POINT]: action === Action.ATTACK ? B + (player?.healBlocked ? -0.6 : 0) + (playerLowHp ? 0.2 : 0) : -5,
       [EffectId.FRENZY]: action === Action.ATTACK ? B + 0.1 : -5,
       [EffectId.PURSUIT]: action === Action.ATTACK ? B + 0.1 + ((ai.agilityBoost || 0) > 0 ? 0.3 : 0) + ((ai.agilityDebuff || 0) > 0 ? 0.3 : 0) : -5,
@@ -135,8 +135,25 @@ export class AIExtraLayer {
       [EffectId.SHOCKWAVE]: action === Action.GUARD ? B : -5,
       [EffectId.MUSTER]: action === Action.GUARD ? 1.5 : -5,
       // ── AI 守备技能 ──
-      [EffectId.STEADY]: action === Action.GUARD ? B : -5,
-      [EffectId.INVIGORATE]: action === Action.GUARD ? B - 0.1 + (isEarlyGame ? -0.1 : 0) : -5,
+      [EffectId.STEADY]: (() => {
+        if (action !== Action.GUARD) return -5;
+        let s = B;
+        if ((ai.dodgeBoost || 0) === 0) s += 0.2;   // 未有闪避增益时更倾向积累
+        return s;
+      })(),
+      [EffectId.INVIGORATE]: (() => {
+        if (action !== Action.GUARD) return -5;
+        let s = B - 0.1 + (isEarlyGame ? -0.1 : 0);
+        // 守备大概率失败（对手攻击点数 > AI守备点数）+ 自身有负面效果 → 洁净最优
+        // 反正守不住，不如放弃守备换取下回合净化
+        if (hasToCleanse) {
+          const aiGrdPts = 1 + readBonus(ai.guardPtsBonus) + (ai.permGuardPtsBonus || 0) - (ai.guardDebuff || 0);
+          const pAtkPts = 1 + (player ? readBonus(player.attackPtsBonus) : 0) + (player?.chargeBoost || 0);
+          if (pAtkPts > aiGrdPts) s += 2.0; // 守备必败，果断洁净
+          else s += 0.5; // 有负面但守得住，仍有洁净价值
+        }
+        return s;
+      })(),
       [EffectId.TREMOR]: action === Action.GUARD ? B : -5,
 
       // ── 共享闪避技能 ──

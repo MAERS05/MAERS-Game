@@ -424,7 +424,7 @@ export class EffectLayer {
     // discount（兴奋）在真实精力为 0 时失效
     const sta = caster.stamina || 0;
     const pocket = sta + (sta >= 1 ? (caster.staminaDiscount || 0) : 0);
-    return pocket > 0;
+    return pocket >= need;
   }
 
   static applyInsightCost(caster) {

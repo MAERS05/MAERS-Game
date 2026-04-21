@@ -320,7 +320,7 @@ export const EngineEvent = Object.freeze({
  * 具体行为定义见 sq-du/skill/ 各子目录
  */
 export const EffectId = Object.freeze({
-  // ── 通用状态效果 ──
+  // ── 通用状态效果（effect/function/）──
   SLUGGISH: 'sluggish',
   REJUVENATED: 'rejuvenated',
   EXHAUSTED: 'exhausted',
@@ -333,8 +333,8 @@ export const EffectId = Object.freeze({
   BLINDED: 'blinded',
   FORTIFIED: 'fortified',
   WOUNDED: 'wounded',
-  POWER: 'power',
   WEAK: 'weak',
+  POWER: 'power',
   BROKEN_BLADE: 'broken_blade',
   SOLID: 'solid',
   CRACKED_ARMOR: 'cracked_armor',
@@ -350,30 +350,31 @@ export const EffectId = Object.freeze({
   DODGE_SLOT0_BLOCK: 'dodge_slot0_block',
   GUARD_ENHANCE: 'guard_enhance',
   DODGE_ENHANCE: 'dodge_enhance',
+  PURIFY: 'purify',
   // ── 玩家攻击技能（skill/player-attack/）──
   BREAK_QI: 'break_qi',
   HAMSTRING: 'hamstring',
-  FATIGUE: 'rend',
+  FATIGUE: 'fatigue',
   // ── 共享攻击技能（skill/attack/）──
   PARALYZE: 'paralyze',
   CHARGE: 'charge',
   SHATTER_POINT: 'shatter_point',
   // ── 共享守备技能（skill/guard/）──
-  RESTORE: 'shackle_guard',
+  RESTORE: 'restore',
+  SHOCKWAVE: 'shockwave',
+  MUSTER: 'muster',
+  // ── 玩家守备技能（skill/player-guard/）──
   REDIRECT: 'redirect',
   BACKLASH: 'backlash',
   BLINDING: 'blinding',
-  SHOCKWAVE: 'shockwave',
-  MUSTER: 'muster',
   // ── 共享闪避技能（skill/dodge/）──
-  // ── 玩家闪避技能（skill/player-dodge/）──
-  HIDE: 'hide',
-  DEFERRED: 'deferred',
-  PILFER: 'pilfer',
   LURE: 'lure',
-  SEE_THROUGH: 'see-through',
+  SEE_THROUGH: 'see_through',
   NIMBLE: 'nimble',
   // ── 玩家闪避技能（skill/player-dodge/）──
+  HIDE: 'hide',
+  PILFER: 'pilfer',
+  EQUITY: 'equity',
   // ── AI 攻击技能（skill/ai-attack/）──
   BLOOD_DRINK: 'blood_drink',
   FRENZY: 'frenzy',
@@ -382,11 +383,9 @@ export const EffectId = Object.freeze({
   STEADY: 'steady',
   INVIGORATE: 'invigorate',
   TREMOR: 'tremor',
-  // ── 通用功能效果 ──
-  PURIFY: 'purify',
   // ── AI 闪避技能（skill/ai-dodge/）──
   DISARM: 'disarm',
-  EQUITY: 'equity',
+  DEFERRED: 'deferred',
   FURY: 'fury',
 });
 
@@ -514,7 +513,7 @@ export const EffectDefs = Object.freeze({
   },
   // ── AI 守备技能（skill/ai-guard/）──
   [EffectId.STEADY]: {
-    id: EffectId.STEADY, name: '反冲',
+    id: EffectId.STEADY, name: '筹算',
     applicableTo: [Action.GUARD],
     aiOnly: true,
   },

@@ -12,7 +12,7 @@ import { EffectLayer } from '../../main/effect.js';
 export const DisarmEffect = createSkillEffect({
   id: EffectId.DISARM,
   name: '解甲',
-  desc: '在行动期开始后为自身附加1级[侧身]并触发，随后为自身附加1级[碎甲]并在下一回合的行动期开始后触发。若闪避成功，为对方附加1级[愚镘]并在下回合开始后，回合结束前生效。',
+  desc: '在行动期开始后为自身附加1级[侧身]并触发，随后为自身附加1级[碎甲]并在下一回合的行动期开始后触发。若闪避成功，为对方附加1级[愚钝]并在下回合开始后，回合结束前生效。',
   applicableTo: [Action.DODGE],
 
   onPre(ctx, state) {

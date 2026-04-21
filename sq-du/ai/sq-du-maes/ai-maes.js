@@ -195,6 +195,22 @@ export function applyCustomization(state) {
 
   // ── 注入行为调优参数 ──
   state.aiTuning = { ...MaesProfile.tuning };
+
+  // ── 赋予 MAES 永久「振奋」效果：从第1回合挂载，每隔3回合（间隔3期）生效一次 ──
+  if (!Array.isArray(state.pendingEffects)) state.pendingEffects = [];
+  state.pendingEffects.push({
+    effectId: EffectId.REJUVENATED,
+    source: 'maes-profile',
+    priority: 0,
+    readyAt: {
+      phaseEvent: 'TURN_START',
+      turn: 4,  // 1、2、3不触发，第4回合首触
+      ownerId: state.id,
+    },
+    duration: null,    // 永久持续
+    interval: 3,       // 每3个间隔回合后触发（包含本身共跨4局）
+    maxTriggers: null,
+  });
 }
 
 // ═════════════════════════════════════════════════
@@ -213,7 +229,11 @@ export function maesConstrainDecision(decision, scene) {
   const d = { ...decision };
   const { ai, player, history } = scene;
   const effectiveStamina = Math.max(0, ai.stamina + (ai.staminaDiscount || 0) - (ai.staminaPenalty || 0));
-  const killWindow = player.hp <= 1 || (player.hp <= 2 && player.stamina <= 1);
+  // killWindow: 玩家处于绝杀射程（一击可毙 或 精尽可处决）
+  // 注意：player.hp<=2 && player.stamina<=1 是"接近绝杀"但未必能一击毙命
+  // AI 自身只有1精力时攻击后归零，若打不死玩家反而让自己等死
+  const canOneShot = player.hp <= 1; // 真正可一击毙命
+  const killWindow = canOneShot || (player.hp <= 2 && player.stamina <= 1 && effectiveStamina >= 2);
   const executeWindow = player.stamina <= 0;
 
   // ── 场景0（好斗本能）：基础层在精力≤1时强制待命，但 MAES 更激进 ──
@@ -238,6 +258,21 @@ export function maesConstrainDecision(decision, scene) {
       d.action = Action.ATTACK;
       d.effects = AIExtraLayer.pickEffects(Action.ATTACK, d.enhance || 0, ai, { player, isRedecide: false });
     }
+  }
+
+  // ── 场景0（截脉死地）：蓄势被封 + 仅剩1精力 + 无绝杀机会 → 就绪保命 ──────────
+  // 任何耗精力的行动都会让 AI 陷入「0精力+蓄势封锁」的永久僵局。
+  // 例外：玩家 HP=1（一击可毙），此时值得用最后精力搏命。
+  if (
+    ai.standbyBlocked &&
+    effectiveStamina <= 1 &&
+    !killWindow && !executeWindow &&
+    player.hp > 1   // 无法一击制胜
+  ) {
+    d.action = Action.READY;
+    d.speed = DefaultStats.BASE_SPEED;
+    d.enhance = 0;
+    d.effects = [];
   }
 
   // ── 场景1（血线保命）：HP=1 + 对手有精力 → 强制守备 ──
@@ -273,6 +308,41 @@ export function maesConstrainDecision(decision, scene) {
       const def = EffectDefs[id];
       return (def?.hpCost && def.hpCost > 0) ? null : id;
     });
+  }
+
+  // ── 场景5（攻击封禁感知）：对手本回合攻击被封，守备/闪避毫无收益 ──
+  const playerAttackBlocked = (() => {
+    const blocked = [
+      ...(Array.isArray(player.actionBlocked) ? player.actionBlocked : []),
+      ...(Array.isArray(player.permActionBlocked) ? player.permActionBlocked : []),
+    ];
+    if (blocked.includes(Action.ATTACK)) return true;
+    const slots = (player.slotBlocked || {})[Action.ATTACK];
+    return Array.isArray(slots) && slots.length > 0 && slots.every(Boolean);
+  })();
+  if (playerAttackBlocked) {
+    if (d.action === Action.GUARD || d.action === Action.DODGE) {
+      d.action = Action.STANDBY;
+      d.speed = DefaultStats.BASE_SPEED;
+      d.enhance = 0;
+      d.effects = AIExtraLayer.pickEffects(Action.STANDBY, 0, ai, { player, isRedecide: false });
+    }
+  }
+
+  // ── 场景6（先手劣势感知）：玩家历史先手领先，MAES 闪避必被追上 ──
+  {
+    const recent = (history || []).slice(-4);
+    const oppSpeedTrend = recent.length
+      ? recent.reduce((s, h) => s + (h.opponentSpeed ?? DefaultStats.BASE_SPEED), 0) / recent.length
+      : DefaultStats.BASE_SPEED;
+    const aiEffSpeed = DefaultStats.BASE_SPEED - (ai.agilityDebuff || 0);
+    const speedLead = oppSpeedTrend - aiEffSpeed;
+    if (speedLead > 0.5 && d.action === Action.DODGE) {
+      d.action = Action.STANDBY;
+      d.speed = DefaultStats.BASE_SPEED;
+      d.enhance = 0;
+      d.effects = AIExtraLayer.pickEffects(Action.STANDBY, 0, ai, { player, isRedecide: false });
+    }
   }
 
   // ── 场景4（MAES 先手本能）：根据对手行为预测决定是否提速 ──

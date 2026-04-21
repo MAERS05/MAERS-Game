@@ -49,8 +49,8 @@ export class AIJudgeLayer {
         final.action === Action.READY  || final.action === Action.PREPARE) {
       final.speed = DefaultStats.BASE_SPEED;
     }
-    // setup 技能（蓄力/稳重）会将行动转为蓄备/就绪，提速无意义
-    if (Array.isArray(final.effects) && final.effects.some(id => id === EffectId.CHARGE || id === EffectId.STEADY)) {
+    // setup 技能（蓄力）会将行动转为蓄备/就绪，提速无意义
+    if (Array.isArray(final.effects) && final.effects.some(id => id === EffectId.CHARGE)) {
       final.speed = DefaultStats.BASE_SPEED;
     }
     return final;
