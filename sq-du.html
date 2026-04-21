@@ -2216,11 +2216,19 @@
     // 初始化音量
     bgm.volume = 0.5;
 
+    // 是否是从上一次打开页面遗留的暂停状态
+    let isRecoveredState = localStorage.getItem('bgm_state') === 'paused';
+
     // 点击模式按钮时播放音乐
     function tryPlayBGM() {
+      // 尊重用户之前的选择：如果之前关闭了音乐则不自动播放
+      if (localStorage.getItem('bgm_state') === 'paused') {
+        return;
+      }
       if (bgm.paused) {
         bgm.play().then(() => {
           bgmToggle.classList.add('playing');
+          localStorage.setItem('bgm_state', 'playing');
         }).catch(() => { });
       }
     }
@@ -2233,11 +2241,20 @@
     // 点击图标切换播放/暂停
     bgmToggle.addEventListener('click', () => {
       if (bgm.paused) {
+        // 如果是上次页面留下的暂停态，也就是重新打开页面的第一次点击播放，则强制重新开始
+        if (isRecoveredState) {
+          bgm.currentTime = 0;
+          isRecoveredState = false;
+        }
         bgm.play();
         bgmToggle.classList.add('playing');
+        localStorage.setItem('bgm_state', 'playing');
       } else {
         bgm.pause();
         bgmToggle.classList.remove('playing');
+        // 当局内的暂停，打断 isRecoveredState 状态，确保之后点击能续播
+        isRecoveredState = false;
+        localStorage.setItem('bgm_state', 'paused');
       }
     });
   </script>
