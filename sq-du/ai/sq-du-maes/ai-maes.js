@@ -119,11 +119,11 @@ export const MaesProfile = {
 
   // ── MAES 行为调优（注入 AI 状态，被 ai-base / ai-scheduler 读取） ──
   tuning: {
-    attackBias: 2.0,
-    guardBias: 2.0,
-    dodgeBias: 0.5,
-    standbyBias: 1.5,
-    healBias: 1.0,
+    attackBias: 3.1,
+    guardBias: 1.5,
+    dodgeBias: 0.6,
+    standbyBias: 2.9,
+    healBias: 2.0,
     insightMaxProb: 0.65,  // 洞察最大概率（默认 0.65）
     redecideBias: 0.20,  // 重决策概率偏移（加到各情境概率上）
     speedBoostBias: 0.1,  // 先手概率偏移（正=更爱先手）

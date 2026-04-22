@@ -493,6 +493,21 @@ export class JudgeLayer {
     // 识破时行动被取消
     const isInsightClash = clash === Clash.INSIGHT_CLASH;
 
+    // ── 行为成功检测 ──
+    let p1ActionSuccess = false;
+    let p2ActionSuccess = false;
+
+    if (!isInsightClash) {
+      if (p1Ctx.action === Action.ATTACK && damageToP2 > 0) p1ActionSuccess = true;
+      if (p2Ctx.action === Action.ATTACK && damageToP1 > 0) p2ActionSuccess = true;
+
+      if (p1Ctx.action === Action.GUARD && clash === Clash.FORTIFY) p1ActionSuccess = true;
+      if (p2Ctx.action === Action.GUARD && clash === Clash.FORTIFY) p2ActionSuccess = true;
+
+      if (p1Ctx.action === Action.DODGE && (clash === Clash.EVADE || clash === Clash.DODGE_OUTMANEUVERED)) p1ActionSuccess = true;
+      if (p2Ctx.action === Action.DODGE && (clash === Clash.EVADE || clash === Clash.DODGE_OUTMANEUVERED)) p2ActionSuccess = true;
+    }
+
     // ═══ 先手恢复时序 ═══
     // 蓄势/疗愈的恢复默认在回合结束后生效（先伤后愈）。
     // 但若先手高于对方，恢复提前到战斗前生效（先愈后伤），可避免处决/击杀。
@@ -549,11 +564,16 @@ export class JudgeLayer {
     const p2ActionCost = isInsightClash ? 0 : (p2Ctx.cost || 0);
     const p1Recovery = p1RecoveryBase;  // 总恢复量不变
     const p2Recovery = p2RecoveryBase;
-    const rawP1Stamina = p1State.stamina - p1ActionCost + (p1State.staminaGainBlocked ? 0 : (p1State.staminaBonus || 0)) + p1Recovery;
+
+    // 行动成功恢复精力
+    const p1ActionSuccessRecovery = (!p1State.staminaGainBlocked && p1ActionSuccess) ? 1 : 0;
+    const p2ActionSuccessRecovery = (!p2State.staminaGainBlocked && p2ActionSuccess) ? 1 : 0;
+
+    const rawP1Stamina = p1State.stamina - p1ActionCost + (p1State.staminaGainBlocked ? 0 : (p1State.staminaBonus || 0)) + p1Recovery + p1ActionSuccessRecovery;
     const newP1Stamina = Math.min(DefaultStats.MAX_STAMINA, Math.max(0, rawP1Stamina));
     const p1StaminaBonusOverflow = rawP1Stamina > DefaultStats.MAX_STAMINA ? rawP1Stamina - DefaultStats.MAX_STAMINA : 0;
     const p1StaminaUnderflow = rawP1Stamina < 0 ? Math.abs(rawP1Stamina) : 0;
-    const rawP2Stamina = p2State.stamina - p2ActionCost + (p2State.staminaGainBlocked ? 0 : (p2State.staminaBonus || 0)) + p2Recovery;
+    const rawP2Stamina = p2State.stamina - p2ActionCost + (p2State.staminaGainBlocked ? 0 : (p2State.staminaBonus || 0)) + p2Recovery + p2ActionSuccessRecovery;
     const newP2Stamina = Math.min(DefaultStats.MAX_STAMINA, Math.max(0, rawP2Stamina));
     const p2StaminaBonusOverflow = rawP2Stamina > DefaultStats.MAX_STAMINA ? rawP2Stamina - DefaultStats.MAX_STAMINA : 0;
     const p2StaminaUnderflow = rawP2Stamina < 0 ? Math.abs(rawP2Stamina) : 0;
