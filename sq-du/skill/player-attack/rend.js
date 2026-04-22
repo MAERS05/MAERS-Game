@@ -11,7 +11,7 @@ import { EffectLayer } from '../../main/effect.js';
 export const FatigueEffect = createSkillEffect({
   id: EffectId.FATIGUE,
   name: '汲取',
-  desc: '为自身附加1级[萎靡]并在本回合行动期开始后触发。若攻击成功，为对方附加1级[萎靡]，并为自身附加1级[振奋]在下回合开始后触发。',
+  desc: '为自身附加1级[萎靡]并在本回合行动期开始后触发。若攻击成功，为对方附加1级[疲惫]，并为自身附加1级[振奋]在下回合开始后触发。',
   applicableTo: [Action.ATTACK],
 
   onPre(ctx, player) {
@@ -29,12 +29,12 @@ export const FatigueEffect = createSkillEffect({
     if (!opponent) return;
     if ((oppDmg || 0) <= 0) return; // 必须命中
 
-    // 给对方附加萎靡（下回合开始）
-    EffectLayer.queueEffect(opponent, EffectId.SLUGGISH, {
+    // 给对方附加疲惫（下回合开始）
+    EffectLayer.queueEffect(opponent, EffectId.EXHAUSTED, {
       phaseEvent: 'TURN_START',
       source: 'skill:drain',
     });
-    EffectLayer.markFlashEffect(opponent, EffectId.SLUGGISH);
+    EffectLayer.markFlashEffect(opponent, EffectId.EXHAUSTED);
 
     // 给自己附加振奋（下回合开始）
     EffectLayer.queueEffect(owner, EffectId.REJUVENATED, {

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file resolver.js
  * @description 博弈战斗系统 — 行为结算判定器（基于效果层和裁判层的核心总线）
  *
@@ -66,12 +66,12 @@ export function resolve(p1Ctx, p2Ctx, p1State, p2State, bothInsighted, turn) {
     },
   };
 
-  // ── 1.5 快照本回合真实精力（前置处理后，后置处理前尚未污染）─────────
-  // 处决检测基于真实精力（stamina），而非有效精力（含 penalty/discount）。
-  // staminaPenalty 仅增加行动成本，不代表"精力耗尽"；
-  // 玩家仍可执行零成本行为（蓄势/就绪/疗愈），不应因临时惩罚被判处决。
-  const p1EntryEffective = p1State.stamina;
-  const p2EntryEffective = p2State.stamina;
+  // ── 1.5 快照本回合真实精力（前置处理「前」的原始值）─────────
+  // 处决检测基于行动期开始之前的精力，而非 onPre 效果修改后的值。
+  // onPre 中的即时消耗（如汲取的萎靡）不应在本回合触发处决；
+  // 负溢出产生的疲惫 pendingEffect 会在下回合正常生效。
+  const p1EntryEffective = preP1Stamina;
+  const p2EntryEffective = preP2Stamina;
 
   // ── 2. 裁判层：构建物理时间轴并推演博弈结果 ─────────
   const { bs, derived } = JudgeLayer.evaluateTimeline(p1CtxEff, p2CtxEff, p1State, p2State, p1EntryEffective, p2EntryEffective);

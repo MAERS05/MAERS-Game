@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file ai-enhace.js
  * @description 博弈战斗系统 — AI 场景约束层（规则底线，不参与权重）
  *
@@ -74,11 +74,14 @@ export class AIEnhanceLayer {
 
     // 底线2.8：仅剩 1 点有效精力且无绝杀机会时，强制待命回气。
     // 注意：若对手精力为 0（executeWindow），即使只有 1 点精力也允许出攻击。
+    // 新机制例外：对手弱势（低精力+低血）时允许冒险出手，成功行动可恢复精力。
+    const opponentWeak = player.stamina <= 1 && player.hp <= 2;
     if (
       normalized.action !== Action.STANDBY &&
       effectiveStamina <= 1 &&
       !killWindow && !executeWindow &&
-      player.hp > 1 && player.stamina > 0
+      player.hp > 1 && player.stamina > 0 &&
+      !opponentWeak
     ) {
       normalized.action = Action.STANDBY;
       normalized.speed = DefaultStats.BASE_SPEED;

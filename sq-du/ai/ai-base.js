@@ -360,13 +360,13 @@ export class AIBaseLogic {
         w.standby += 1.0;  // 原 4.0 大幅减少
         w.attack -= 0.3;   // 原 -1.5 大幅减少
       } else {
-        w.standby += 4.0;
-        w.attack -= 1.5;
-        w.dodge -= 0.5;
-        // 1精力 + 无法一击制胜：攻击后归零精力，对手保有精力 → 自己等死
-        // 额外惩罚确保收益矩阵调整（±1~2）无法将 attack 推回正数
+        w.standby += 2.5;
+        w.attack -= 0.8;
+        w.dodge -= 0.3;
+        // 1精力 + 无法一击制胜：攻击后精力归零，但命中可恢复1精力
+        // 惩罚适度降低以反映行动成功恢复精力的新机制
         const canOneShot = snap.playerHpRatio <= (this.TUNING.executeHpLine + 0.15);
-        if (!canOneShot) w.attack -= 3.0;
+        if (!canOneShot) w.attack -= 1.5;
       }
       // 疗愈消耗 1 精力——危机期只有精力=1且先手值高时才考虑
       // 但绝对不能在自己 1 血且对手有精力能攻击时疗愈，那等于找死（疗愈无法拦截伤害）
@@ -386,12 +386,12 @@ export class AIBaseLogic {
     else if (aiEffectiveStamina === 2) {
       // 对手也低精力：精力对等，不急于蓄势
       if (snap.playerStamina <= 1) {
-        w.attack += 0.8;
-        w.guard += 0.5;
+        w.attack += 1.2;  // 成功攻击不消耗净精力
+        w.guard += 0.6;   // 成功守备回收精力
       }
-      // 对手高精力：我方处于劣势，适度收缩，拉平攻击/守备/蓄势各22%，疗愈19%，闪避15%
+      // 对手高精力：我方处于劣势，但成功行动可回收精力，收缩幅度降低
       else {
-        w.standby += 0.5;
+        w.standby += 0.3;
         w.heal += 0.6;
         w.dodge += 0.55;
       }
@@ -839,20 +839,20 @@ export class AIBaseLogic {
     // ── AI 攻击 ──────────────────────────────────────────
     if (aiAct === Action.ATTACK) {
       if (pAct === Action.STANDBY || pAct === Action.HEAL) {
-        return 1.5;  // 命中无防御：强优势
+        return 1.7;  // 命中无防御 + 回精力：强优势
       }
       if (pAct === Action.GUARD) {
         // 打穿：胜（区分高pt暴击感）；被挡：负（浪费精力）
-        if (aiPts > pPts)  return 1.0;
+        if (aiPts > pPts)  return 1.2;  // 打穿 + 回精力
         if (aiPts === pPts) return -0.2; // 同分=守备胜
         return -0.8;
       }
       if (pAct === Action.DODGE) {
-        return aiSpd > pSpd ? 0.8 : -0.4; // 先手追击才能打中
+        return aiSpd > pSpd ? 1.0 : -0.4; // 先手追击命中 + 回精力
       }
       if (pAct === Action.ATTACK) {
         // 双方互打：pts高者赢，同pts平局
-        if (aiPts > pPts)  return 0.8;
+        if (aiPts > pPts)  return 1.0;  // 压制 + 回精力
         if (aiPts < pPts)  return -1.0;
         return 0;
       }
@@ -862,7 +862,7 @@ export class AIBaseLogic {
     if (aiAct === Action.GUARD) {
       if (pAct === Action.ATTACK) {
         // 守住有反震收益；被打穿受损
-        if (aiPts >= pPts) return 0.8;
+        if (aiPts >= pPts) return 1.0;  // 挡住 + 回精力
         return -0.8 - (pPts - aiPts) * 0.3; // 差值越大损失越惨
       }
       if (pAct === Action.STANDBY || pAct === Action.HEAL) {
@@ -874,7 +874,7 @@ export class AIBaseLogic {
     // ── AI 闪避 ──────────────────────────────────────────
     if (aiAct === Action.DODGE) {
       if (pAct === Action.ATTACK) {
-        return aiSpd > pSpd ? 0.8 : -0.8;
+        return aiSpd > pSpd ? 1.0 : -0.8; // 闪过 + 回精力
       }
       if (pAct === Action.STANDBY || pAct === Action.HEAL) {
         return -0.3; // 机会成本
