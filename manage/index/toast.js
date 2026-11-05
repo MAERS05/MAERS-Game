@@ -1,5 +1,5 @@
 /**
- * MAERS Toast 通知系统
+ * MAERS Toast 通知系统（遵循 Hum 实体卡纸设计变量）
  * 使用方式：
  *   Toast.success('sq-du.html 文件创建成功')
  *   Toast.error('删除失败：文件不存在')
@@ -9,83 +9,86 @@
 const Toast = (() => {
     'use strict';
 
-    // ── 注入样式（仅执行一次）────────────────────
     const CSS = `
         #maers-toast-container {
             position: fixed;
-            top: 32px;
-            right: 32px;
-            z-index: 9999;
+            top: var(--space-lg, 24px);
+            right: var(--space-lg, 24px);
+            z-index: var(--z-toast, 500);
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: var(--space-xs, 8px);
             pointer-events: none;
         }
 
         .maers-toast {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: var(--space-sm, 12px);
             min-width: 280px;
             max-width: 420px;
-            padding: 14px 18px;
-            background: rgba(8, 8, 10, 0.95);
-            border: 1px solid rgba(60, 65, 75, 0.6);
-            border-left-width: 3px;
-            backdrop-filter: blur(12px);
-            font-family: 'Noto Sans SC', 'Cinzel', monospace, sans-serif;
-            font-size: 0.85rem;
-            color: #e2e8f0;
+            padding: var(--space-sm, 12px) var(--space-md, 16px);
+            background: var(--color-card, oklch(98.8% 0.007 95));
+            border-radius: var(--radius-stock, 16px);
+            box-shadow: var(--shadow-stock);
+            font-family: var(--font-body, sans-serif);
+            font-size: var(--text-sm, 0.875rem);
+            font-weight: 600;
+            color: var(--color-ink, oklch(20% 0.014 255));
             pointer-events: auto;
             cursor: pointer;
-
-            /* 入场动画 */
-            animation: maers-toast-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            animation: maers-toast-in var(--dur-short, 220ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) forwards;
         }
 
         .maers-toast.leaving {
-            animation: maers-toast-out 0.25s ease-in forwards;
+            animation: maers-toast-out var(--dur-micro, 120ms) var(--ease-in, cubic-bezier(0.7, 0, 0.84, 0)) forwards;
         }
 
         .maers-toast-icon {
-            font-size: 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border-radius: var(--radius-pill, 999px);
+            font-size: var(--text-xs, 0.75rem);
             flex-shrink: 0;
-            line-height: 1;
         }
 
         .maers-toast-msg {
             flex: 1;
             line-height: 1.45;
-            letter-spacing: 0.3px;
         }
 
         .maers-toast-close {
-            font-size: 0.75rem;
-            color: rgba(100, 116, 139, 0.6);
+            font-size: var(--text-xs, 0.75rem);
+            color: var(--color-muted);
             flex-shrink: 0;
-            transition: color 0.2s;
-        }
-        .maers-toast:hover .maers-toast-close {
-            color: #e2e8f0;
         }
 
-        /* 类型配色 */
-        .maers-toast.success { border-left-color: #f59e0b; }
-        .maers-toast.error   { border-left-color: #ef4444; }
-        .maers-toast.info    { border-left-color: #64748b; }
+        .maers-toast.success .maers-toast-icon {
+            background: var(--color-mint, oklch(82% 0.15 152));
+            color: var(--color-ink);
+        }
 
-        .maers-toast.success .maers-toast-icon { color: #f59e0b; }
-        .maers-toast.error   .maers-toast-icon { color: #ef4444; }
-        .maers-toast.info    .maers-toast-icon { color: #64748b; }
+        .maers-toast.error .maers-toast-icon {
+            background: var(--color-error, oklch(52% 0.19 27));
+            color: var(--color-card);
+        }
+
+        .maers-toast.info .maers-toast-icon {
+            background: var(--color-accent, oklch(87% 0.175 96));
+            color: var(--color-accent-ink);
+        }
 
         @keyframes maers-toast-in {
-            from { opacity: 0; transform: translateX(24px); }
-            to   { opacity: 1; transform: translateX(0);    }
+            from { opacity: 0; transform: translateY(-8px); }
+            to   { opacity: 1; transform: translateY(0); }
         }
 
         @keyframes maers-toast-out {
-            from { opacity: 1; transform: translateX(0);    }
-            to   { opacity: 0; transform: translateX(24px); }
+            from { opacity: 1; transform: translateY(0); }
+            to   { opacity: 0; transform: translateY(-8px); }
         }
     `;
 
@@ -104,29 +107,25 @@ const Toast = (() => {
         if (!container) {
             container = document.createElement('div');
             container.id = 'maers-toast-container';
+            container.setAttribute('role', 'status');
+            container.setAttribute('aria-live', 'polite');
             document.body.appendChild(container);
         }
         return container;
     }
 
-    // ── 核心函数 ─────────────────────────────────
-    /**
-     * @param {'success'|'error'|'info'} type
-     * @param {string} message
-     * @param {number} [duration=3000] 自动消失毫秒数，0 = 不自动消失
-     */
     function show(type, message, duration = 3000) {
         injectStyle();
 
-        const icons = { success: '✦', error: '✖', info: '◈' };
-        const icon  = icons[type] || '◈';
+        const icons = { success: '✓', error: '!', info: 'i' };
+        const icon  = icons[type] || 'i';
 
         const el = document.createElement('div');
         el.className = `maers-toast ${type}`;
         el.innerHTML = `
-            <span class="maers-toast-icon">${icon}</span>
+            <span class="maers-toast-icon" aria-hidden="true">${icon}</span>
             <span class="maers-toast-msg">${escHtml(message)}</span>
-            <span class="maers-toast-close">✕</span>
+            <span class="maers-toast-close" aria-hidden="true">关闭</span>
         `;
 
         function dismiss() {

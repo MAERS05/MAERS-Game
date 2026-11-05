@@ -1,0 +1,2167 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="occult">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>独 · 神启 — 博弈战斗系统</title>
+  <link rel="icon" href="data:,">
+  <link href="/font/base/fonts.css" rel="stylesheet">
+  <style>
+    /* ═══ 级联层声明：明确样式优先级，避免权重争夺 ═══ */
+    @layer reset, tokens, layout, components, overlays;
+
+    /* ═══ 1. 精确元素重置（不使用全局 * 选择器） ═══ */
+    @layer reset {
+      :where(html, body, div, header, main, footer, aside, section, article, nav, h1, h2, h3, h4, p, span, a, button, img, svg) {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        user-select: none;
+      }
+
+      :where(button) {
+        font: inherit;
+        color: inherit;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+      }
+
+      :where(img, svg) {
+        display: block;
+      }
+    }
+
+    /* ═══ 2. 暗金羊皮卷（古典契约风）设计变量 ═══ */
+    @layer tokens {
+      :root {
+        color-scheme: dark;
+        --in-oklab: ;
+        --in-oklch: ;
+
+        /* 字体族定义 */
+        --font-display: 'Cinzel', 'Songti SC', 'STSong', 'SimSun', serif;
+        --font-serif-cn: 'Songti SC', 'Noto Serif SC', 'STSong', 'SimSun', serif;
+        --font-sans: 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+        --font-title: var(--font-display);
+        --font-number: var(--font-display);
+
+        /* 方向 A：暗金羊皮卷（Editorial Occult / 古典契约档案馆）核心色板 */
+        --bg-canvas: #12100e;
+        --bg-surface: #191613;
+        --bg-elevated: #221d18;
+        --text-primary: #e6dfd3;
+        --text-secondary: #9e9382;
+        --text-dim: #665e52;
+        --accent-main: #c4a468;
+        --accent-strong: #dfc288;
+        --border-hairline: color-mix(in oklab, var(--accent-main) 28%, transparent);
+        --border-strong: color-mix(in oklab, var(--accent-main) 62%, transparent);
+        --radius-card: 2px;
+        --shadow-depth: 0 2px 4px rgba(0, 0, 0, 0.45), 0 12px 28px rgba(0, 0, 0, 0.68);
+
+        /* 语义功能色（低饱和度矿物色：朱砂、青金、古铜、玄铁、青玉、紫晶） */
+        --tone-hp: #a63429;
+        --tone-stamina: #4d7a8c;
+        --tone-atk: #c27832;
+        --tone-def: #6e7b85;
+        --tone-dod: #487d6b;
+        --tone-insight: #8c6f9e;
+
+        /* 兼容 main/ui.js 动态注入 HTML 所引用的变量名 */
+        --bg-base: var(--bg-canvas);
+        --panel-bg: var(--bg-surface);
+        --border: var(--border-hairline);
+        --text-main: var(--text-primary);
+        --text-muted: var(--text-secondary);
+        --color-hp: var(--tone-hp);
+        --color-stamina: var(--tone-stamina);
+        --color-atk: var(--tone-atk);
+        --color-def: var(--tone-def);
+        --color-dod: var(--tone-dod);
+        --color-insight: var(--tone-insight);
+        --timer-decision: var(--accent-strong);
+        --timer-insight: var(--tone-hp);
+
+        /* SVG 倒计时环兼容参数 */
+        --ring-r: 36;
+        --ring-circ: 226.2;
+      }
+
+      @supports (background: linear-gradient(in oklab, white, black)) {
+        :root {
+          --in-oklab: in oklab;
+          --in-oklch: in oklch;
+        }
+      }
+
+      /* 强制颜色模式（Windows 高对比度）无障碍回退 */
+      @media (forced-colors: active) {
+        :root {
+          --border-hairline: CanvasText;
+          --border-strong: Highlight;
+        }
+      }
+    }
+
+    /* ═══ 3. 战场整体骨架与背景图层 ═══ */
+    @layer layout {
+      body {
+        background-color: var(--bg-canvas);
+        color: var(--text-primary);
+        font-family: var(--font-sans);
+        line-height: 1.5;
+        min-block-size: 100dvh;
+        block-size: 100dvh;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        overflow: clip;
+        position: relative;
+        isolation: isolate;
+      }
+
+      /* 真实对局背景图层 + 暗角遮罩 */
+      .combat-backdrop {
+        position: fixed;
+        inset: 0;
+        background-image:
+          radial-gradient(circle at 50% 42%, transparent 20%, rgba(8, 8, 10, 0.88) 85%),
+          url('background/combat-bg.jpg');
+        background-size: cover;
+        background-position: center;
+        filter: saturate(0.78) contrast(1.05);
+        z-index: -1;
+        pointer-events: none;
+      }
+
+      /* 顶部对阵席位（P1 vs P2） */
+      .hud-top {
+        display: grid;
+        grid-template-columns: minmax(18rem, 25rem) 1fr minmax(18rem, 25rem);
+        align-items: start;
+        gap: 1.5rem;
+        padding-block: 1.35rem;
+        padding-inline: clamp(1.25rem, 3vw, 2.75rem);
+        position: relative;
+        z-index: 1500;
+        pointer-events: none;
+      }
+
+      body:not(.game-started) .hud-top {
+        z-index: 10;
+      }
+
+      /* 舞台中央：结算战报或装配期预览浮层 */
+      .battle-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding-inline: 1.5rem;
+        position: relative;
+      }
+
+      /* 底部战术指挥台：左侧辅助指令，中间三张主力行动牌，右侧联动配置面板 */
+      .combat-hud-bottom {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: end;
+        gap: 1.75rem;
+        padding-block: 1rem 1.6rem;
+        padding-inline: clamp(1.25rem, 3vw, 2.75rem);
+        background: linear-gradient(to top var(--in-oklab), rgba(8, 8, 10, 0.94) 18%, transparent);
+        position: relative;
+        z-index: 20;
+      }
+
+      /* 结算锁定（禁止交互） */
+      body.resolving .combat-hud-bottom,
+      body.resolving .hud-top {
+        pointer-events: none;
+        opacity: 0.65;
+      }
+    }
+
+    /* ═══ 4. 核心对局 HUD 组件 ═══ */
+    @layer components {
+      /* ─── 顶部席位铭牌（P1 / P2） ─── */
+      .fighter-plate {
+        background: color-mix(in oklab, var(--bg-surface) 92%, transparent);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-card);
+        box-shadow: var(--shadow-depth);
+        padding: 0.85rem 1.05rem;
+        display: grid;
+        grid-template-columns: 4.5rem 1fr;
+        gap: 0.95rem;
+        position: relative;
+        pointer-events: auto;
+      }
+
+      .fighter-plate.is-enemy {
+        grid-template-columns: 1fr 4.5rem;
+        text-align: end;
+      }
+
+      .portrait-box {
+        inline-size: 4.5rem;
+        block-size: 5.2rem;
+        border: 1px solid var(--border-strong);
+        position: relative;
+        overflow: clip;
+        background: #090807;
+      }
+
+      .portrait-box img {
+        inline-size: 100%;
+        block-size: 100%;
+        object-fit: cover;
+      }
+
+      /* 头像底部的刻度数字条（替代原左上角悬浮圆环） */
+      .portrait-timer {
+        position: absolute;
+        inset-inline: 0;
+        bottom: 0;
+        background: rgba(12, 10, 9, 0.88);
+        border-block-start: 1px solid var(--border-hairline);
+        font-family: var(--font-display);
+        font-size: 0.7rem;
+        text-align: center;
+        color: var(--accent-strong);
+        padding-block: 0.12rem;
+        line-height: 1.25;
+        z-index: 2;
+      }
+
+      /* 隐藏旧版 SVG 圆环图形，仅保留 DOM 节点供 ui.js 更新属性 */
+      .timer-ring-svg {
+        display: none;
+      }
+
+      .timer-center {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.15rem;
+      }
+
+      .timer-sec {
+        font-weight: 600;
+      }
+
+      .timer-sec::after {
+        content: 's · ';
+      }
+
+      .timer-phase-label {
+        font-family: var(--font-sans);
+        font-size: 0.68rem;
+      }
+
+      .timer-ready-overlay {
+        display: none;
+        color: var(--accent-strong);
+        font-family: var(--font-serif-cn);
+        font-weight: 600;
+        letter-spacing: 0.1em;
+      }
+
+      .portrait-timer.is-ready .timer-center {
+        display: none;
+      }
+
+      .portrait-timer.is-ready .timer-ready-overlay {
+        display: inline;
+      }
+
+      .portrait-timer:has(.ring-arc.insight-phase) {
+        color: var(--tone-hp);
+      }
+
+      .opponent-ring {
+        display: none;
+      }
+
+      /* 角色信息与资源行 */
+      .fighter-info {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 0.4rem;
+        min-inline-size: 0;
+      }
+
+      .fighter-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        border-block-end: 1px solid var(--border-hairline);
+        padding-block-end: 0.28rem;
+        gap: 0.5rem;
+      }
+
+      .fighter-plate.is-enemy .fighter-header {
+        flex-direction: row-reverse;
+      }
+
+      .fighter-name {
+        font-family: var(--font-title);
+        font-size: 1.05rem;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        color: var(--text-primary);
+      }
+
+      .fighter-role {
+        font-size: 0.72rem;
+        color: var(--text-secondary);
+      }
+
+      /* 敌方情报入口按钮（融合在敌方席位副标题处） */
+      .intel-trigger-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        font-size: 0.72rem;
+        color: var(--text-secondary);
+        padding: 0.1rem 0.4rem;
+        border: 1px solid var(--border-hairline);
+        background: var(--bg-canvas);
+        transition: color 0.2s, border-color 0.2s;
+      }
+
+      .intel-trigger-btn:hover {
+        color: var(--accent-strong);
+        border-color: var(--border-strong);
+      }
+
+      .intel-trigger-btn img {
+        inline-size: 0.8rem;
+        block-size: 0.8rem;
+        opacity: 0.85;
+      }
+
+      .resource-rows {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+
+      .res-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 0.78rem;
+      }
+
+      .fighter-plate.is-enemy .res-row {
+        flex-direction: row-reverse;
+      }
+
+      .res-label {
+        color: var(--text-secondary);
+        letter-spacing: 0.08em;
+      }
+
+      /* 实体刻印槽：命数用菱形赤印，精力用斜切方晶 */
+      .pip-track {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+      }
+
+      .hp-pip {
+        inline-size: 0.68rem;
+        block-size: 0.68rem;
+        transform: rotate(45deg);
+        border: 1px solid var(--tone-hp);
+        background: var(--tone-hp);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+        transition: background-color 0.2s, opacity 0.2s, box-shadow 0.2s;
+      }
+
+      .hp-pip.lost {
+        background: transparent;
+        box-shadow: none;
+        opacity: 0.42;
+      }
+
+      .stamina-pip {
+        inline-size: 0.95rem;
+        block-size: 0.48rem;
+        transform: skewX(-18deg);
+        border: 1px solid var(--tone-stamina);
+        background: var(--tone-stamina);
+        transition: background-color 0.2s, opacity 0.2s, border-color 0.2s;
+      }
+
+      .stamina-pip.spent {
+        background: transparent;
+        opacity: 0.38;
+      }
+
+      .stamina-pip.penalty {
+        background: #7f1d1d;
+        border-color: var(--tone-hp);
+        opacity: 0.85;
+      }
+
+      /* 先手调速器 */
+      .speed-stepper {
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid var(--border-hairline);
+        background: var(--bg-canvas);
+      }
+
+      .step-btn {
+        inline-size: 1.35rem;
+        block-size: 1.25rem;
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        display: grid;
+        place-items: center;
+        transition: color 0.15s, background-color 0.15s;
+      }
+
+      .step-btn:hover:not(:disabled) {
+        color: var(--text-primary);
+        background: var(--bg-elevated);
+      }
+
+      .step-btn:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
+
+      .step-val {
+        font-family: var(--font-display);
+        font-size: 0.85rem;
+        padding-inline: 0.55rem;
+        color: var(--accent-strong);
+        font-weight: 600;
+      }
+
+      /* 状态印记托盘 */
+      .status-strip {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.4rem;
+        min-block-size: 1.7rem;
+        padding-block-start: 0.42rem;
+        border-block-start: 1px dashed var(--border-hairline);
+      }
+
+      .fighter-plate.is-enemy .status-strip {
+        justify-content: flex-end;
+      }
+
+      .status-strip:empty::before {
+        content: '无附加状态';
+        font-size: 0.68rem;
+        color: var(--text-dim);
+        letter-spacing: 0.06em;
+      }
+
+      .status-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding-block: 0.12rem;
+        padding-inline: 0.45rem;
+        inline-size: auto;
+        block-size: auto;
+        background: var(--bg-canvas);
+        border: 1px solid var(--border-hairline);
+        font-size: 0.72rem;
+        color: var(--text-primary);
+        cursor: pointer;
+        transition: border-color 0.15s, transform 0.15s;
+      }
+
+      .status-tag:hover {
+        border-color: var(--border-strong);
+        transform: translateY(-1px);
+      }
+
+      .status-tag img {
+        inline-size: 0.85rem;
+        block-size: 0.85rem;
+        object-fit: contain;
+      }
+
+      .status-tag .layer-num {
+        color: var(--accent-main);
+        font-family: var(--font-display);
+        font-weight: 600;
+      }
+
+      .status-icon.flash-effect {
+        animation: flashShow 1s step-end forwards;
+      }
+
+      @keyframes flashShow {
+        0%, 99% { opacity: 1; }
+        100% { opacity: 0; }
+      }
+
+      .status-tooltip {
+        position: absolute;
+        inset-block-start: calc(100% + 0.4rem);
+        inset-inline-start: 0;
+        background: var(--bg-surface);
+        color: var(--text-primary);
+        border: 1px solid var(--border-strong);
+        padding: 0.5rem 0.7rem;
+        border-radius: var(--radius-card);
+        font-size: 0.72rem;
+        min-inline-size: 11rem;
+        max-inline-size: 15rem;
+        line-height: 1.55;
+        box-shadow: var(--shadow-depth);
+        z-index: 1800;
+        pointer-events: none;
+        display: none;
+        text-align: start;
+      }
+
+      .fighter-plate.is-enemy .status-tooltip {
+        inset-inline-start: auto;
+        inset-inline-end: 0;
+      }
+
+      .status-tooltip.show {
+        display: block;
+      }
+
+      /* ─── 中央回合铭牌 ─── */
+      .center-chronicle {
+        justify-self: center;
+        text-align: center;
+        background: color-mix(in oklab, var(--bg-surface) 90%, transparent);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-card);
+        box-shadow: var(--shadow-depth);
+        padding: 0.65rem 1.85rem;
+        position: relative;
+        pointer-events: auto;
+      }
+
+      .chronicle-phase {
+        font-size: 0.75rem;
+        letter-spacing: 0.22em;
+        color: var(--accent-main);
+        margin-block-end: 0.15rem;
+      }
+
+      .chronicle-turn {
+        font-family: var(--font-title);
+        font-size: 1.35rem;
+        letter-spacing: 0.12em;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .chronicle-log-trigger {
+        margin-block-start: 0.3rem;
+        font-size: 0.72rem;
+        color: var(--text-secondary);
+        letter-spacing: 0.1em;
+        border-block-end: 1px solid transparent;
+        transition: color 0.18s, border-color 0.18s;
+      }
+
+      body.game-started .chronicle-log-trigger {
+        z-index: 9999;
+        pointer-events: auto;
+      }
+
+      .chronicle-log-trigger:hover {
+        color: var(--text-primary);
+        border-block-end-color: var(--accent-main);
+      }
+
+      /* ─── 底部左侧：战术辅助指令区（蓄势 / 疗愈 / 洞察 / 就绪） ─── */
+      .tactical-dock {
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+        justify-self: start;
+      }
+
+      .dock-row {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .tactic-btn {
+        padding-block: 0.5rem;
+        padding-inline: 0.95rem;
+        background: var(--bg-surface);
+        border: 1px solid var(--border-hairline);
+        border-radius: var(--radius-card);
+        color: var(--text-primary);
+        font-size: 0.84rem;
+        letter-spacing: 0.08em;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        transition: border-color 0.2s, background-color 0.2s, opacity 0.2s;
+      }
+
+      .tactic-btn:hover:not(:disabled) {
+        border-color: var(--border-strong);
+        background: var(--bg-elevated);
+      }
+
+      .tactic-btn:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+
+      .tactic-btn .cost-hint {
+        font-size: 0.7rem;
+        color: var(--text-secondary);
+      }
+
+      .tactic-btn.is-commit {
+        background: var(--accent-main);
+        color: #12100e;
+        border-color: var(--accent-strong);
+        font-weight: 600;
+        padding-inline: 1.4rem;
+      }
+
+      .tactic-btn.is-commit:hover:not(:disabled) {
+        background: var(--accent-strong);
+      }
+
+      .tactic-btn.is-commit .cost-hint {
+        color: #2b241b;
+      }
+
+      /* 取消行动与重筹按钮显隐控制 */
+      .cancel-action-btn {
+        display: none;
+        border-color: color-mix(in oklab, var(--tone-hp) 55%, transparent);
+        color: #e08b83;
+      }
+
+      .cancel-action-btn.visible {
+        display: inline-flex;
+      }
+
+      .redecide-btn,
+      .decline-btn {
+        display: none;
+      }
+
+      .redecide-btn.show,
+      .decline-btn.show {
+        display: inline-flex;
+      }
+
+      .redecide-btn {
+        border-color: var(--tone-atk);
+        color: var(--accent-strong);
+      }
+
+      .waiting-label {
+        font-size: 0.75rem;
+        color: var(--accent-main);
+        letter-spacing: 0.08em;
+        display: none;
+        animation: pulse 1.6s infinite;
+      }
+
+      .waiting-label.show {
+        display: block;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 0.45; }
+        50% { opacity: 1; }
+      }
+
+      /* ─── 底部中央：三张主战行动牌（闪避 / 守备 / 攻击） ─── */
+      .action-deck {
+        display: flex;
+        gap: 1rem;
+        align-items: end;
+      }
+
+      .act-card {
+        inline-size: 8.5rem;
+        padding: 1rem 0.9rem;
+        background: var(--bg-surface);
+        border: 1px solid var(--border-hairline);
+        border-radius: var(--radius-card);
+        box-shadow: var(--shadow-depth);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.45rem;
+        position: relative;
+        transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s, background-color 0.2s, opacity 0.2s;
+      }
+
+      .act-card::before {
+        content: '';
+        position: absolute;
+        inset-inline: 0;
+        top: 0;
+        block-size: 3px;
+        background: var(--card-tone, var(--border-strong));
+        opacity: 0.65;
+      }
+
+      .act-card.dodge { --card-tone: var(--tone-dod); }
+      .act-card.guard { --card-tone: var(--tone-def); }
+      .act-card.attack { --card-tone: var(--tone-atk); }
+
+      @media (hover: hover) {
+        .act-card:hover:not(:disabled):not([disabled]):not(.selected) {
+          transform: translateY(-4px);
+          border-color: var(--border-strong);
+        }
+      }
+
+      .act-card.selected {
+        transform: translateY(-6px);
+        background: var(--bg-elevated);
+        border-color: var(--card-tone);
+      }
+
+      .act-card.selected::before {
+        opacity: 1;
+      }
+
+      .act-card:disabled,
+      .act-card[disabled] {
+        opacity: 0.4;
+        cursor: not-allowed;
+        transform: none;
+        filter: grayscale(0.8);
+        pointer-events: none;
+      }
+
+      .act-seal {
+        font-family: var(--font-serif-cn);
+        font-size: 0.72rem;
+        letter-spacing: 0.15em;
+        color: var(--text-secondary);
+      }
+
+      .act-name {
+        font-family: var(--font-title);
+        font-size: 1.25rem;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        color: var(--text-primary);
+      }
+
+      .act-pts-badge {
+        margin-block-start: 0.2rem;
+        padding-block: 0.15rem;
+        padding-inline: 0.65rem;
+        border: 1px solid var(--border-hairline);
+        background: var(--bg-canvas);
+        font-family: var(--font-display);
+        font-size: 0.82rem;
+        color: var(--accent-strong);
+      }
+
+      .act-pt {
+        font-weight: 600;
+      }
+
+      .act-sub {
+        font-size: 0.72rem;
+        color: var(--text-secondary);
+      }
+
+      /* ─── 底部右侧：行动强化与技能槽配置面板 ─── */
+      .config-drawer {
+        justify-self: end;
+        inline-size: 100%;
+        max-inline-size: 22rem;
+        background: color-mix(in oklab, var(--bg-surface) 94%, black);
+        border: 1px solid var(--border-hairline);
+        border-radius: var(--radius-card);
+        box-shadow: var(--shadow-depth);
+        padding: 0.85rem 1.05rem;
+        opacity: 0.55;
+        transition: opacity 0.2s, border-color 0.2s;
+      }
+
+      .config-drawer.show,
+      body:has(.act-card.selected) .config-drawer {
+        opacity: 1;
+        border-color: var(--border-strong);
+      }
+
+      .drawer-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-block-end: 0.42rem;
+        margin-block-end: 0.55rem;
+        border-block-end: 1px solid var(--border-hairline);
+        font-size: 0.8rem;
+      }
+
+      .drawer-title {
+        font-weight: 500;
+        letter-spacing: 0.06em;
+        color: var(--text-primary);
+      }
+
+      .drawer-meta {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--accent-main);
+        font-size: 0.74rem;
+      }
+
+      .config-close {
+        color: var(--text-secondary);
+        font-size: 0.78rem;
+        padding: 0.1rem 0.35rem;
+        border: 1px solid transparent;
+      }
+
+      .config-close:hover {
+        color: var(--text-primary);
+        border-color: var(--border-hairline);
+      }
+
+      /* 强化栏 */
+      .config-enhance-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        background: var(--bg-canvas);
+        border: 1px solid var(--border-hairline);
+        padding: 0.32rem 0.55rem;
+        margin-block-end: 0.6rem;
+        font-size: 0.76rem;
+      }
+
+      .config-enhance-row.disabled {
+        opacity: 0.35;
+        pointer-events: none;
+      }
+
+      .enhance-info {
+        color: var(--text-primary);
+        font-size: 0.78rem;
+      }
+
+      .slot-tier {
+        display: block;
+        font-size: 0.65rem;
+        color: var(--text-secondary);
+        margin-block-start: 0.1rem;
+      }
+
+      .enhance-btn {
+        inline-size: 1.45rem;
+        block-size: 1.3rem;
+        border: 1px solid var(--border-hairline);
+        background: var(--bg-surface);
+        color: var(--accent-strong);
+        display: grid;
+        place-items: center;
+        font-size: 0.85rem;
+      }
+
+      .enhance-btn:hover:not(:disabled) {
+        background: var(--bg-elevated);
+        border-color: var(--border-strong);
+      }
+
+      .enhance-btn:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
+
+      /* 技能槽列表（兼容 ui.js 动态渲染的 3 个 .effect-item） */
+      .config-drawer .effect-list {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.45rem;
+      }
+
+      .config-drawer .effect-item {
+        padding: 0.45rem 0.5rem;
+        background: var(--bg-canvas);
+        border: 1px solid var(--border-hairline);
+        border-radius: var(--radius-card);
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-block-size: 3.1rem;
+      }
+
+      .config-drawer .effect-item.selected {
+        border-color: var(--accent-main);
+        background: color-mix(in oklab, var(--accent-main) 10%, var(--bg-canvas));
+      }
+
+      .config-drawer .effect-item.incompatible {
+        opacity: 0.42;
+      }
+
+      .config-drawer .effect-item-name {
+        font-size: 0.76rem;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .config-drawer .effect-item.selected .effect-item-name {
+        color: var(--accent-strong);
+      }
+
+      .config-drawer .effect-item-desc {
+        font-size: 0.64rem;
+        color: var(--text-secondary);
+        line-height: 1.3;
+        margin-block-start: 0.15rem;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        line-clamp: 2;
+        overflow: clip;
+      }
+
+      .term-link {
+        color: var(--accent-strong);
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        cursor: pointer;
+      }
+    }
+
+    /* ═══ 5. 战报卷轴、装备面板、情报框与系统浮层 ═══ */
+    @layer overlays {
+      /* ─── 中央结算战报卷轴（对应预览中的 .clash-scroll） ─── */
+      .battle-log {
+        position: relative;
+        max-inline-size: 34rem;
+        inline-size: 100%;
+        background: color-mix(in oklab, var(--bg-surface) 96%, black);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-card);
+        box-shadow: var(--shadow-depth);
+        padding: 1.75rem 2.25rem;
+        text-align: center;
+        opacity: 0;
+        transform: translateY(12px);
+        transition: opacity 0.28s ease, transform 0.28s ease;
+        pointer-events: none;
+        z-index: 460;
+      }
+
+      .battle-log.show {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+      }
+
+      .battle-log.fade-out {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.8s ease;
+      }
+
+      .clash-kicker {
+        font-family: var(--font-display);
+        font-size: 0.72rem;
+        letter-spacing: 0.25em;
+        color: var(--text-secondary);
+        margin-block-end: 0.35rem;
+      }
+
+      .clash-name {
+        font-family: var(--font-serif-cn);
+        font-size: 2.1rem;
+        font-weight: 700;
+        letter-spacing: 0.22em;
+        color: var(--accent-strong);
+        margin-block-end: 0.8rem;
+      }
+
+      .log-detail {
+        font-size: 0.9rem;
+        color: var(--text-primary);
+        line-height: 1.75;
+        text-wrap: pretty;
+        padding-block: 0.85rem;
+        border-block: 1px solid var(--border-hairline);
+      }
+
+      .log-hint {
+        font-size: 0.74rem;
+        color: var(--text-secondary);
+        margin-block-start: 0.85rem;
+        letter-spacing: 0.08em;
+      }
+
+      .battle-log-close {
+        position: absolute;
+        inset-inline-end: 0.75rem;
+        inset-block-start: 0.75rem;
+        color: var(--text-secondary);
+        font-size: 0.95rem;
+        inline-size: 1.75rem;
+        block-size: 1.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid transparent;
+        cursor: pointer;
+      }
+
+      .battle-log-close:hover {
+        color: var(--text-primary);
+        border-color: var(--border-hairline);
+      }
+
+      /* ─── 洞察与阶段提示浮层 ─── */
+      .insight-notice {
+        position: absolute;
+        inset-block-start: 50%;
+        inset-inline-start: 50%;
+        transform: translate(-50%, -50%) scale(0.95);
+        background: color-mix(in oklab, var(--bg-surface) 95%, black);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-card);
+        box-shadow: var(--shadow-depth);
+        color: var(--accent-strong);
+        padding: 0.9rem 2rem;
+        font-size: 0.92rem;
+        letter-spacing: 0.08em;
+        text-align: center;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s, transform 0.3s;
+        z-index: 100;
+      }
+
+      .insight-notice.show {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+      }
+
+      .phase-banner-notice {
+        padding: 1.4rem 3rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .phase-banner-title {
+        font-family: var(--font-serif-cn);
+        font-size: 1.65rem;
+        letter-spacing: 0.35em;
+        color: var(--text-primary);
+        font-weight: 700;
+        text-indent: 0.35em;
+      }
+
+      .phase-banner-sub {
+        font-size: 0.78rem;
+        color: var(--text-secondary);
+      }
+
+      /* ─── 模式选择与重新开始面板 ─── */
+      .mode-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(8, 7, 6, 0.55);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+        z-index: 490;
+      }
+
+      .mode-overlay.show {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .phase-overlay {
+        position: fixed;
+        inset: 0;
+        background: transparent;
+        pointer-events: none;
+        z-index: 450;
+      }
+
+      .phase-overlay.active {
+        pointer-events: auto;
+      }
+
+      .mode-select-box {
+        position: fixed;
+        inset-block-start: 50%;
+        inset-inline-start: 50%;
+        transform: translate(-50%, -50%) scale(0.96);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease, transform 0.3s ease;
+        background: color-mix(in oklab, var(--bg-surface) 96%, black);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-card);
+        box-shadow: var(--shadow-depth);
+        padding: 2rem 2.75rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.15rem;
+        z-index: 500;
+      }
+
+      .mode-select-box.show {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+        pointer-events: auto;
+      }
+
+      .mode-select-title {
+        font-family: var(--font-serif-cn);
+        font-size: 1rem;
+        font-weight: 600;
+        letter-spacing: 0.25em;
+        color: var(--accent-main);
+        text-indent: 0.25em;
+      }
+
+      .mode-select-divider {
+        inline-size: 100%;
+        border-block-start: 1px solid var(--border-hairline);
+        padding-block-start: 1rem;
+        margin-block-start: 0.25rem;
+        text-align: center;
+      }
+
+      .mode-select-btns {
+        display: flex;
+        gap: 1rem;
+      }
+
+      .game-btn {
+        position: absolute;
+        inset-block-start: 50%;
+        inset-inline-start: 50%;
+        transform: translate(-50%, -50%) scale(0.95);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease, border-color 0.2s, background-color 0.2s;
+        background: var(--bg-elevated);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-card);
+        padding: 0.75rem 2.25rem;
+        color: var(--text-primary);
+        font-family: var(--font-serif-cn);
+        font-size: 1rem;
+        font-weight: 600;
+        letter-spacing: 0.2em;
+        text-indent: 0.2em;
+        box-shadow: var(--shadow-depth);
+        z-index: 500;
+        white-space: nowrap;
+      }
+
+      .game-btn:hover {
+        background: var(--accent-main);
+        color: #12100e;
+        border-color: var(--accent-strong);
+      }
+
+      .game-btn.show {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+        pointer-events: auto;
+      }
+
+      .mode-select-box .game-btn {
+        position: relative;
+        inset: auto;
+        transform: none;
+        opacity: 1;
+        pointer-events: none;
+      }
+
+      .mode-select-box.show .game-btn {
+        pointer-events: auto;
+      }
+
+      /* ─── 装配期覆盖面板 ─── */
+      .equip-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(8, 7, 6, 0.45);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1600;
+      }
+
+      .equip-overlay.active {
+        display: flex;
+      }
+
+      .equip-overlay-inner {
+        background: color-mix(in oklab, var(--bg-surface) 95%, black);
+        border: 1px solid var(--border-strong);
+        border-inline-start: 3px solid var(--accent-main);
+        border-radius: var(--radius-card);
+        padding: 2rem 2.75rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.5rem;
+        box-shadow: var(--shadow-depth);
+      }
+
+      .equip-header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        inline-size: 100%;
+      }
+
+      .equip-title {
+        font-family: var(--font-serif-cn);
+        font-size: 1.2rem;
+        letter-spacing: 0.2em;
+        color: var(--accent-strong);
+        font-weight: 600;
+      }
+
+      .equip-close {
+        position: absolute;
+        inset-inline-end: 0;
+        inset-block-start: 50%;
+        transform: translateY(-50%);
+        color: var(--text-secondary);
+        font-size: 0.95rem;
+        cursor: pointer;
+        inline-size: 1.75rem;
+        block-size: 1.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid transparent;
+      }
+
+      .equip-close:hover {
+        color: var(--text-primary);
+        border-color: var(--border-hairline);
+      }
+
+      .equip-slots-wrapper {
+        display: flex;
+        gap: 2rem;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      .equip-action-block {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.65rem;
+      }
+
+      .equip-action-label {
+        font-family: var(--font-serif-cn);
+        font-size: 0.88rem;
+        font-weight: 600;
+        letter-spacing: 0.15em;
+      }
+
+      .equip-slots {
+        display: flex;
+        gap: 0.55rem;
+      }
+
+      .equip-slot {
+        inline-size: 4.25rem;
+        block-size: 4.25rem;
+        border-radius: var(--radius-card);
+        border: 1px dashed var(--border-hairline);
+        background: var(--bg-canvas);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: border-color 0.2s, background-color 0.2s;
+        position: relative;
+        overflow: clip;
+      }
+
+      .equip-slot:hover {
+        border-color: var(--border-strong);
+        background: var(--bg-elevated);
+      }
+
+      .equip-slot .slot-add {
+        font-size: 1.35rem;
+        color: var(--text-secondary);
+      }
+
+      .equip-slot:hover .slot-add {
+        color: var(--accent-strong);
+      }
+
+      .equip-slot.filled {
+        border: 1px solid var(--border-strong);
+        background: var(--bg-elevated);
+      }
+
+      .equip-slot .slot-name {
+        font-size: 0.75rem;
+        color: var(--accent-strong);
+        text-align: center;
+        line-height: 1.25;
+        padding-inline: 0.25rem;
+      }
+
+      .equip-slot .slot-actions {
+        position: absolute;
+        inset-inline: 0;
+        bottom: 0;
+        block-size: 0;
+        overflow: clip;
+        display: flex;
+        transition: block-size 0.18s;
+      }
+
+      .equip-slot.filled:hover .slot-actions {
+        block-size: 1.35rem;
+      }
+
+      .slot-btn {
+        flex: 1;
+        font-size: 0.62rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .slot-change {
+        background: color-mix(in oklab, var(--accent-main) 28%, var(--bg-canvas));
+        color: var(--accent-strong);
+      }
+
+      .slot-swap {
+        background: color-mix(in oklab, var(--tone-stamina) 28%, var(--bg-canvas));
+        color: #9ec5d4;
+      }
+
+      .equip-slot.swapping {
+        border-color: var(--tone-stamina);
+        box-shadow: 0 0 0 2px color-mix(in oklab, var(--tone-stamina) 45%, transparent);
+      }
+
+      /* ─── 技能选择弹窗（effectPicker） ─── */
+      .picker-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        z-index: 1699;
+      }
+
+      .picker-backdrop.show {
+        display: block;
+      }
+
+      .effect-picker {
+        position: fixed;
+        inset-block-end: 1.5rem;
+        inset-inline-start: 50%;
+        transform: translateX(-50%);
+        inline-size: min(24rem, 92vw);
+        background: color-mix(in oklab, var(--bg-surface) 97%, black);
+        border: 1px solid var(--border-strong);
+        border-inline-start: 3px solid var(--accent-main);
+        border-radius: var(--radius-card);
+        padding: 1rem 1.15rem;
+        display: none;
+        z-index: 1700;
+        box-shadow: var(--shadow-depth);
+      }
+
+      .effect-picker.show {
+        display: block;
+      }
+
+      .effect-picker-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-block-end: 0.75rem;
+        padding-block-end: 0.45rem;
+        border-block-end: 1px solid var(--border-hairline);
+      }
+
+      .effect-picker-title {
+        font-family: var(--font-serif-cn);
+        font-size: 0.85rem;
+        color: var(--accent-main);
+        letter-spacing: 0.1em;
+        margin-inline-end: 0.75rem;
+      }
+
+      .effect-picker-compact-btn {
+        border: 1px solid var(--border-hairline);
+        color: var(--text-secondary);
+        padding: 0.1rem 0.45rem;
+        font-size: 0.72rem;
+        margin-inline-end: auto;
+      }
+
+      .effect-picker-compact-btn.active {
+        background: var(--accent-main);
+        color: #12100e;
+        border-color: var(--accent-strong);
+      }
+
+      .effect-picker-close {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+        padding: 0.1rem 0.35rem;
+      }
+
+      .effect-picker-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+        max-block-size: 17.5rem;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+      }
+
+      .effect-picker-list.compact {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.4rem;
+      }
+
+      .effect-picker-list.compact .effect-item {
+        padding: 0.5rem 0.25rem;
+        justify-content: center;
+        text-align: center;
+      }
+
+      .effect-picker-list.compact .effect-item-desc {
+        display: none;
+      }
+
+      .effect-picker-list .effect-item {
+        padding: 0.6rem 0.8rem;
+        border-radius: var(--radius-card);
+        border: 1px solid var(--border-hairline);
+        background: var(--bg-canvas);
+        cursor: pointer;
+        transition: border-color 0.15s, background-color 0.15s;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .effect-picker-list .effect-item:hover {
+        border-color: var(--border-strong);
+        background: var(--bg-elevated);
+      }
+
+      .effect-picker-list .effect-item-name {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .effect-picker-list .effect-item-desc {
+        font-size: 0.7rem;
+        color: var(--text-secondary);
+        margin-block-start: 0.15rem;
+      }
+
+      /* ─── 敌方情报浮窗与战事录弹窗 ─── */
+      .intel-box {
+        position: fixed;
+        inset-block-start: 10.5rem;
+        inset-inline-end: clamp(1.25rem, 3vw, 2.75rem);
+        inline-size: 14rem;
+        background: color-mix(in oklab, var(--bg-surface) 95%, black);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-card);
+        padding: 0.75rem 0.95rem;
+        box-shadow: var(--shadow-depth);
+        z-index: 1550;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s;
+      }
+
+      .intel-box.show {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .intel-box.fade-out {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.8s ease;
+      }
+
+      .intel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-block-end: 0.5rem;
+        padding-block-end: 0.35rem;
+        border-block-end: 1px solid var(--border-hairline);
+      }
+
+      .intel-title {
+        font-size: 0.74rem;
+        color: var(--accent-main);
+        letter-spacing: 0.08em;
+      }
+
+      .intel-close {
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+        padding: 0.1rem 0.3rem;
+      }
+
+      .intel-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+      }
+
+      .intel-empty {
+        font-size: 0.72rem;
+        color: var(--text-dim);
+      }
+
+      .intel-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+
+      .intel-group-title {
+        font-size: 0.68rem;
+        color: var(--text-secondary);
+        border-inline-start: 2px solid var(--accent-main);
+        padding-inline-start: 0.35rem;
+        line-height: 1;
+      }
+
+      .intel-group-tags {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+      }
+
+      .intel-tag {
+        font-size: 0.74rem;
+        padding: 0.35rem 0.55rem;
+        background: var(--bg-canvas);
+        border: 1px solid var(--border-hairline);
+        color: var(--text-primary);
+        line-height: 1.4;
+      }
+
+      .intel-tag strong {
+        color: var(--accent-strong);
+        margin-inline-end: 0.25rem;
+      }
+
+      .intel-tag span {
+        font-size: 0.68rem;
+        color: var(--text-secondary);
+      }
+
+      /* 战事录历史弹窗 */
+      .history-modal {
+        position: fixed;
+        inset-block-start: 50%;
+        inset-inline-start: 50%;
+        transform: translate(-50%, -46%);
+        background: color-mix(in oklab, var(--bg-surface) 97%, black);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-card);
+        box-shadow: var(--shadow-depth);
+        inline-size: min(32rem, 92vw);
+        max-block-size: 75dvh;
+        padding: 1.35rem 1.5rem;
+        z-index: 2000;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s, transform 0.25s;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .history-modal.show {
+        opacity: 1;
+        transform: translate(-50%, -50%);
+        pointer-events: auto;
+      }
+
+      .history-modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-block-end: 0.9rem;
+        padding-block-end: 0.65rem;
+        border-block-end: 1px solid var(--border-hairline);
+        font-family: var(--font-serif-cn);
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--accent-strong);
+        letter-spacing: 0.1em;
+      }
+
+      .history-close {
+        cursor: pointer;
+        color: var(--text-secondary);
+        padding: 0.15rem 0.4rem;
+      }
+
+      .history-list {
+        flex: 1;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding-inline-end: 0.4rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+        text-align: start;
+      }
+
+      .history-item {
+        background: var(--bg-canvas);
+        border: 1px solid var(--border-hairline);
+        border-radius: var(--radius-card);
+        padding: 0.7rem 0.85rem;
+        font-size: 0.82rem;
+        line-height: 1.55;
+      }
+
+      /* ─── 右上角音频与暂停控制 ─── */
+      #bgmToggle {
+        position: fixed;
+        inset-block-start: 0.75rem;
+        inset-inline-end: 0.85rem;
+        inline-size: 1.35rem;
+        block-size: 1.35rem;
+        z-index: 9999;
+        cursor: pointer;
+        opacity: 0.75;
+        transition: opacity 0.25s, transform 0.25s;
+      }
+
+      #bgmToggle:hover {
+        opacity: 1;
+        transform: scale(1.08);
+      }
+
+      #bgmToggle.playing {
+        animation: spin 4s linear infinite;
+      }
+
+      @keyframes spin {
+        100% { transform: rotate(360deg); }
+      }
+
+      #globalPauseBtn {
+        position: fixed;
+        inset-block-start: 0.6rem;
+        inset-inline-end: 2.65rem;
+        z-index: 9999;
+        inline-size: 1.7rem;
+        block-size: 1.7rem;
+        display: grid;
+        place-items: center;
+        font-size: 0.82rem;
+        color: var(--text-secondary);
+        background: var(--bg-surface);
+        border: 1px solid var(--border-hairline);
+        border-radius: var(--radius-card);
+        cursor: pointer;
+        transition: color 0.2s, border-color 0.2s;
+      }
+
+      #globalPauseBtn:hover {
+        color: var(--text-primary);
+        border-color: var(--border-strong);
+      }
+
+      #pauseOverlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(8, 7, 6, 0.65);
+        z-index: 9998;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+      }
+
+      #pauseOverlay.active {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      #pauseOverlay .pause-text {
+        color: var(--accent-strong);
+        font-family: var(--font-serif-cn);
+        font-size: 2.5rem;
+        font-weight: 700;
+        letter-spacing: 0.35em;
+        text-indent: 0.35em;
+      }
+    }
+  </style>
+  <link href="mobile-sq-du.css" rel="stylesheet">
+</head>
+
+<body>
+  <!-- 战场暗角背景图层 -->
+  <div class="combat-backdrop" aria-hidden="true"></div>
+
+  <!-- ═══ 顶部：双方席位铭牌 + 中央回合纪年 ═══ -->
+  <header class="hud-top combat-hud-top">
+
+    <!-- P1 我方席位铭牌 -->
+    <div class="status-card status-player fighter-plate" id="p1Card">
+      <div class="portrait-box" id="p1Avatar">
+        <img src="avatar/girl.jpg" alt="少女">
+        <!-- 头像底部嵌入式倒计时条（保留 p1RingWrap / p1Arc 供 ui.js 驱动） -->
+        <div class="timer-ring-wrap portrait-timer" id="p1RingWrap">
+          <svg class="timer-ring-svg" viewBox="0 0 84 84" aria-hidden="true">
+            <circle class="ring-bg" cx="42" cy="42" r="36" />
+            <circle class="ring-arc" id="p1Arc" cx="42" cy="42" r="36" />
+          </svg>
+          <div class="timer-center">
+            <span class="timer-sec" id="p1Sec">30</span>
+            <span class="timer-phase-label" id="p1Phase">决策期</span>
+          </div>
+          <div class="timer-ready-overlay">就绪</div>
+        </div>
+      </div>
+
+      <div class="fighter-info stats-col">
+        <div class="fighter-header">
+          <span class="fighter-name">少女</span>
+          <span class="fighter-role">我方席位 · 闪避特化</span>
+        </div>
+        <div class="resource-rows">
+          <div class="res-row stat-row">
+            <span class="res-label stat-label">命数</span>
+            <div class="pip-track stat-value-group">
+              <div class="hp-pip pip-diamond" id="p1-hp-1"></div>
+              <div class="hp-pip pip-diamond" id="p1-hp-2"></div>
+              <div class="hp-pip pip-diamond" id="p1-hp-3"></div>
+            </div>
+          </div>
+          <div class="res-row stat-row">
+            <span class="res-label stat-label">精力</span>
+            <div class="pip-track stat-value-group">
+              <div class="stamina-pip pip-shard" id="p1-stam-3"></div>
+              <div class="stamina-pip pip-shard" id="p1-stam-2"></div>
+              <div class="stamina-pip pip-shard" id="p1-stam-1"></div>
+            </div>
+          </div>
+          <div class="res-row stat-row speed-row">
+            <span class="res-label stat-label">先手</span>
+            <div class="speed-stepper stat-value-group">
+              <button type="button" class="speed-btn step-btn" id="p1SpeedDown" title="降低先手">−</button>
+              <span class="speed-val step-val" id="p1SpeedVal">1</span>
+              <button type="button" class="speed-btn step-btn" id="p1SpeedUp" title="提升先手">+</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 状态印记栏 -->
+      <div class="status-strip status-icon-tray" id="p1-status"></div>
+      <div class="status-tooltip" id="p1StatusTooltip"></div>
+    </div>
+
+    <!-- 中央回合纪年与战事录入口 -->
+    <div class="hud-center center-chronicle">
+      <div class="phase-indicator chronicle-phase" id="phaseIndicator">回合开始期</div>
+      <div class="turn-indicator chronicle-turn" id="turnIndicator">第 壹 回合</div>
+      <button type="button" class="history-btn chronicle-log-trigger" id="historyBtn" title="查阅本局战事录">查阅本局战事录</button>
+    </div>
+
+    <!-- P2 敌方席位铭牌 -->
+    <div class="status-card status-enemy fighter-plate is-enemy" id="p2Card">
+      <div class="fighter-info stats-col">
+        <div class="fighter-header">
+          <span class="fighter-name">马厄斯</span>
+          <button type="button" class="intel-trigger-btn" id="p2IntelBtn" title="查看已获敌方情报">
+            <img src="/ui-all/information.svg" alt="">
+            <span>敌方席位 · 情报</span>
+          </button>
+        </div>
+        <div class="resource-rows">
+          <div class="res-row stat-row">
+            <span class="res-label stat-label">命数</span>
+            <div class="pip-track stat-value-group">
+              <div class="hp-pip pip-diamond" id="p2-hp-1"></div>
+              <div class="hp-pip pip-diamond" id="p2-hp-2"></div>
+              <div class="hp-pip pip-diamond" id="p2-hp-3"></div>
+            </div>
+          </div>
+          <div class="res-row stat-row">
+            <span class="res-label stat-label">精力</span>
+            <div class="pip-track stat-value-group">
+              <div class="stamina-pip pip-shard" id="p2-stam-3"></div>
+              <div class="stamina-pip pip-shard" id="p2-stam-2"></div>
+              <div class="stamina-pip pip-shard" id="p2-stam-1"></div>
+            </div>
+          </div>
+          <div class="res-row stat-row speed-row">
+            <span class="res-label stat-label">先手</span>
+            <span class="speed-val step-val" id="p2SpeedVal">1</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="portrait-box" id="p2Avatar">
+        <img src="avatar/man.jpg" alt="马厄斯">
+        <div class="portrait-timer">对手席位</div>
+      </div>
+
+      <!-- 状态印记栏 -->
+      <div class="status-strip status-icon-tray" id="p2-status"></div>
+      <div class="status-tooltip" id="p2StatusTooltip"></div>
+
+      <!-- 对手倒计时环（完全隐藏，仅供 ui.js 引用） -->
+      <div class="timer-ring-wrap opponent-ring" id="p2RingWrap" aria-hidden="true">
+        <svg class="timer-ring-svg" viewBox="0 0 84 84">
+          <circle class="ring-bg" cx="42" cy="42" r="36" />
+          <circle class="ring-arc" id="p2Arc" cx="42" cy="42" r="36" />
+        </svg>
+        <div class="timer-center">
+          <span class="timer-sec" id="p2Sec"></span>
+          <span class="timer-phase-label" id="p2Phase"></span>
+        </div>
+        <div class="timer-ready-overlay"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══ 敌方情报浮窗（位于 P2 席位下方）═══ -->
+  <div class="intel-box" id="intelBox">
+    <div class="intel-header">
+      <div class="intel-title">已获取敌方情报</div>
+      <button type="button" class="intel-close" id="intelClose">✕</button>
+    </div>
+    <div class="intel-list" id="intelList">
+      <span class="intel-empty">尚未获取任何情报</span>
+    </div>
+  </div>
+
+  <!-- ═══ 舞台中央（战报卷轴 / 阶段通知 / 装配面板） ═══ -->
+  <main class="battle-area stage-centerpiece">
+    <!-- 洞察提示 -->
+    <div class="insight-notice" id="insightNotice"></div>
+
+    <!-- 行动期提示 -->
+    <div class="insight-notice" id="actionNotice">双方行动中… 3s</div>
+
+    <!-- 回合开始提示 -->
+    <div class="insight-notice phase-banner-notice" id="roundStartNotice">
+      <div class="phase-banner-title">回合开始</div>
+      <div class="phase-banner-sub" id="roundStartCountdownHint">1s 后自动关闭</div>
+    </div>
+
+    <!-- 回合结束提示 -->
+    <div class="insight-notice phase-banner-notice" id="turnEndNotice">
+      <div class="phase-banner-title">回合结束</div>
+      <div class="phase-banner-sub" id="turnEndCountdownHint">1s 后自动关闭</div>
+    </div>
+
+    <!-- 结算战报卷轴 -->
+    <article class="battle-log clash-scroll" id="battleLog">
+      <div class="battle-log-close" id="battleLogClose" style="display:none;">✕</div>
+      <div class="clash-kicker">ROUND RESOLUTION</div>
+      <h2 class="clash-name" id="clashName"></h2>
+      <div class="log-detail" id="logDetail"></div>
+      <div class="log-hint" id="battleLogHint">点击关闭，开始下一回合</div>
+    </article>
+
+    <!-- 阶段遮罩：在非交互阶段阻止底层点击 -->
+    <div id="phaseOverlay" class="phase-overlay"></div>
+
+    <!-- 重新开始按钮 -->
+    <button type="button" id="restartBtn" class="game-btn" onclick="location.reload()">重新开始</button>
+
+    <!-- 模式选择遮罩 -->
+    <div id="modeOverlay" class="mode-overlay"></div>
+
+    <!-- 模式选择面板 -->
+    <div id="modeSelectBox" class="mode-select-box">
+      <div class="mode-select-title">剧情模式（含技能装配）</div>
+      <div class="mode-select-btns">
+        <button type="button" id="modeTimedBtn" class="game-btn">计时博弈</button>
+        <button type="button" id="modeInstantBtn" class="game-btn">即时博弈</button>
+      </div>
+      <div class="mode-select-divider">
+        <div class="mode-select-title">普通模式（纯粹数值对弈）</div>
+      </div>
+      <div class="mode-select-btns">
+        <button type="button" id="modeNormalTimedBtn" class="game-btn">计时博弈</button>
+        <button type="button" id="modeNormalInstantBtn" class="game-btn">即时博弈</button>
+      </div>
+    </div>
+
+    <!-- ═══ 装配期覆盖面板 ═══ -->
+    <div class="equip-overlay" id="equipOverlay">
+      <div class="equip-overlay-inner">
+        <div class="equip-header">
+          <span class="equip-title" id="equipOverlayTitle">装配期</span>
+          <div class="equip-close" id="equipCloseBtn" style="display:none;">✕</div>
+        </div>
+        <div class="equip-slots-wrapper">
+          <!-- 攻击槽 -->
+          <div class="equip-action-block" data-action="attack">
+            <div class="equip-action-label" style="color: var(--tone-atk)">攻击</div>
+            <div class="equip-slots" id="equipSlots-attack">
+              <div class="equip-slot" data-action="attack" data-slot="0"><span class="slot-add">+</span></div>
+              <div class="equip-slot" data-action="attack" data-slot="1"><span class="slot-add">+</span></div>
+              <div class="equip-slot" data-action="attack" data-slot="2"><span class="slot-add">+</span></div>
+            </div>
+          </div>
+          <!-- 守备槽 -->
+          <div class="equip-action-block" data-action="guard">
+            <div class="equip-action-label" style="color: var(--tone-def)">守备</div>
+            <div class="equip-slots" id="equipSlots-guard">
+              <div class="equip-slot" data-action="guard" data-slot="0"><span class="slot-add">+</span></div>
+              <div class="equip-slot" data-action="guard" data-slot="1"><span class="slot-add">+</span></div>
+              <div class="equip-slot" data-action="guard" data-slot="2"><span class="slot-add">+</span></div>
+            </div>
+          </div>
+          <!-- 闪避槽 -->
+          <div class="equip-action-block" data-action="dodge">
+            <div class="equip-action-label" style="color: var(--tone-dod)">闪避</div>
+            <div class="equip-slots" id="equipSlots-dodge">
+              <div class="equip-slot" data-action="dodge" data-slot="0"><span class="slot-add">+</span></div>
+              <div class="equip-slot" data-action="dodge" data-slot="1"><span class="slot-add">+</span></div>
+              <div class="equip-slot" data-action="dodge" data-slot="2"><span class="slot-add">+</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="log-hint" id="equipCountdownHint">10s 后关闭</div>
+      </div>
+    </div>
+
+    <!-- 技能表模态遮罩 -->
+    <div class="picker-backdrop" id="pickerBackdrop"></div>
+    <!-- 效果库弹窗 -->
+    <div class="effect-picker" id="effectPicker">
+      <div class="effect-picker-header">
+        <span class="effect-picker-title">选择装配技能</span>
+        <button type="button" class="effect-picker-compact-btn" id="effectPickerCompactBtn" title="简化视图">简</button>
+        <button type="button" class="effect-picker-close" id="effectPickerClose">✕</button>
+      </div>
+      <div class="effect-picker-list" id="effectPickerList"></div>
+    </div>
+  </main>
+
+  <!-- ═══ 底部战术指挥台（左：战术动作 | 中：三张主战牌 | 右：强化与技能槽面板） ═══ -->
+  <footer class="combat-hud-bottom">
+    <!-- 左侧：蓄势 / 疗愈 / 主动洞察 / 确认就绪 -->
+    <div class="commit-area tactical-dock" id="commitArea">
+      <div class="dock-row">
+        <button type="button" class="commit-btn tactic-btn" id="standbyBtn" title="跳过回合恢复1点精力">
+          蓄势 <span class="cost-hint">回 1 精力</span>
+        </button>
+        <button type="button" class="commit-btn tactic-btn" id="healBtn" title="消耗1点精力恢复1点命数">
+          疗愈 <span class="cost-hint">耗 1 回 1 命</span>
+        </button>
+        <button type="button" class="redecide-btn tactic-btn" id="redecideBtn">重新决策</button>
+        <button type="button" class="decline-btn tactic-btn" id="declineRedecideBtn">放弃</button>
+      </div>
+      <div class="dock-row insight-row">
+        <button type="button" class="insight-btn tactic-btn" id="insightBtn">
+          <img src="../basic/effect/ui/eye.svg" alt="" style="width: 1em; height: 1em;">
+          主动洞察 <span class="cost-hint">耗 1 精力</span>
+        </button>
+        <button type="button" class="commit-btn tactic-btn is-commit" id="readyBtn">确认就绪</button>
+        <button type="button" class="cancel-action-btn tactic-btn" id="cancelActionBtn">✕ 取消行动</button>
+      </div>
+      <span class="waiting-label" id="waitingLabel">等待对方就绪…</span>
+    </div>
+
+    <!-- 中央：三张主战行动牌 -->
+    <div class="bottom-actions action-deck" role="group" aria-label="战斗行动选择">
+      <button type="button" class="act-btn act-card dodge" id="btn-dodge" data-act="dodge">
+        <span class="act-seal">身 法</span>
+        <span class="act-name">闪避</span>
+        <span class="act-pts-badge">点数 <span class="act-pt" id="pt-dodge">1</span></span>
+        <span class="act-sub">差合躲避</span>
+      </button>
+
+      <button type="button" class="act-btn act-card guard" id="btn-guard" data-act="guard">
+        <span class="act-seal">铁 壁</span>
+        <span class="act-name">守备</span>
+        <span class="act-pts-badge">点数 <span class="act-pt" id="pt-guard">1</span></span>
+        <span class="act-sub">正面格挡</span>
+      </button>
+
+      <button type="button" class="act-btn act-card attack" id="btn-attack" data-act="attack">
+        <span class="act-seal">破 阵</span>
+        <span class="act-name">攻击</span>
+        <span class="act-pts-badge">点数 <span class="act-pt" id="pt-attack">1</span></span>
+        <span class="act-sub">主动斩击</span>
+      </button>
+    </div>
+
+    <!-- 右侧：行动强化与技能槽联动面板 -->
+    <aside class="action-config-panel config-drawer" id="actionConfigPanel" aria-label="行动强化与技能配置">
+      <div class="config-header drawer-head">
+        <span class="config-title drawer-title" id="drawerActTitle">未选择行动（点击主战牌配置）</span>
+        <div class="drawer-meta">
+          <span>上限 <strong id="maxEffectSlots">1</strong> 槽</span>
+          <button type="button" class="config-close" id="configCloseBtn" title="收起面板">✕</button>
+        </div>
+      </div>
+
+      <!-- 强化栏 -->
+      <div class="config-enhance-row" id="enhanceRow">
+        <span class="enhance-info" id="enhanceInfo">点数强化（+0）</span>
+        <div class="speed-stepper">
+          <button type="button" class="step-btn" id="enhanceMinusBtn" aria-label="减少强化" disabled>−</button>
+          <span class="step-val" id="enhStepNum">0</span>
+          <button type="button" class="step-btn" id="enhancePlusBtn" aria-label="增加强化" disabled>+</button>
+        </div>
+      </div>
+
+      <!-- 效果槽位区（由 main/ui.js 动态更新） -->
+      <div class="effect-list" id="effectList">
+        <div class="effect-item">
+          <div class="effect-item-main">
+            <div class="effect-item-name" style="color:var(--text-secondary)">未装配</div>
+            <span class="slot-tier">壹号槽 · 空置</span>
+          </div>
+        </div>
+        <div class="effect-item incompatible">
+          <div class="effect-item-main">
+            <div class="effect-item-name" style="color:var(--text-secondary)">未激活</div>
+            <span class="slot-tier">需 2 点数</span>
+          </div>
+        </div>
+        <div class="effect-item incompatible">
+          <div class="effect-item-main">
+            <div class="effect-item-name" style="color:var(--text-secondary)">未激活</div>
+            <span class="slot-tier">需 3 点数</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </footer>
+
+  <!-- ═══ 战事录浮层 ═══ -->
+  <div class="history-modal" id="historyModal">
+    <div class="history-modal-header">
+      <div>本局战事录</div>
+      <div class="history-close" id="historyClose">✕</div>
+    </div>
+    <div class="history-list" id="historyList">
+      <div style="color:var(--text-secondary);font-size:0.85rem;text-align:center;padding:16px 0">
+        尚未发生任何交锋。
+      </div>
+    </div>
+  </div>
+
+  <!-- 暂停遮罩与全局控制按钮 -->
+  <div id="pauseOverlay">
+    <div class="pause-text">已暂停</div>
+  </div>
+  <button type="button" id="globalPauseBtn" title="暂停或继续">⏸︎</button>
+
+  <audio id="bgm" loop>
+    <source src="music/sq-du-maes.mp3" type="audio/mpeg">
+  </audio>
+  <img src="/ui-all/music.svg" id="bgmToggle" alt="背景音乐开关">
+
+  <!-- ═══ 交互逻辑（由 main/ui.js 负责） ═══ -->
+  <script type="module" src="./main/ui.js"></script>
+
+  <script>
+    const bgm = document.getElementById('bgm');
+    const bgmToggle = document.getElementById('bgmToggle');
+
+    // 初始化音量
+    bgm.volume = 0.5;
+
+    // 是否是从上一次打开页面遗留的暂停状态
+    let isRecoveredState = localStorage.getItem('bgm_state') === 'paused';
+
+    // 点击模式按钮时播放音乐
+    function tryPlayBGM() {
+      if (localStorage.getItem('bgm_state') === 'paused') {
+        return;
+      }
+      if (bgm.paused) {
+        bgm.play().then(() => {
+          bgmToggle.classList.add('playing');
+          localStorage.setItem('bgm_state', 'playing');
+        }).catch(() => { });
+      }
+    }
+
+    const modeTimedBtn = document.getElementById('modeTimedBtn');
+    const modeInstantBtn = document.getElementById('modeInstantBtn');
+    if (modeTimedBtn) modeTimedBtn.addEventListener('click', tryPlayBGM);
+    if (modeInstantBtn) modeInstantBtn.addEventListener('click', tryPlayBGM);
+
+    // 点击图标切换播放/暂停
+    bgmToggle.addEventListener('click', () => {
+      if (bgm.paused) {
+        if (isRecoveredState) {
+          bgm.currentTime = 0;
+          isRecoveredState = false;
+        }
+        bgm.play();
+        bgmToggle.classList.add('playing');
+        localStorage.setItem('bgm_state', 'playing');
+      } else {
+        bgm.pause();
+        bgmToggle.classList.remove('playing');
+        isRecoveredState = false;
+        localStorage.setItem('bgm_state', 'paused');
+      }
+    });
+  </script>
+</body>
+
+</html>

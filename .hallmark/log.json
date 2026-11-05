@@ -1,0 +1,55 @@
+[
+ {
+  "mode": "redesign",
+  "depth": "full",
+  "scope": "app",
+  "shape": "app screen",
+  "theme": "hum",
+  "genre": "playful",
+  "axes": "light/rounded-sans/chromatic-yellow",
+  "hero": "none (app screen)",
+  "nav": "top shelf bar with multi-genre filter pills",
+  "footer": "single rule bar",
+  "imagery": "featured game cartridge stage and shelf",
+  "photos": [],
+  "entry": "index.html, index-admin.html",
+  "fingerprint": "app-screen/hum/playbox-shelf",
+  "sections": [
+   "header",
+   "featured-stage",
+   "shelf-toolbar",
+   "module-grid",
+   "footer"
+  ],
+  "signature": "tactile card-stock game cartridge showcase and shelf",
+  "waived": [],
+  "prompt": "indie game collection lobby for puzzle, cozy, farming, strategy and combat games",
+  "date": "2026-11-05"
+ },
+ {
+  "mode": "redesign",
+  "depth": "full",
+  "scope": "app",
+  "shape": "app screen",
+  "theme": "kiln",
+  "genre": "atmospheric",
+  "axes": "dark/high-contrast-serif/warm",
+  "hero": "none (app screen)",
+  "nav": "top bar with inline gameType filter",
+  "footer": "single rule bar",
+  "imagery": "real module cover in warm low-light treatment",
+  "photos": [],
+  "entry": "index.html",
+  "fingerprint": "app-screen/kiln/ember/ledger-grid",
+  "sections": [
+   "header",
+   "toolbar",
+   "module-grid",
+   "footer"
+  ],
+  "signature": "module kiln ledger with heat-ramp status bars",
+  "waived": [],
+  "prompt": "experimental tactical game module launcher and archive index",
+  "date": "2026-11-05"
+ }
+]

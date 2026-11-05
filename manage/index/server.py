@@ -3,7 +3,7 @@
 MAERS-Game 本地开发服务器
 - 静态文件服务（根目录为 MAERS-Game/）
 - GET  /api/list-modules   →  读取 data/index/modules.json 返回模块列表
-- POST /api/create-module  →  创建新模块 HTML 文件 + 写入注册表
+- POST /api/create-module  →  创建新模块目录 games/<模块名>/ 与 HTML 入口文件 + 写入注册表
 """
 
 import http.server
@@ -19,6 +19,7 @@ from threading import Timer
 PORT      = 8765
 ROOT      = Path(__file__).parent.parent.parent.resolve()   # MAERS-Game/
 REGISTRY  = ROOT / 'data' / 'index' / 'modules.json'
+GAMES_DIR = ROOT / 'games'                                      # 各游戏的独立目录：games/<模块名>/
 OPEN_URL  = f"http://localhost:{PORT}/index-admin.html"
 
 # 新模块 HTML 模板
@@ -66,24 +67,50 @@ def registry_append(module: dict):
     raw.setdefault('modules', []).append(module)
     registry_write(raw)
 
-def safe_path(filename: str) -> Path:
+DEFAULT_GAME_TYPE = '未分类'
+
+def type_dir_name(game_type: str) -> str:
+    """游戏类型 → 类型目录名（games/<类型目录>/）。允许字母、数字、中文、连字符、下划线，其余替换为 '-'"""
+    name = re.sub(r'[^\w\u4e00-\u9fff\-]', '-', (game_type or '').strip() or DEFAULT_GAME_TYPE)
+    if not name.strip('-'):
+        raise ValueError(f'游戏类型无法转换为合法目录名: {game_type}')
+    return name
+
+def lookup_game_type(filename: str) -> str:
+    """从注册表读取模块的游戏类型"""
+    for m in registry_read():
+        if m.get('filename') == filename:
+            return m.get('gameType', '') or DEFAULT_GAME_TYPE
+    return DEFAULT_GAME_TYPE
+
+def safe_path(filename: str, game_type: str | None = None) -> Path:
     """
     验证 filename 是合法的单层文件名（无路径穿越）。
-    返回 ROOT / filename，若存在穿越则抛出 ValueError。
+    返回模块入口文件路径，若存在穿越则抛出 ValueError。
+    game_type 为 None 时从注册表查询。
     """
     # 拒绝任何包含路径分隔符或特殊前缀的名称
     if '/' in filename or '\\' in filename or filename.startswith('.'):
         raise ValueError(f'非法文件名: {filename}')
-    resolved = (ROOT / filename).resolve()
-    if ROOT.resolve() not in (resolved, *resolved.parents):
-        # resolved 不在 ROOT 子树内
+    resolved = (get_module_dir(filename, game_type) / filename).resolve()
+    if GAMES_DIR.resolve() not in resolved.parents:
+        # resolved 不在 games/ 子树内
         raise ValueError(f'路径穿越检测: {filename}')
     return resolved
 
-def get_module_dir(filename: str) -> Path:
-    """根据模块 filename（如 'sq-du.html'）返回模块目录（如 ROOT/'sq-du'）"""
-    dir_name = Path(filename).stem
-    return ROOT / dir_name
+def get_module_dir(filename: str, game_type: str | None = None) -> Path:
+    """
+    返回模块目录 games/<游戏类型>/<模块名>/（如 games/sq-du/sq-du-prototype）。
+    game_type 为 None 时从注册表查询。
+    """
+    if game_type is None:
+        game_type = lookup_game_type(filename)
+    return GAMES_DIR / type_dir_name(game_type) / Path(filename).stem
+
+def get_module_url(filename: str, game_type: str | None = None) -> str:
+    """返回模块入口页的访问 URL（如 '/games/sq-du/sq-du-prototype/sq-du-prototype.html'）"""
+    module_dir = get_module_dir(filename, game_type)
+    return '/' + (module_dir / filename).relative_to(ROOT).as_posix()
 
 def get_manuals_dir(filename: str) -> Path:
     """返回模块的 manuals 子目录"""
@@ -469,33 +496,47 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if idx is None:
                 return self._json_error(404, f'{filename} 不在注册表中')
 
-            new_filename = filename
+            # 注册表中的游戏类型为空时回落到默认类型
+            game_type = game_type or DEFAULT_GAME_TYPE
+            old_game_type = modules[idx].get('gameType', '') or DEFAULT_GAME_TYPE
 
-            # 重命名文件（可选）
+            new_filename = filename
             if do_rename:
                 safe = re.sub(r'[^\w\u4e00-\u9fff\-]', '-', new_name)
                 new_filename = f'{safe}.html'
-                if new_filename != filename:
-                    # 注册表层面重复检查（排除自身）
-                    if any(m['filename'] == new_filename for i2, m in enumerate(modules) if i2 != idx):
-                        return self._json_error(409, f'注册表中已存在模块 {new_filename}')
-                    try:
-                        src = safe_path(filename)
-                        dst = safe_path(new_filename) if new_filename != filename else None
-                    except ValueError as ve:
-                        return self._json_error(400, str(ve))
-                    if dst and dst.exists():
-                        return self._json_error(409, f'磁盘文件 {new_filename} 已存在')
-                    if src.exists() and dst:
-                        src.rename(dst)
 
-                    # 同步重命名 manuals 目录（在模块目录内）
-                    old_manuals = get_manuals_dir(filename)
-                    new_module_dir = get_module_dir(new_filename)
-                    if old_manuals.exists() and new_module_dir != get_module_dir(filename):
-                        new_manuals = new_module_dir / 'manuals'
-                        new_manuals.parent.mkdir(parents=True, exist_ok=True)
-                        old_manuals.rename(new_manuals)
+            # 文件名或游戏类型变化 → 整个模块目录迁移到 games/<新类型>/<新模块名>/
+            if new_filename != filename or game_type != old_game_type:
+                # 注册表层面重复检查（排除自身）
+                if new_filename != filename and any(
+                        m['filename'] == new_filename for i2, m in enumerate(modules) if i2 != idx):
+                    return self._json_error(409, f'注册表中已存在模块 {new_filename}')
+                try:
+                    dst = safe_path(new_filename, game_type)
+                    old_module_dir = get_module_dir(filename, old_game_type)
+                    new_module_dir = get_module_dir(new_filename, game_type)
+                except ValueError as ve:
+                    return self._json_error(400, str(ve))
+                if new_module_dir.exists():
+                    return self._json_error(409, f'模块目录 {new_module_dir.relative_to(ROOT).as_posix()} 已存在')
+
+                # 整个模块目录（代码、素材、说明书）一同迁移，再重命名入口文件
+                if old_module_dir.exists():
+                    new_module_dir.parent.mkdir(parents=True, exist_ok=True)
+                    old_module_dir.rename(new_module_dir)
+                    moved_src = new_module_dir / filename
+                    if moved_src.exists() and moved_src != dst:
+                        moved_src.rename(dst)
+                    # 类型目录被搬空时清理
+                    if not any(old_module_dir.parent.iterdir()):
+                        old_module_dir.parent.rmdir()
+
+                # 封面路径位于模块目录内，目录迁移后同步修正
+                old_rel = old_module_dir.relative_to(ROOT).as_posix()
+                new_rel = new_module_dir.relative_to(ROOT).as_posix()
+                cover = modules[idx].get('cover', '')
+                if cover.startswith(old_rel + '/'):
+                    modules[idx]['cover'] = new_rel + cover[len(old_rel):]
 
             # 更新注册表
             modules[idx].update({
@@ -503,7 +544,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 'name':        new_name,
                 'gameType':    game_type,
                 'description': description,
-                'url':         f'/{new_filename}',
+                'url':         get_module_url(new_filename, game_type),
             })
             raw['modules'] = modules
             registry_write(raw)
@@ -550,6 +591,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if manuals_dir.exists():
                 shutil.rmtree(manuals_dir)
 
+            # 模块目录已空则一并清理（含代码/素材的模块目录保留，避免误删游戏源码）
+            module_dir = get_module_dir(filename)
+            if module_dir.exists() and not any(module_dir.iterdir()):
+                module_dir.rmdir()
+
             raw['modules'] = modules
             registry_write(raw)
 
@@ -573,7 +619,6 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             game_type   = data.get('gameType', '').strip()
             description = data.get('description', '').strip()
             manual      = data.get('manual', '').strip()
-
             # ── 验证 ────────────────────────────
             if not name:
                 return self._json_error(400, "模块名称不能为空")
@@ -585,10 +630,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if not safe_name.strip('-'):
                 return self._json_error(400, '模块名称清洗后为空，请使用字母、数字或中文命名')
             filename  = f"{safe_name}.html"
+            game_type = game_type or DEFAULT_GAME_TYPE
 
             # 路径安全检查
             try:
-                target = safe_path(filename)
+                target = safe_path(filename, game_type)
             except ValueError as ve:
                 return self._json_error(400, str(ve))
 
@@ -601,16 +647,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if target.exists():
                 return self._json_error(409, f'磁盘文件 {filename} 已存在')
 
-            # ── 写 HTML 文件 ─────────────────────
+            # ── 创建模块目录并写入 HTML 入口文件 ──
+            module_dir = get_module_dir(filename, game_type)
+            module_dir.mkdir(parents=True, exist_ok=True)
             content = MODULE_TEMPLATE.format(
                 name=name,
-                game_type=game_type or '未分类',
+                game_type=game_type,
                 description=description or '暂无简介',
             )
             target.write_text(content, encoding='utf-8')
 
-            # ── 创建模块目录和 manuals 子目录 ────
-            module_dir = get_module_dir(filename)
+            # ── 创建 manuals 子目录 ──────────────
             manuals_dir = module_dir / 'manuals'
             manuals_dir.mkdir(parents=True, exist_ok=True)
 
@@ -626,16 +673,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             module = {
                 "filename":    filename,
                 "name":        name,
-                "gameType":    game_type or '未分类',
+                "gameType":    game_type,
                 "description": description or '暂无简介',
-                "url":         f"/{filename}",
+                "url":         get_module_url(filename, game_type),
                 "status":      "offline",
                 "cover":       ""
             }
             registry_append(module)
 
             print(f"[MAERS] 创建模块：{filename}（说明书：{safe_manual}）")
-            self._json_ok({"filename": filename, "url": f"/{filename}", "module": module})
+            self._json_ok({"filename": filename, "url": module["url"], "module": module})
 
         except json.JSONDecodeError:
             self._json_error(400, "无效的 JSON 数据")

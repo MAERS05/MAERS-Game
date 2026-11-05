@@ -1,0 +1,97 @@
+/* ═══ 独·神启 响应式与移动端布局适配 ═══ */
+
+@layer layout {
+  @media (max-width: 64rem) {
+    body {
+      block-size: auto;
+      min-block-size: 100dvh;
+      overflow-y: auto;
+      overflow-x: clip;
+    }
+
+    .hud-top,
+    .combat-hud-bottom {
+      grid-template-columns: 1fr;
+      justify-items: center;
+      gap: 0.9rem;
+      padding-block: 0.85rem;
+      padding-inline: 0.85rem;
+    }
+
+    .fighter-plate,
+    .tactical-dock,
+    .config-drawer {
+      justify-self: center;
+      inline-size: min(100%, 25rem);
+    }
+
+    .dock-row {
+      justify-content: center;
+    }
+  }
+}
+
+@layer components {
+  @media (max-width: 40rem) {
+    .fighter-plate {
+      padding: 0.65rem 0.8rem;
+      grid-template-columns: 3.6rem 1fr;
+      gap: 0.7rem;
+    }
+
+    .fighter-plate.is-enemy {
+      grid-template-columns: 1fr 3.6rem;
+    }
+
+    .portrait-box {
+      inline-size: 3.6rem;
+      block-size: 4.2rem;
+    }
+
+    .center-chronicle {
+      padding: 0.45rem 1.25rem;
+    }
+
+    .chronicle-turn {
+      font-size: 1.1rem;
+    }
+
+    .action-deck {
+      gap: 0.6rem;
+      inline-size: 100%;
+      justify-content: center;
+    }
+
+    .act-card {
+      inline-size: min(6.6rem, 30vw);
+      padding: 0.75rem 0.55rem;
+    }
+
+    .act-name {
+      font-size: 1.05rem;
+    }
+
+    .intel-box {
+      inset-block-start: 14rem;
+      inset-inline-end: auto;
+      inset-inline-start: 50%;
+      transform: translateX(-50%);
+      inline-size: min(18rem, 88vw);
+    }
+
+    .equip-overlay-inner {
+      padding: 1.25rem 1rem;
+      gap: 1rem;
+      inline-size: min(24rem, 94vw);
+    }
+
+    .equip-slots-wrapper {
+      gap: 1rem;
+    }
+
+    .equip-slot {
+      inline-size: 3.5rem;
+      block-size: 3.5rem;
+    }
+  }
+}
